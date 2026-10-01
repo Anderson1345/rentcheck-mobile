@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { StyleSheet, TextInput, View } from 'react-native';
 
 import {
   alturas,
@@ -24,6 +24,9 @@ interface Props {
   error?: string;
 }
 
+/** Ancho que se reserva al prefijo "$" a la izquierda del texto. */
+const ANCHO_PREFIJO = 16;
+
 /** Centavos → texto del campo sin el "$" ("1.850.000"). */
 function aTextoCampo(centavos: number | null): string {
   if (centavos === null) return '';
@@ -33,9 +36,11 @@ function aTextoCampo(centavos: number | null): string {
 /**
  * Campo de dinero: etiqueta flotante, prefijo "$" y teclado numérico. Solo admite pesos enteros
  * (el diseño no tiene centavos); el texto se convierte a centavos con utilidades/dinero.ts.
+ *
+ * Igual que CampoTexto, el TextInput ocupa siempre el mismo lugar y está visible: solo la
+ * etiqueta y el "$" (textos que no reciben toques) cambian al enfocar o escribir.
  */
 export function CampoDinero({ etiqueta, valorCentavos, onCambio, ayuda, error }: Props) {
-  const entrada = useRef<TextInput>(null);
   const [enfocado, setEnfocado] = useState(false);
   const texto = aTextoCampo(valorCentavos);
   const flotante = enfocado || texto !== '';
@@ -53,8 +58,7 @@ export function CampoDinero({ etiqueta, valorCentavos, onCambio, ayuda, error }:
 
   return (
     <View style={estilos.contenedor}>
-      <Pressable
-        onPress={() => entrada.current?.focus()}
+      <View
         style={[
           estilos.caja,
           flotante ? estilos.cajaLlena : estilos.cajaVacia,
@@ -62,31 +66,33 @@ export function CampoDinero({ etiqueta, valorCentavos, onCambio, ayuda, error }:
           error ? estilos.conError : null,
         ]}
       >
-        <Texto
-          variante={flotante ? 'etiqueta' : 'cuerpo'}
-          color={enfocado ? colores.tintaCapa : colores.textoSecundario}
-        >
-          {etiqueta}
-        </Texto>
-        <View style={[estilos.fila, !flotante && estilos.oculta]}>
-          <Texto variante="cuerpo" color={colores.textoSecundario}>
-            $
+        <TextInput
+          value={texto}
+          onChangeText={alEscribir}
+          onFocus={() => setEnfocado(true)}
+          onBlur={() => setEnfocado(false)}
+          keyboardType="number-pad"
+          inputMode="numeric"
+          accessibilityLabel={etiqueta}
+          cursorColor={colores.tintaCapa}
+          selectionColor={colores.lima}
+          style={[tipografia.valorGrande, cifras, estilos.entrada]}
+        />
+        <View pointerEvents="none" style={estilos.zonaTextos}>
+          <Texto
+            variante={flotante ? 'etiqueta' : 'cuerpo'}
+            color={enfocado ? colores.tintaCapa : colores.textoSecundario}
+            style={flotante ? estilos.etiquetaArriba : estilos.etiquetaCentro}
+          >
+            {etiqueta}
           </Texto>
-          <TextInput
-            ref={entrada}
-            value={texto}
-            onChangeText={alEscribir}
-            onFocus={() => setEnfocado(true)}
-            onBlur={() => setEnfocado(false)}
-            keyboardType="number-pad"
-            inputMode="numeric"
-            accessibilityLabel={etiqueta}
-            cursorColor={colores.tintaCapa}
-            selectionColor={colores.lima}
-            style={[tipografia.valorGrande, cifras, estilos.entrada]}
-          />
+          {flotante ? (
+            <Texto variante="cuerpo" color={colores.textoSecundario} style={estilos.prefijo}>
+              $
+            </Texto>
+          ) : null}
         </View>
-      </Pressable>
+      </View>
       {error ? (
         <Texto variante="secundario" color={colores.peligroTexto} style={estilos.ayuda}>
           {error}
@@ -102,24 +108,24 @@ export function CampoDinero({ etiqueta, valorCentavos, onCambio, ayuda, error }:
 
 const estilos = StyleSheet.create({
   contenedor: { gap: 6 },
-  caja: {
-    minHeight: alturas.campo,
-    borderRadius: radios.medio,
-    paddingHorizontal: espaciado.md,
-    justifyContent: 'center',
-  },
+  caja: { height: alturas.campo, borderRadius: radios.medio },
   cajaVacia: { backgroundColor: tintaAlfa(0.05) },
-  cajaLlena: {
-    backgroundColor: colores.superficie,
-    gap: 2,
-    paddingVertical: 8,
-    boxShadow: `0 0 0 1px ${tintaAlfa(0.12)}`,
-  },
+  cajaLlena: { backgroundColor: colores.superficie, boxShadow: `0 0 0 1px ${tintaAlfa(0.12)}` },
   enfocado: { boxShadow: sombras.campoEnfocado },
   conError: { boxShadow: `0 0 0 2px ${colores.peligroTexto}` },
-  fila: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-  // Se mantiene montado (no se desmonta) para poder enfocarlo al tocar la caja.
-  oculta: { position: 'absolute', opacity: 0, left: espaciado.md, right: espaciado.md },
-  entrada: { flex: 1, color: colores.texto, padding: 0, margin: 0 },
+  entrada: {
+    position: 'absolute',
+    left: espaciado.md + ANCHO_PREFIJO,
+    right: espaciado.md,
+    top: 24,
+    height: 36,
+    padding: 0,
+    margin: 0,
+    color: colores.texto,
+  },
+  zonaTextos: { ...StyleSheet.absoluteFill, paddingHorizontal: espaciado.md },
+  etiquetaCentro: { position: 'absolute', top: 19 },
+  etiquetaArriba: { position: 'absolute', top: 7 },
+  prefijo: { position: 'absolute', top: 31 },
   ayuda: { paddingLeft: 4 },
 });

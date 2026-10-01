@@ -1,4 +1,4 @@
-import { type RefObject, useRef, useState } from 'react';
+import { type RefObject, useState } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -47,9 +47,17 @@ interface Props extends Pick<
   style?: StyleProp<ViewStyle>;
 }
 
+/** Espacio a la derecha que reserva el botón "Mostrar" / "Ocultar". */
+const ANCHO_ALTERNAR = 92;
+
 /**
  * Campo de texto del sistema Medianoche: etiqueta flotante, mismo alto, radio y foco que
  * CampoDinero. No corrige ni recorta lo que escribe la persona (eso lo hace el esquema).
+ *
+ * El TextInput ocupa SIEMPRE el mismo lugar de la caja, visible: cualquier toque sobre el campo
+ * cae directamente en él. Solo la etiqueta (un texto que no recibe toques) se mueve al enfocar o
+ * escribir. Cambiar la disposición del TextInput al enfocarlo hacía que Android perdiera el foco
+ * y lo diera al primer campo del formulario.
  */
 export function CampoTexto({
   etiqueta,
@@ -63,22 +71,14 @@ export function CampoTexto({
   style,
   ...entrada
 }: Props) {
-  const propia = useRef<TextInput>(null);
-  const referencia = inputRef ?? propia;
   const [enfocado, setEnfocado] = useState(false);
   const [visible, setVisible] = useState(false);
   const flotante = enfocado || valor !== '';
   const oculto = contrasena && !visible;
 
-  function enfocar() {
-    referencia.current?.focus();
-  }
-
   return (
     <View style={[estilos.contenedor, style]}>
-      <Pressable
-        onPress={enfocar}
-        accessible={false}
+      <View
         style={[
           estilos.caja,
           flotante ? estilos.cajaLlena : estilos.cajaVacia,
@@ -86,46 +86,52 @@ export function CampoTexto({
           error ? estilos.conError : null,
         ]}
       >
-        <Texto
-          variante={flotante ? 'etiqueta' : 'cuerpo'}
-          color={enfocado ? colores.tintaCapa : colores.textoSecundario}
-        >
-          {etiqueta}
-        </Texto>
-        <View style={[estilos.fila, !flotante && estilos.oculta]}>
-          <TextInput
-            {...entrada}
-            ref={referencia}
-            value={valor}
-            onChangeText={onCambio}
-            onFocus={() => setEnfocado(true)}
-            onBlur={() => {
-              setEnfocado(false);
-              onBlur?.();
-            }}
-            secureTextEntry={oculto}
-            autoCorrect={false}
-            spellCheck={false}
-            accessibilityLabel={etiqueta}
-            cursorColor={colores.tintaCapa}
-            selectionColor={colores.lima}
-            style={[tipografia.valorGrande, contrasena ? null : cifras, estilos.entrada]}
-          />
-          {contrasena ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-              onPress={() => setVisible((actual) => !actual)}
-              hitSlop={8}
-              style={estilos.alternar}
-            >
-              <Texto variante="etiqueta" color={colores.tintaCapa}>
-                {visible ? 'Ocultar' : 'Mostrar'}
-              </Texto>
-            </Pressable>
-          ) : null}
+        <TextInput
+          {...entrada}
+          ref={inputRef}
+          value={valor}
+          onChangeText={onCambio}
+          onFocus={() => setEnfocado(true)}
+          onBlur={() => {
+            setEnfocado(false);
+            onBlur?.();
+          }}
+          secureTextEntry={oculto}
+          autoCorrect={false}
+          spellCheck={false}
+          accessibilityLabel={etiqueta}
+          cursorColor={colores.tintaCapa}
+          selectionColor={colores.lima}
+          style={[
+            tipografia.valorGrande,
+            contrasena ? null : cifras,
+            estilos.entrada,
+            contrasena && estilos.entradaConAlternar,
+          ]}
+        />
+        <View pointerEvents="none" style={estilos.zonaEtiqueta}>
+          <Texto
+            variante={flotante ? 'etiqueta' : 'cuerpo'}
+            color={enfocado ? colores.tintaCapa : colores.textoSecundario}
+            style={flotante ? estilos.etiquetaArriba : estilos.etiquetaCentro}
+          >
+            {etiqueta}
+          </Texto>
         </View>
-      </Pressable>
+        {contrasena ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+            onPress={() => setVisible((actual) => !actual)}
+            hitSlop={8}
+            style={estilos.alternar}
+          >
+            <Texto variante="etiqueta" color={colores.tintaCapa}>
+              {visible ? 'Ocultar' : 'Mostrar'}
+            </Texto>
+          </Pressable>
+        ) : null}
+      </View>
       {error ? (
         <Texto variante="secundario" color={colores.peligroTexto} style={estilos.ayuda}>
           {error}
@@ -141,25 +147,33 @@ export function CampoTexto({
 
 const estilos = StyleSheet.create({
   contenedor: { gap: 6 },
-  caja: {
-    minHeight: alturas.campo,
-    borderRadius: radios.medio,
-    paddingHorizontal: espaciado.md,
-    justifyContent: 'center',
-  },
+  caja: { height: alturas.campo, borderRadius: radios.medio },
   cajaVacia: { backgroundColor: tintaAlfa(0.05) },
-  cajaLlena: {
-    backgroundColor: colores.superficie,
-    gap: 2,
-    paddingVertical: 8,
-    boxShadow: `0 0 0 1px ${tintaAlfa(0.12)}`,
-  },
+  cajaLlena: { backgroundColor: colores.superficie, boxShadow: `0 0 0 1px ${tintaAlfa(0.12)}` },
   enfocado: { boxShadow: sombras.campoEnfocado },
   conError: { boxShadow: `0 0 0 2px ${colores.peligroTexto}` },
-  fila: { flexDirection: 'row', alignItems: 'center', gap: espaciado.xs },
-  // Se mantiene montado (no se desmonta) para poder enfocarlo al tocar la caja.
-  oculta: { position: 'absolute', opacity: 0, left: espaciado.md, right: espaciado.md },
-  entrada: { flex: 1, color: colores.texto, padding: 0, margin: 0 },
-  alternar: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
+  entrada: {
+    position: 'absolute',
+    left: espaciado.md,
+    right: espaciado.md,
+    top: 24,
+    height: 36,
+    padding: 0,
+    margin: 0,
+    color: colores.texto,
+  },
+  entradaConAlternar: { right: ANCHO_ALTERNAR },
+  zonaEtiqueta: { ...StyleSheet.absoluteFill, paddingHorizontal: espaciado.md },
+  etiquetaCentro: { position: 'absolute', top: 19 },
+  etiquetaArriba: { position: 'absolute', top: 7 },
+  alternar: {
+    position: 'absolute',
+    right: 4,
+    top: 10,
+    minWidth: 76,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   ayuda: { paddingLeft: 4 },
 });
