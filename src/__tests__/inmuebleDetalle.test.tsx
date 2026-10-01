@@ -143,6 +143,15 @@ describe('Detalle del inmueble', () => {
     });
   });
 
+  it('"Nuevo contrato" abre el asistente con el inmueble ya elegido', async () => {
+    const { raiz } = await renderizarPantalla(<Detalle />);
+    await pulsar(raiz, 'Nuevo contrato');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/contrato/nuevo',
+      params: { inmuebleId: 'i1' },
+    });
+  });
+
   it('tocar una unidad abre su edición', async () => {
     const { raiz } = await renderizarPantalla(<Detalle />);
     await pulsar(raiz, 'Apto 302');

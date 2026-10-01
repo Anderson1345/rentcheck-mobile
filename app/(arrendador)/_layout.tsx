@@ -14,6 +14,11 @@ export default function LayoutArrendador() {
       <Stack.Screen name="inmueble/[id]/unidad/nueva" options={{ title: 'Nueva unidad' }} />
       <Stack.Screen name="inmueble/[id]/unidad/[unidadId]" options={{ title: 'Editar unidad' }} />
       <Stack.Screen name="perfil" options={{ title: 'Mi perfil' }} />
+      <Stack.Screen name="contrato/nuevo" options={{ title: 'Nuevo contrato' }} />
+      <Stack.Screen
+        name="contrato/[id]/creado"
+        options={{ title: 'Contrato creado', headerBackVisible: false, gestureEnabled: false }}
+      />
     </Stack>
   );
 }

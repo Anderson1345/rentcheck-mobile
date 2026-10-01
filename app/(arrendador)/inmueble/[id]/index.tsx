@@ -218,6 +218,14 @@ export default function DetalleInmueble() {
         Unidades
       </Texto>
       <Boton
+        titulo="Nuevo contrato"
+        icono="contratos"
+        ancho="completo"
+        onPress={() =>
+          router.push({ pathname: '/contrato/nuevo', params: { inmuebleId: inmueble.id } })
+        }
+      />
+      <Boton
         titulo="Agregar unidad"
         icono="anadir"
         variante="secundario"

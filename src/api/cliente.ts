@@ -175,8 +175,18 @@ export interface ArchivoSubida {
   type: string;
 }
 
+/** Opciones por petición. `tiempo`: plazo propio en ms (p. ej. crear un contrato genera el PDF). */
+export interface OpcionesPeticion {
+  tiempo?: number;
+}
+
 export interface ClienteApi {
-  solicitar<T = unknown>(metodo: Metodo, ruta: string, cuerpo?: unknown): Promise<T>;
+  solicitar<T = unknown>(
+    metodo: Metodo,
+    ruta: string,
+    cuerpo?: unknown,
+    opciones?: OpcionesPeticion,
+  ): Promise<T>;
   /** POST multipart/form-data con un archivo en `campo` (más campos de texto opcionales). */
   subirArchivo<T = unknown>(
     ruta: string,
@@ -185,7 +195,7 @@ export interface ClienteApi {
     extras?: Record<string, string>,
   ): Promise<T>;
   get<T = unknown>(ruta: string): Promise<T>;
-  post<T = unknown>(ruta: string, cuerpo?: unknown): Promise<T>;
+  post<T = unknown>(ruta: string, cuerpo?: unknown, opciones?: OpcionesPeticion): Promise<T>;
   put<T = unknown>(ruta: string, cuerpo?: unknown): Promise<T>;
   patch<T = unknown>(ruta: string, cuerpo?: unknown): Promise<T>;
   delete<T = unknown>(ruta: string): Promise<T>;
@@ -293,14 +303,18 @@ export function crearClienteApi(opciones: OpcionesCliente = {}): ClienteApi {
     }
   }
 
-  function solicitar<T>(metodo: Metodo, ruta: string, cuerpo?: unknown): Promise<T> {
-    return ejecutar<T>(
-      metodo,
-      ruta,
-      cuerpo === undefined
+  function solicitar<T>(
+    metodo: Metodo,
+    ruta: string,
+    cuerpo?: unknown,
+    opciones?: OpcionesPeticion,
+  ): Promise<T> {
+    return ejecutar<T>(metodo, ruta, {
+      ...(cuerpo === undefined
         ? {}
-        : { cuerpo: JSON.stringify(cuerpo), tipoContenido: 'application/json' },
-    );
+        : { cuerpo: JSON.stringify(cuerpo), tipoContenido: 'application/json' }),
+      tiempo: opciones?.tiempo,
+    });
   }
 
   /**
@@ -370,7 +384,7 @@ export function crearClienteApi(opciones: OpcionesCliente = {}): ClienteApi {
     solicitar,
     subirArchivo,
     get: (ruta) => solicitar('GET', ruta),
-    post: (ruta, cuerpo) => solicitar('POST', ruta, cuerpo),
+    post: (ruta, cuerpo, opciones) => solicitar('POST', ruta, cuerpo, opciones),
     put: (ruta, cuerpo) => solicitar('PUT', ruta, cuerpo),
     patch: (ruta, cuerpo) => solicitar('PATCH', ruta, cuerpo),
     delete: (ruta) => solicitar('DELETE', ruta),
