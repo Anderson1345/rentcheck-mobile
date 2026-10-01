@@ -1,6 +1,6 @@
 # RentCheck — Plan de entregas de la app móvil (E1 a E12)
 
-**Versión 1.2 — 30/09/2026.** Documento de guía para las entregas de la Fase 1 (repositorio `rentcheck-mobile`).
+**Versión 1.3 — 01/10/2026.** Documento de guía para las entregas de la Fase 1 (repositorio `rentcheck-mobile`).
 
 ## 0. Para qué sirve y qué lugar ocupa
 
@@ -74,14 +74,23 @@ Cada ficha: objetivo · pantallas · reglas clave · referencias · prueba manua
 - **Referencias**: Contexto §5.3, §5.4, F2, §9.
 - **Prueba manual**: crear inmueble con foto tomada con la cámara; editar; crear unidad de cada tipo; intentar una foto inválida (renombrar un archivo) y ver el 415 bien explicado.
 
-### E4 — Asistente de nuevo arrendamiento
+### E4 — Asistente de nuevo arrendamiento (se hace en dos entregas: E4-A y E4-B)
+
+- **E4-A (asistente y creación)**: asistente de 6 pasos con barra de progreso, resumen y confirmación, creación del contrato y pantalla "Contrato creado" con el código y compartir. Cerrada.
+- **E4-B (inventario y código)**: fotos de inventario de entrega por zona, QR del código (solo el texto del código: el enlace `rentcheck://activar/...` no abre en Expo Go y llega con la development build de E10) y copiar código. Cerrada.
+- Lo siguiente es la ficha original de E4.
 
 - **Pantallas**: asistente por pasos de F3 con barra de progreso; resumen y confirmación; fotos de inventario de entrega; compartir código y QR.
-- **Reglas**: depósito solo si la plantilla no es vivienda; aviso si falta la cédula del arrendador antes de empezar; aviso si la unidad tiene liquidación pendiente; el PDF lo genera el servidor (la app no arma contratos); nuevo inquilino por documento: no mostrar datos de personas ya existentes; `Idempotency-Key` al confirmar para no duplicar por doble toque.
+- **Reglas**: depósito solo si la plantilla no es vivienda; aviso si falta la cédula del arrendador antes de empezar; aviso si la unidad tiene liquidación pendiente; el PDF lo genera el servidor (la app no arma contratos); nuevo inquilino por documento: no mostrar datos de personas ya existentes; **`POST /contratos` no acepta `Idempotency-Key` (B-60)**: al confirmar, el botón se bloquea y, si no hay respuesta, la app verifica leyendo `GET /contratos` antes de dejar reintentar; los contratos no se encolan sin conexión (E11).
 - **Referencias**: Contexto F3, §6; Plan B-16, B-55 (fecha fin pasada), B-48.
 - **Prueba manual**: crear contrato de vivienda y de local; doble toque en "Confirmar" (un solo contrato); compartir el código por WhatsApp.
 
-### E5 — Contratos (arrendador)
+### E5 — Contratos (arrendador) (se hace en tres entregas: E5-A, E5-B y E5-C)
+
+- **E5-A (lectura)**: pestaña Contratos con lista y filtros por estado (se filtra en la app: `GET /contratos` no tiene parámetros), detalle de solo lectura (datos, incrementos de IPC, avisos como información), documentos (ver y compartir PDF; se pide la lista fresca antes de cada descarga porque la URL firmada caduca), código de acceso (ver, compartir, regenerar) y acceso al inventario. Cerrada.
+- **E5-B (acciones y períodos)**: estado de cuenta por períodos (`GET /contratos/:id/estado-cuenta`), incremento (avisar al aplicarlo que un período futuro ya pagado por adelantado con el canon anterior queda debiendo la diferencia, límite de B0.3-A2), prórroga (ventana de 90 días previos al vencimiento), aviso de no renovación y su cancelación, y **cancelar un contrato programado** (`POST /contratos/:id/cancelar-programado`; no estaba en la ficha original).
+- **E5-C (terminación y correcciones)**: terminación anticipada (solicitar, confirmar la solicitud del inquilino, cancelar la propia) y corregir datos del contrato y del inquilino mientras no estén vinculados (`PATCH /contratos/:id` y `PATCH /contratos/:id/inquilino`; un cambio de cédula regenera el código).
+- Lo siguiente es la ficha original de E5.
 
 - **Pantallas**: lista con filtros por estado, detalle, períodos, documentos (ver y compartir PDF con `expo-sharing`), incremento, prórroga, no renovación, terminación, regenerar código, corregir datos del inquilino sin vincular.
 - **Reglas**: los topes de incremento los valida el servidor (la app muestra el tope que devuelva); cada acción legal con confirmación; documentos no disponibles (URL nula por `firmarTolerante`) se muestran como "Archivo no disponible", sin romper la pantalla; ZIP por flujo (F11) se descarga y comparte.

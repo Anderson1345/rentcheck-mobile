@@ -24,6 +24,45 @@ export interface ContratoResumen {
   codigo_acceso: { codigo: string; expira_en: string } | null;
 }
 
+export type TipoDocumentoContrato = 'CONTRATO_ORIGINAL' | 'OTROSI_INCREMENTO' | 'OTROSI_PRORROGA';
+export type RolContrato = 'ARRENDADOR' | 'INQUILINO';
+
+export interface IncrementoIpc {
+  id: string;
+  fecha_aplicacion: string;
+  canon_anterior_centavos: number;
+  canon_nuevo_centavos: number;
+  /** Decimal de Prisma: llega como texto. */
+  porcentaje_ipc_aplicado: string | number;
+}
+
+/** Resumen de solo lectura (resumenAvisoNoRenovacion del backend). */
+export interface ResumenAviso {
+  estado: 'NINGUNO' | 'DADO';
+  dado_por: RolContrato | null;
+  dado_en: string | null;
+  motivo: string | null;
+}
+
+/** Resumen de solo lectura (resumenTerminacion del backend). */
+export interface ResumenTerminacionContrato {
+  estado: 'NINGUNA' | 'SOLICITADA' | 'CONFIRMADA';
+  solicitada_por: RolContrato | null;
+  solicitada_en: string | null;
+  motivo: string | null;
+  fecha_efectiva: string | null;
+}
+
+/** GET /contratos/:id/documentos. `url_firmada` es temporal: nunca se guarda ni se registra. */
+export interface DocumentoContrato {
+  id: string;
+  tipo: TipoDocumentoContrato;
+  version: number;
+  generado_en: string;
+  hash_sha256: string | null;
+  url_firmada: string | null;
+}
+
 /** GET /contratos/:id y respuesta 201 de POST /contratos. El código de acceso es un dato sensible. */
 export interface ContratoDetalle {
   id: string;
@@ -33,9 +72,21 @@ export interface ContratoDetalle {
   canon_centavos: number;
   tipo_plantilla: TipoPlantilla;
   vinculado: boolean;
-  inquilino: { id: string; nombre: string; cedula?: string; telefono?: string };
+  dia_pago?: number;
+  deposito_centavos?: number | null;
+  inquilino: {
+    id: string;
+    nombre: string;
+    cedula?: string;
+    telefono?: string;
+    /** Solo si el servidor lo envía (la copia del contrato no lo trae hoy). */
+    correo?: string | null;
+  };
   unidad: { id: string; nombre: string; tipo: TipoUnidad };
   codigo_acceso: { codigo: string; expira_en: string } | null;
+  incrementos_ipc?: IncrementoIpc[];
+  aviso_no_renovacion?: ResumenAviso;
+  terminacion_anticipada?: ResumenTerminacionContrato;
 }
 
 /** GET /inquilinos: datos que escribió el arrendador. */
@@ -62,3 +113,12 @@ export const obtenerContrato = (id: string) =>
   api.get<ContratoDetalle>(`/contratos/${encodeURIComponent(id)}`);
 
 export const listarInquilinos = () => api.get<InquilinoFicha[]>('/inquilinos');
+
+export const listarDocumentos = (id: string) =>
+  api.get<DocumentoContrato[]>(`/contratos/${encodeURIComponent(id)}/documentos`);
+
+/** El código anterior deja de servir. 404 si el contrato es ajeno o no tiene código. */
+export const regenerarCodigo = (id: string) =>
+  api.post<{ codigo: string; expira_en: string }>(
+    `/contratos/${encodeURIComponent(id)}/regenerar-codigo`,
+  );

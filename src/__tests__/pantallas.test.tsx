@@ -33,6 +33,7 @@ import { fuentes } from '../tema';
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn(), dismissTo: jest.fn() }),
   useLocalSearchParams: () => ({ correo: 'marta@ejemplo.com' }),
+  useFocusEffect: () => undefined,
 }));
 jest.mock(
   'react-native-safe-area-context',
@@ -137,7 +138,7 @@ describe.each([
   ['Restablecer contraseña', () => <RestablecerContrasena />],
   ['Página no disponible', () => <NoEncontrada />],
   ['Panel provisional del arrendador', () => <PanelArrendador />, true],
-  ['Contratos del arrendador (próximamente)', () => <ContratosArrendador />, true],
+  ['Contratos del arrendador', () => <ContratosArrendador />, true],
   ['Pagos del arrendador (próximamente)', () => <PagosArrendador />, true],
   ['Más del arrendador', () => <MasArrendador />, true],
   ['Nuevo inmueble', () => <NuevoInmueble />, true],
