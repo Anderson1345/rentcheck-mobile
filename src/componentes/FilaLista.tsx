@@ -15,8 +15,10 @@ interface Props {
   valor?: ReactNode;
   /** Avatar de relieve de la persona (por nombre)… */
   avatar?: string;
-  /** …o un icono en mosaico. */
+  /** …o un icono en mosaico… */
   icono?: NombreIcono;
+  /** …o una miniatura de 56 dp (la foto de un inmueble). */
+  miniatura?: ReactNode;
   /** Chevron a la derecha cuando la fila abre un detalle. */
   conChevron?: boolean;
   /** Línea separadora arriba (a partir de la segunda fila de una lista). */
@@ -32,13 +34,16 @@ export function FilaLista({
   valor,
   avatar,
   icono,
+  miniatura,
   conChevron = false,
   separador = false,
   onPress,
 }: Props) {
   const contenido = (
     <>
-      {avatar ? (
+      {miniatura ? (
+        miniatura
+      ) : avatar ? (
         <AvatarRelieve nombre={avatar} tamano={40} />
       ) : icono ? (
         <View style={estilos.mosaico}>
@@ -73,7 +78,12 @@ export function FilaLista({
   return (
     <View>
       {separador ? (
-        <View style={[estilos.separador, { marginLeft: avatar || icono ? 74 : espaciado.md }]} />
+        <View
+          style={[
+            estilos.separador,
+            { marginLeft: miniatura ? 86 : avatar || icono ? 74 : espaciado.md },
+          ]}
+        />
       ) : null}
       {onPress ? (
         <Pressable

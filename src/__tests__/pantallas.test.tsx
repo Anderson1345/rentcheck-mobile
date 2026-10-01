@@ -7,7 +7,11 @@ import { StyleSheet, Text, TextInput, type TextStyle } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import NoEncontrada from '../../app/+not-found';
-import PanelArrendador from '../../app/(arrendador)/panel';
+import ContratosArrendador from '../../app/(arrendador)/(pestanas)/contratos-arrendador';
+import MasArrendador from '../../app/(arrendador)/(pestanas)/mas-arrendador';
+import PagosArrendador from '../../app/(arrendador)/(pestanas)/pagos-arrendador';
+import PanelArrendador from '../../app/(arrendador)/(pestanas)/panel';
+import NuevoInmueble from '../../app/(arrendador)/inmueble/nuevo';
 import ContratosInquilino from '../../app/(inquilino)/contratos';
 import Bienvenida from '../../app/(auth)/index';
 import Activar from '../../app/(auth)/activar';
@@ -133,6 +137,10 @@ describe.each([
   ['Restablecer contraseña', () => <RestablecerContrasena />],
   ['Página no disponible', () => <NoEncontrada />],
   ['Panel provisional del arrendador', () => <PanelArrendador />, true],
+  ['Contratos del arrendador (próximamente)', () => <ContratosArrendador />, true],
+  ['Pagos del arrendador (próximamente)', () => <PagosArrendador />, true],
+  ['Más del arrendador', () => <MasArrendador />, true],
+  ['Nuevo inmueble', () => <NuevoInmueble />, true],
   ['Contratos provisional del inquilino', () => <ContratosInquilino />, true],
 ])('%s', (_nombre, pantalla, conArrendador = false) => {
   it('renderiza; todo texto usa Manrope y respeta el tamaño mínimo', async () => {

@@ -136,6 +136,7 @@ const TITULOS_ESTADO: Record<TipoEstado, string> = {
   contrato: 'Contrato',
   vinculo: 'Vínculo',
   unidad: 'Unidad',
+  datos: 'Datos de la unidad',
   mantenimiento: 'Mantenimiento',
 };
 
@@ -202,7 +203,7 @@ export default function Galeria() {
   const [filtro, setFiltro] = useState<'validar' | 'vencidos' | 'historial'>('validar');
   const [monto, setMonto] = useState<number | null>(185_000_000);
   const [montoVacio, setMontoVacio] = useState<number | null>(null);
-  const [pestanaArrendador, setPestanaArrendador] = useState('pagos');
+  const [pestanaArrendador, setPestanaArrendador] = useState('pagos-arrendador');
   const [pestanaInquilino, setPestanaInquilino] = useState('mi-panel');
   const [cargando, setCargando] = useState(false);
 
@@ -688,7 +689,7 @@ export default function Galeria() {
                 pestanas={PESTANAS_ARRENDADOR}
                 activa={pestanaArrendador}
                 onSeleccionar={setPestanaArrendador}
-                insignias={{ pagos: 3, contratos: 12 }}
+                insignias={{ 'pagos-arrendador': 3, 'contratos-arrendador': 12 }}
               />
             </View>
             <Rotulo>Inquilino</Rotulo>

@@ -65,3 +65,16 @@ describe('FilaLista', () => {
     expect(margenSeparador(renderizar(<FilaLista titulo="A" separador />))).toBe(16);
   });
 });
+
+describe('FilaLista con miniatura (inmuebles)', () => {
+  it('muestra la miniatura en lugar del avatar o el icono', () => {
+    const raiz = renderizar(<FilaLista titulo="Calle 45" miniatura={<Text>foto</Text>} />);
+    expect(raiz.root.findAllByType(Text).some((t) => t.props.children === 'foto')).toBe(true);
+  });
+
+  it('el separador deja pasar la miniatura de 56 dp (margen 86)', () => {
+    expect(
+      margenSeparador(renderizar(<FilaLista titulo="A" separador miniatura={<Text>foto</Text>} />)),
+    ).toBe(86);
+  });
+});

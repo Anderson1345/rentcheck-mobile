@@ -26,7 +26,10 @@ export async function renderizarPantalla(
   await controlador.arrancar();
   // gcTime infinito: sin el temporizador de limpieza de 5 min que dejaría vivo a Jest.
   const cliente = new QueryClient({
-    defaultOptions: { queries: { gcTime: Infinity, retry: false } },
+    defaultOptions: {
+      queries: { gcTime: Infinity, retry: false },
+      mutations: { gcTime: Infinity },
+    },
   });
   let raiz!: ReactTestRenderer;
   await act(async () => {

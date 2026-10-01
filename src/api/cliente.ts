@@ -4,6 +4,8 @@
 /** Render gratis duerme: la primera petición (o la que sigue a un largo silencio) puede tardar ~60 s. */
 export const TIMEOUT_PRIMERA_PETICION_MS = 60_000;
 export const TIMEOUT_PETICION_MS = 20_000;
+/** Subir un archivo (foto) por una red móvil lenta puede tardar: 60 s, haya o no despertado el servidor. */
+export const TIMEOUT_SUBIDA_MS = 60_000;
 /** Render duerme el servicio tras 15 min sin tráfico; con más de 10 min sin respuesta se asume dormido. */
 export const INACTIVIDAD_SERVIDOR_DORMIDO_MS = 10 * 60_000;
 
@@ -80,8 +82,22 @@ export interface OpcionesCliente {
 
 type Metodo = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
+/** Archivo local a subir. En React Native el FormData acepta { uri, name, type } en lugar de un Blob. */
+export interface ArchivoSubida {
+  uri: string;
+  name: string;
+  type: string;
+}
+
 export interface ClienteApi {
   solicitar<T = unknown>(metodo: Metodo, ruta: string, cuerpo?: unknown): Promise<T>;
+  /** POST multipart/form-data con un archivo en `campo` (más campos de texto opcionales). */
+  subirArchivo<T = unknown>(
+    ruta: string,
+    campo: string,
+    archivo: ArchivoSubida,
+    extras?: Record<string, string>,
+  ): Promise<T>;
   get<T = unknown>(ruta: string): Promise<T>;
   post<T = unknown>(ruta: string, cuerpo?: unknown): Promise<T>;
   put<T = unknown>(ruta: string, cuerpo?: unknown): Promise<T>;
@@ -140,20 +156,28 @@ export function crearClienteApi(opciones: OpcionesCliente = {}): ClienteApi {
     return despierto ? TIMEOUT_PETICION_MS : TIMEOUT_PRIMERA_PETICION_MS;
   }
 
-  async function solicitar<T>(metodo: Metodo, ruta: string, cuerpo?: unknown): Promise<T> {
+  interface Contenido {
+    cuerpo?: BodyInit;
+    /** Solo el JSON lo fija; en multipart lo calcula fetch (lleva el boundary). */
+    tipoContenido?: string;
+    /** Tiempo de espera propio (subidas); por defecto el de una petición normal. */
+    tiempo?: number;
+  }
+
+  async function ejecutar<T>(metodo: Metodo, ruta: string, envio: Contenido): Promise<T> {
     const url = `${urlBase()}${ruta}`;
     const controlador = new AbortController();
     let vencido = false;
     const temporizador = setTimeout(() => {
       vencido = true;
       controlador.abort();
-    }, tiempoDeEspera());
+    }, envio.tiempo ?? tiempoDeEspera());
 
     try {
       const token = await obtenerToken();
       const encabezados: Record<string, string> = { Accept: 'application/json' };
       if (token) encabezados.Authorization = `Bearer ${token}`;
-      if (cuerpo !== undefined) encabezados['Content-Type'] = 'application/json';
+      if (envio.tipoContenido) encabezados['Content-Type'] = envio.tipoContenido;
 
       let status: number;
       let texto: string;
@@ -161,7 +185,7 @@ export function crearClienteApi(opciones: OpcionesCliente = {}): ClienteApi {
         const respuesta = await fetchImpl(url, {
           method: metodo,
           headers: encabezados,
-          body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
+          body: envio.cuerpo,
           signal: controlador.signal,
         });
         ultimaRespuestaEn = ahora();
@@ -181,8 +205,31 @@ export function crearClienteApi(opciones: OpcionesCliente = {}): ClienteApi {
     }
   }
 
+  function solicitar<T>(metodo: Metodo, ruta: string, cuerpo?: unknown): Promise<T> {
+    return ejecutar<T>(
+      metodo,
+      ruta,
+      cuerpo === undefined
+        ? {}
+        : { cuerpo: JSON.stringify(cuerpo), tipoContenido: 'application/json' },
+    );
+  }
+
+  function subirArchivo<T>(
+    ruta: string,
+    campo: string,
+    archivo: ArchivoSubida,
+    extras: Record<string, string> = {},
+  ): Promise<T> {
+    const formulario = new FormData();
+    for (const [nombre, valor] of Object.entries(extras)) formulario.append(nombre, valor);
+    formulario.append(campo, archivo as unknown as Blob);
+    return ejecutar<T>('POST', ruta, { cuerpo: formulario, tiempo: TIMEOUT_SUBIDA_MS });
+  }
+
   return {
     solicitar,
+    subirArchivo,
     get: (ruta) => solicitar('GET', ruta),
     post: (ruta, cuerpo) => solicitar('POST', ruta, cuerpo),
     put: (ruta, cuerpo) => solicitar('PUT', ruta, cuerpo),

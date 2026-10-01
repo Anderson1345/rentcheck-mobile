@@ -5,6 +5,7 @@ import { colores, coloresEstado, conAlfa, fuentes, type TonoEstado } from '../te
 import {
   type DefinicionEstado,
   type EstadoContrato,
+  type EstadoDatos,
   type EstadoMantenimiento,
   type EstadoPago,
   type EstadoPagoContrato,
@@ -28,6 +29,7 @@ export type PropsChipEstado = { sobre?: Fondo } & (
   | { tipo: 'contrato'; estado: EstadoContrato }
   | { tipo: 'vinculo'; estado: EstadoVinculo }
   | { tipo: 'unidad'; estado: EstadoUnidad }
+  | { tipo: 'datos'; estado: EstadoDatos }
   | { tipo: 'mantenimiento'; estado: EstadoMantenimiento }
   | { tipo: 'urgencia'; estado: Urgencia }
   | { tipo: 'venceEn'; dias: number }

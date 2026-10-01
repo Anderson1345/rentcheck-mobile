@@ -29,7 +29,15 @@
         }
       ],
       "expo-font",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "RentCheck usa tus fotos solo para elegir la foto de portada de tu inmueble.",
+          "cameraPermission": "RentCheck usa la cámara para tomar la foto de portada de tu inmueble.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

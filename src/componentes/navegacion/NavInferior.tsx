@@ -18,8 +18,9 @@ interface Props {
  * Barra inferior propia. La pestaña activa pasa de contorno a duotono con una píldora detrás;
  * las etiquetas siempre se ven (12 sp para que quepan en 360 dp).
  *
- * En E2 se conecta a Expo Router con `<Tabs tabBar={(p) => <NavInferior pestanas={…}
- * activa={p.state.routes[p.state.index].name} onSeleccionar={(c) => p.navigation.navigate(c)} />}>`.
+ * Se conecta a Expo Router con `<Tabs tabBar={(p) => <NavInferior pestanas={…}
+ * activa={p.state.routes[p.state.index].name} onSeleccionar={(c) => p.navigation.navigate(c)} />}>`
+ * (ver app/(arrendador)/(pestanas)/_layout.tsx).
  */
 export function NavInferior({ pestanas, activa, onSeleccionar, insignias = {} }: Props) {
   const { bottom } = useSafeAreaInsets();

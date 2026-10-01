@@ -1,19 +1,24 @@
 import type { NombreIcono } from '../iconos/Icono';
 
 export interface PestanaNav {
-  /** Nombre de la ruta de Expo Router que abrirá (E2+). */
+  /** Nombre de la ruta (archivo) de Expo Router que abre la pestaña. */
   clave: string;
   etiqueta: string;
   icono: NombreIcono;
 }
 
-/** Pestañas del arrendador (diseño: Panel, Inmuebles, Contratos, Pagos, Más). */
+/**
+ * Pestañas del arrendador (diseño: Panel, Inmuebles, Contratos, Pagos, Más). Las claves son los
+ * nombres de ruta de app/(arrendador)/(pestanas): contratos, pagos y más llevan el sufijo
+ * "-arrendador" porque dos grupos de rutas no pueden compartir la misma URL (el inquilino tendrá
+ * /pagos y /mas).
+ */
 export const PESTANAS_ARRENDADOR = [
   { clave: 'panel', etiqueta: 'Panel', icono: 'panel' },
   { clave: 'inmuebles', etiqueta: 'Inmuebles', icono: 'inmuebles' },
-  { clave: 'contratos', etiqueta: 'Contratos', icono: 'contratos' },
-  { clave: 'pagos', etiqueta: 'Pagos', icono: 'pagos' },
-  { clave: 'mas', etiqueta: 'Más', icono: 'mas' },
+  { clave: 'contratos-arrendador', etiqueta: 'Contratos', icono: 'contratos' },
+  { clave: 'pagos-arrendador', etiqueta: 'Pagos', icono: 'pagos' },
+  { clave: 'mas-arrendador', etiqueta: 'Más', icono: 'mas' },
 ] as const satisfies readonly PestanaNav[];
 
 /** Pestañas del inquilino (diseño: Mi panel, Pagos, Solicitudes, Más). */

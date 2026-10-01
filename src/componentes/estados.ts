@@ -32,6 +32,8 @@ export type EstadoContrato =
 export type EstadoVinculo = 'VINCULADO' | 'SIN_VINCULAR';
 /** Unidad, derivado de si tiene un contrato activo. */
 export type EstadoUnidad = 'OCUPADA' | 'LIBRE';
+/** Datos de una unidad: la principal nace con área, habitaciones, baños y ocupantes en null. */
+export type EstadoDatos = 'POR_COMPLETAR';
 
 /** Forma de la señal: llena, media luz (Parcial) o hueca (estados apagados). */
 export type FormaSenal = 'llena' | 'media' | 'hueca';
@@ -85,6 +87,10 @@ export const ESTADOS_UNIDAD = {
   LIBRE: { etiqueta: 'Libre', tono: 'neutro', senal: 'hueca' },
 } as const satisfies Record<EstadoUnidad, DefinicionEstado>;
 
+export const ESTADOS_DATOS = {
+  POR_COMPLETAR: { etiqueta: 'Por completar', tono: 'advertencia', senal: 'media' },
+} as const satisfies Record<EstadoDatos, DefinicionEstado>;
+
 export const ESTADOS_MANTENIMIENTO = {
   PENDIENTE: { etiqueta: 'Pendiente', tono: 'advertencia', senal: 'llena' },
   EN_PROCESO: { etiqueta: 'En proceso', tono: 'informacion', senal: 'llena' },
@@ -106,6 +112,7 @@ export const MAPAS_ESTADO = {
   contrato: ESTADOS_CONTRATO,
   vinculo: ESTADOS_VINCULO,
   unidad: ESTADOS_UNIDAD,
+  datos: ESTADOS_DATOS,
   mantenimiento: ESTADOS_MANTENIMIENTO,
 } as const;
 

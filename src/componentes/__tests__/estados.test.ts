@@ -1,5 +1,6 @@
 import {
   ESTADOS_CONTRATO,
+  ESTADOS_DATOS,
   ESTADOS_MANTENIMIENTO,
   ESTADOS_PAGO,
   ESTADOS_PAGO_CONTRATO,
@@ -93,5 +94,16 @@ describe('etiquetaVenceEn', () => {
   it('rechaza días negativos o fraccionarios', () => {
     expect(() => etiquetaVenceEn(-1)).toThrow();
     expect(() => etiquetaVenceEn(1.5)).toThrow();
+  });
+});
+
+describe('estado de los datos de una unidad', () => {
+  it('"Por completar" (unidad con área, habitaciones, baños u ocupantes en null) es un aviso de media luz', () => {
+    expect(ESTADOS_DATOS.POR_COMPLETAR).toEqual({
+      etiqueta: 'Por completar',
+      tono: 'advertencia',
+      senal: 'media',
+    });
+    expect(MAPAS_ESTADO.datos).toBe(ESTADOS_DATOS);
   });
 });

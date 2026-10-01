@@ -35,6 +35,8 @@ export const MENSAJES_ERROR: Record<string, string> = {
   SIN_CAMPOS: 'No enviaste ningún dato para cambiar.',
 
   // Archivos
+  // 415 por tipo declarado (el filtro global lo nombra por su estado, sin código propio).
+  ERROR_415: 'Ese tipo de archivo no está permitido.',
   ARCHIVO_CONTENIDO_INVALIDO:
     'El contenido del archivo no coincide con su tipo. Usa una foto (JPG o PNG), un PDF o un video MP4 válido.',
   DOCUMENTO_NO_GENERADO: 'No se pudo generar el documento del contrato. Inténtalo de nuevo.',
@@ -137,5 +139,42 @@ export function mensajeDeErrorActivacion(error: unknown): string {
 /** Vincular un contrato con sesión abierta: el 404 es "este código no es válido para tu cuenta". */
 export function mensajeDeErrorVinculacion(error: unknown): string {
   if (error instanceof ErrorApi && error.status === 404) return MENSAJE_CODIGO_NO_VALIDO_CUENTA;
+  return mensajeDeError(error);
+}
+
+const MENSAJE_FOTO_NO_VALIDA = 'Esa foto no es válida. Usa una imagen JPG o PNG.';
+const MENSAJE_FOTO_GRANDE =
+  'La foto es demasiado grande (máximo 10 MB). Elige otra o tómala de nuevo.';
+const MENSAJE_FOTO_AUSENTE = 'No se recibió la foto. Elígela de nuevo.';
+
+/**
+ * Subir una foto: el servidor responde 415 si el tipo no es JPG o PNG (ERROR_415 por el tipo
+ * declarado, ARCHIVO_CONTENIDO_INVALIDO si el contenido real no coincide), 413 si pesa más de 10 MB
+ * y 400 si no llegó la foto.
+ */
+export function mensajeDeErrorFoto(error: unknown): string {
+  if (error instanceof ErrorApi) {
+    if (error.status === 415) return MENSAJE_FOTO_NO_VALIDA;
+    if (error.status === 413 || error.codigo === 'CARGA_DEMASIADO_GRANDE') {
+      return MENSAJE_FOTO_GRANDE;
+    }
+    if (error.status === 400) return MENSAJE_FOTO_AUSENTE;
+  }
+  return mensajeDeError(error);
+}
+
+/**
+ * Inmuebles: algunos 409 del backend traen solo un texto en español (el filtro global les pone
+ * CONFLICTO). Si no hay un código con mensaje propio, se muestra el texto del servidor.
+ */
+export function mensajeDeErrorInmueble(error: unknown): string {
+  if (
+    error instanceof ErrorApi &&
+    error.status === 409 &&
+    (error.codigo === null || error.codigo === 'CONFLICTO') &&
+    error.mensaje.trim() !== ''
+  ) {
+    return error.mensaje;
+  }
   return mensajeDeError(error);
 }
