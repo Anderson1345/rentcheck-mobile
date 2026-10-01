@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { Boton } from '@/componentes/Boton';
@@ -8,6 +9,7 @@ import { useSesion } from '@/sesion/SesionProvider';
 import { colores, espaciado } from '@/tema';
 
 export default function MasArrendador() {
+  const router = useRouter();
   const { cerrarSesion } = useSesion();
 
   return (
@@ -16,12 +18,15 @@ export default function MasArrendador() {
         <TituloCabecera titulo="Más" />
       </CabeceraTinta>
       <ContenidoBajoCabecera style={estilos.cuerpo}>
-        {/* Mi perfil llega en E3-B: fila deshabilitada, sin acción. */}
-        <View accessible accessibilityState={{ disabled: true }} style={estilos.deshabilitada}>
-          <Superficie relleno="ninguno">
-            <FilaLista icono="perfil" titulo="Mi perfil" subtitulo="Próximamente (E3-B)" />
-          </Superficie>
-        </View>
+        <Superficie relleno="ninguno">
+          <FilaLista
+            icono="perfil"
+            titulo="Mi perfil"
+            subtitulo="Nombre, teléfono y cédula"
+            conChevron
+            onPress={() => router.push('/perfil')}
+          />
+        </Superficie>
         <Boton
           titulo="Cerrar sesión"
           variante="secundario"
@@ -36,5 +41,4 @@ export default function MasArrendador() {
 const estilos = StyleSheet.create({
   pantalla: { flex: 1, backgroundColor: colores.fondo },
   cuerpo: { flex: 1, paddingTop: espaciado.xl, gap: espaciado.md },
-  deshabilitada: { opacity: 0.6 },
 });

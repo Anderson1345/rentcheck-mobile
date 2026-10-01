@@ -1,9 +1,14 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { RefreshControl, StyleSheet, View } from 'react-native';
+import { Alert, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { ErrorApi, sanearCausa } from '@/api/cliente';
-import { detalleTecnico, mensajeDeError, mensajeDeErrorFoto } from '@/api/errores';
+import {
+  detalleTecnico,
+  mensajeDeError,
+  mensajeDeErrorFoto,
+  mensajeDeErrorInmueble,
+} from '@/api/errores';
 import type { ArchivoFoto, Inmueble } from '@/api/inmuebles';
 import { Aviso } from '@/componentes/Aviso';
 import { Boton } from '@/componentes/Boton';
@@ -17,7 +22,7 @@ import { PantallaPila } from '@/componentes/PantallaPila';
 import { Superficie } from '@/componentes/Superficie';
 import { Texto } from '@/componentes/Texto';
 import { useRefrescarAlEnfocar } from '@/consultas/enfoque';
-import { useInmueble, useSubirPortada } from '@/consultas/inmuebles';
+import { useEliminarInmueble, useInmueble, useSubirPortada } from '@/consultas/inmuebles';
 import { colores, espaciado } from '@/tema';
 
 const AVISO_FOTO_FALLIDA =
@@ -30,7 +35,14 @@ export default function DetalleInmueble() {
     foto?: string;
     detalle?: string;
   }>();
-  const consulta = useInmueble(id);
+  // Al eliminar se deja de consultar el detalle: pedirlo otra vez daría 404.
+  const [eliminando, setEliminando] = useState(false);
+  const consulta = useInmueble(id, !eliminando);
+  const eliminarInmueble = useEliminarInmueble(id);
+  const [errorEliminar, setErrorEliminar] = useState<{
+    mensaje: string;
+    detalle: string | null;
+  } | null>(null);
   const subirPortada = useSubirPortada(id);
   const { data: inmueble, isPending, isError, error, refetch } = consulta;
   const [refrescando, setRefrescando] = useState(false);
@@ -49,6 +61,34 @@ export default function DetalleInmueble() {
   function volver() {
     if (router.canGoBack()) router.back();
     else router.replace('/inmuebles');
+  }
+
+  function confirmarEliminar() {
+    Alert.alert(
+      'Eliminar inmueble',
+      'Se eliminará este inmueble y no se puede deshacer. Solo se puede si no tiene unidades ni documentos.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: () => {
+            setErrorEliminar(null);
+            setEliminando(true);
+            eliminarInmueble.mutateAsync().then(
+              () => router.replace('/inmuebles'),
+              (falla: unknown) => {
+                setEliminando(false);
+                setErrorEliminar({
+                  mensaje: mensajeDeErrorInmueble(falla),
+                  detalle: detalleTecnico(falla),
+                });
+              },
+            );
+          },
+        },
+      ],
+    );
   }
 
   async function arrastrar() {
@@ -177,6 +217,15 @@ export default function DetalleInmueble() {
       <Texto variante="tituloSeccion" accessibilityRole="header" style={estilos.titulo}>
         Unidades
       </Texto>
+      <Boton
+        titulo="Agregar unidad"
+        icono="anadir"
+        variante="secundario"
+        ancho="completo"
+        onPress={() =>
+          router.push({ pathname: '/inmueble/[id]/unidad/nueva', params: { id: inmueble.id } })
+        }
+      />
       {inmueble.unidades.length === 0 ? (
         <Texto variante="cuerpo" color={colores.textoSecundario}>
           Este inmueble aún no tiene unidades.
@@ -184,10 +233,42 @@ export default function DetalleInmueble() {
       ) : (
         <Superficie relleno="ninguno" style={estilos.unidades}>
           {inmueble.unidades.map((unidad, indice) => (
-            <FilaUnidad key={unidad.id} unidad={unidad} separador={indice > 0} />
+            <FilaUnidad
+              key={unidad.id}
+              unidad={unidad}
+              separador={indice > 0}
+              onPress={() =>
+                router.push({
+                  pathname: '/inmueble/[id]/unidad/[unidadId]',
+                  params: { id: inmueble.id, unidadId: unidad.id },
+                })
+              }
+            />
           ))}
         </Superficie>
       )}
+
+      <View style={estilos.eliminar}>
+        {errorEliminar ? (
+          <>
+            <Aviso mensaje={errorEliminar.mensaje} />
+            <DetalleTecnico detalle={errorEliminar.detalle} />
+          </>
+        ) : null}
+        {inmueble.unidades.length > 0 ? (
+          <Texto variante="secundario" color={colores.textoSecundario}>
+            Para eliminar el inmueble, primero elimina sus unidades (incluida la unidad principal).
+            Solo se puede si nunca tuvieron contratos.
+          </Texto>
+        ) : null}
+        <Boton
+          titulo="Eliminar inmueble"
+          variante="destructivo"
+          ancho="completo"
+          deshabilitado={eliminando}
+          onPress={confirmarEliminar}
+        />
+      </View>
     </PantallaPila>
   );
 }
@@ -218,4 +299,5 @@ const estilos = StyleSheet.create({
   accion: { flex: 1 },
   titulo: { marginTop: espaciado.xs },
   unidades: { paddingVertical: espaciado.xxs },
+  eliminar: { gap: espaciado.xs, marginTop: espaciado.lg },
 });

@@ -1,7 +1,7 @@
 // Detalle del inmueble: datos, unidades en solo lectura ("Por completar"), 404, portada expirada
 // y cambio de foto (picker simulado).
 import { Image } from 'expo-image';
-import { Linking } from 'react-native';
+import { Alert, Linking } from 'react-native';
 import { act } from 'react-test-renderer';
 
 import Detalle from '../../app/(arrendador)/inmueble/[id]/index';
@@ -14,6 +14,7 @@ const mockBack = jest.fn();
 const mockReplace = jest.fn();
 const mockObtener = jest.fn();
 const mockSubirFoto = jest.fn();
+const mockEliminar = jest.fn();
 const mockElegir = jest.fn();
 let mockParams: Record<string, string> = {};
 
@@ -39,6 +40,7 @@ jest.mock('../api/inmuebles', () => ({
   ...jest.requireActual('../api/inmuebles'),
   obtenerInmueble: (...a: unknown[]) => mockObtener(...a),
   subirFotoPortada: (...a: unknown[]) => mockSubirFoto(...a),
+  eliminarInmueble: (...a: unknown[]) => mockEliminar(...a),
 }));
 jest.mock('../utilidades/foto', () => ({
   ...jest.requireActual('../utilidades/foto'),
@@ -60,7 +62,15 @@ const imagenes = (raiz: Raiz) => raiz.root.findAllByType(Image);
 
 beforeEach(() => {
   jest.restoreAllMocks();
-  for (const m of [mockPush, mockBack, mockReplace, mockObtener, mockSubirFoto, mockElegir]) {
+  for (const m of [
+    mockPush,
+    mockBack,
+    mockReplace,
+    mockObtener,
+    mockSubirFoto,
+    mockElegir,
+    mockEliminar,
+  ]) {
     m.mockReset();
   }
   mockParams = { id: 'i1' };
@@ -124,15 +134,37 @@ describe('Detalle del inmueble', () => {
     expect(textosDe(raiz)).toContain('Por completar');
   });
 
-  it('E3-B queda fuera: no hay acciones sobre las unidades', async () => {
+  it('"Agregar unidad" abre el formulario de nueva unidad', async () => {
     const { raiz } = await renderizarPantalla(<Detalle />);
-    const todo = textosDe(raiz).join('|');
-    expect(todo).not.toMatch(/Agregar unidad|Nueva unidad|Eliminar|Editar unidad/);
-    expect(
-      raiz.root.findAll(
-        (n) => n.props.accessibilityRole === 'button' && n.props.accessibilityLabel === 'Apto 302',
-      ),
-    ).toHaveLength(0);
+    await pulsar(raiz, 'Agregar unidad');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/inmueble/[id]/unidad/nueva',
+      params: { id: 'i1' },
+    });
+  });
+
+  it('tocar una unidad abre su edición', async () => {
+    const { raiz } = await renderizarPantalla(<Detalle />);
+    await pulsar(raiz, 'Apto 302');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/inmueble/[id]/unidad/[unidadId]',
+      params: { id: 'i1', unidadId: 'u1' },
+    });
+  });
+
+  it('el canon 0 de la unidad principal automática se muestra como "Sin definir"', async () => {
+    mockObtener.mockResolvedValue(inmuebleEjemplo({ unidades: [unidadPrincipalNueva()] }));
+    const { raiz } = await renderizarPantalla(<Detalle />);
+    expect(textosDe(raiz)).toContain('Sin definir');
+    expect(textosDe(raiz)).not.toContain('$ 0');
+  });
+
+  it('una unidad comercial con campos en null NO aparece "Por completar"', async () => {
+    mockObtener.mockResolvedValue(
+      inmuebleEjemplo({ unidades: [unidadPrincipalNueva({ uso_permitido: 'COMERCIAL' })] }),
+    );
+    const { raiz } = await renderizarPantalla(<Detalle />);
+    expect(textosDe(raiz)).not.toContain('Por completar');
   });
 
   it('sin unidades: lo dice en vez de dejar un hueco', async () => {
@@ -372,5 +404,68 @@ describe('Detalle: cambiar la foto de portada', () => {
 
     expect(mockSubirFoto).not.toHaveBeenCalled();
     expect(raiz.root.findAll((n) => n.props.accessibilityRole === 'alert')).toHaveLength(0);
+  });
+});
+
+describe('Detalle: eliminar inmueble', () => {
+  const confirmar = async (raiz: Raiz, alerta: jest.SpyInstance) => {
+    await pulsar(raiz, 'Eliminar inmueble');
+    await act(async () => alerta.mock.calls[0][2][1].onPress());
+    await esperar();
+  };
+
+  it('pide confirmación explicando que no se puede deshacer; cancelar no borra', async () => {
+    const alerta = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const { raiz } = await renderizarPantalla(<Detalle />);
+    await pulsar(raiz, 'Eliminar inmueble');
+    expect(alerta.mock.calls[0][0]).toBe('Eliminar inmueble');
+    expect(alerta.mock.calls[0][1]).toContain('no se puede deshacer');
+    expect(mockEliminar).not.toHaveBeenCalled();
+  });
+
+  it('con unidades explica que primero deben eliminarse (incluida la principal)', async () => {
+    const { raiz } = await renderizarPantalla(<Detalle />);
+    expect(textosDe(raiz).join(' ')).toContain(
+      'primero elimina sus unidades (incluida la unidad principal)',
+    );
+  });
+
+  it('al confirmar: elimina, NO vuelve a pedir el detalle (evita el 404) y vuelve a Inmuebles', async () => {
+    const alerta = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    mockObtener.mockResolvedValue(inmuebleEjemplo({ unidades: [] }));
+    const { raiz } = await renderizarPantalla(<Detalle />);
+    const pedidos = mockObtener.mock.calls.length;
+
+    await confirmar(raiz, alerta);
+
+    expect(mockEliminar).toHaveBeenCalledWith('i1');
+    expect(mockObtener.mock.calls.length).toBe(pedidos);
+    expect(mockReplace).toHaveBeenCalledWith('/inmuebles');
+  });
+
+  it.each([
+    [
+      new ErrorApi({
+        status: 409,
+        codigo: 'CONFLICTO',
+        mensaje: 'No se puede eliminar: este inmueble tiene unidades asociadas, elimínalas primero',
+      }),
+      'No se puede eliminar: este inmueble tiene unidades asociadas, elimínalas primero',
+    ],
+    [
+      new ErrorApi({ status: 409, codigo: 'INMUEBLE_CON_DOCUMENTOS', mensaje: 'texto' }),
+      'Este inmueble tiene documentos y no se puede eliminar.',
+    ],
+  ])('409: muestra el mensaje, no navega y el detalle sigue ahí', async (error, mensaje) => {
+    const alerta = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    mockEliminar.mockRejectedValue(error);
+    const { raiz } = await renderizarPantalla(<Detalle />);
+
+    await confirmar(raiz, alerta);
+
+    expect(textosDe(raiz)).toContain(mensaje);
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(textosDe(raiz)).toContain('Calle 45 # 12-30');
+    expect(hayBoton(raiz, 'Eliminar inmueble')).toBe(true);
   });
 });

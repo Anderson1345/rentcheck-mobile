@@ -11,6 +11,9 @@ import { crearToken } from '../pruebas/crearToken';
 const mockLlavero = new Map<string, string>();
 const mockNavegar = jest.fn();
 const mockListar = jest.fn();
+const mockObtener = jest.fn();
+const mockPerfil = jest.fn();
+const mockPush = jest.fn();
 let mockRuta: string[] = [];
 let mockArbol: Record<string, ComponentType> = {};
 let mockNombresTabs: string[] = [];
@@ -48,18 +51,24 @@ jest.mock('../consultas/cliente-consultas', () => ({
 jest.mock('../api/inmuebles', () => ({
   ...jest.requireActual('../api/inmuebles'),
   listarInmuebles: (...a: unknown[]) => mockListar(...a),
+  obtenerInmueble: (...a: unknown[]) => mockObtener(...a),
+}));
+jest.mock('../api/perfil', () => ({
+  ...jest.requireActual('../api/perfil'),
+  obtenerPerfil: (...a: unknown[]) => mockPerfil(...a),
 }));
 jest.mock('expo-router', () => {
   const React = jest.requireActual('react');
   const Nivel = React.createContext(0);
 
   /** Monta la ruta que toca en este nivel: primero su layout (si lo hay) y, dentro, el siguiente. */
-  function Salida() {
+  function Salida({ hasta }: { hasta?: number }) {
     const nivel = React.useContext(Nivel);
-    const Componente = mockArbol[mockRuta.slice(0, nivel + 1).join('/')];
+    const fin = hasta ?? nivel + 1;
+    const Componente = mockArbol[mockRuta.slice(0, fin).join('/')];
     if (!Componente) return null;
     return (
-      <Nivel.Provider value={nivel + 1}>
+      <Nivel.Provider value={fin}>
         <Componente />
       </Nivel.Provider>
     );
@@ -78,7 +87,9 @@ jest.mock('expo-router', () => {
   };
   Stack.Screen = function Screen({ name }: { name: string }) {
     const nivel = React.useContext(Nivel);
-    return name === mockRuta[nivel] ? <Salida /> : null;
+    // Un nombre como "inmueble/[id]/unidad/nueva" abarca varios segmentos de la ruta.
+    if (name === mockRuta[nivel]) return <Salida />;
+    return name === mockRuta.slice(nivel).join('/') ? <Salida hasta={mockRuta.length} /> : null;
   };
   function Tabs({
     tabBar,
@@ -115,8 +126,13 @@ jest.mock('expo-router', () => {
   return {
     Stack,
     Tabs,
-    useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
-    useLocalSearchParams: () => ({}),
+    useRouter: () => ({
+      push: (...a: unknown[]) => mockPush(...a),
+      replace: jest.fn(),
+      back: jest.fn(),
+      canGoBack: () => true,
+    }),
+    useLocalSearchParams: () => ({ id: 'i1', unidadId: 'u1' }),
     useFocusEffect: () => undefined,
   };
 });
@@ -167,6 +183,11 @@ async function montar(guardado: string | null, ruta: string[]): Promise<Montaje>
       require('../../app/(arrendador)/(pestanas)/pagos-arrendador').default,
     '(arrendador)/(pestanas)/mas-arrendador':
       require('../../app/(arrendador)/(pestanas)/mas-arrendador').default,
+    '(arrendador)/perfil': require('../../app/(arrendador)/perfil').default,
+    '(arrendador)/inmueble/[id]/unidad/nueva':
+      require('../../app/(arrendador)/inmueble/[id]/unidad/nueva').default,
+    '(arrendador)/inmueble/[id]/unidad/[unidadId]':
+      require('../../app/(arrendador)/inmueble/[id]/unidad/[unidadId]').default,
     '(inquilino)': require('../../app/(inquilino)/_layout').default,
     '(inquilino)/contratos': require('../../app/(inquilino)/contratos').default,
   };
@@ -217,6 +238,43 @@ async function montar(guardado: string | null, ruta: string[]): Promise<Montaje>
 beforeEach(() => {
   jest.clearAllMocks();
   mockListar.mockReset().mockResolvedValue([]);
+  mockObtener.mockReset().mockResolvedValue({
+    id: 'i1',
+    arrendador_id: 'a1',
+    direccion: 'Calle 45 # 12-30',
+    ciudad: 'Bogotá',
+    estrato: 4,
+    matricula_inmobiliaria: 'M-1',
+    foto_portada_url: null,
+    creado_en: 'x',
+    unidades: [
+      {
+        id: 'u1',
+        inmueble_id: 'i1',
+        nombre: 'Apto 302',
+        tipo: 'APARTAMENTO',
+        metros_cuadrados: '50',
+        numero_habitaciones: 1,
+        numero_banos: 1,
+        canon_base_centavos: 100,
+        ocupantes_maximos: 2,
+        acepta_mascotas: false,
+        uso_permitido: 'RESIDENCIAL',
+        foto_principal_url: null,
+        creado_en: 'x',
+      },
+    ],
+  });
+  mockPerfil.mockReset().mockResolvedValue({
+    id: 'a1',
+    nombre: 'Camila Ruiz',
+    correo: 'c@x.co',
+    telefono: '300',
+    cedula: null,
+    foto_cedula_nit_url: null,
+    creado_en: 'x',
+  });
+  mockPush.mockReset();
 });
 
 describe('barra inferior del arrendador (layouts reales)', () => {
@@ -263,17 +321,19 @@ describe('barra inferior del arrendador (layouts reales)', () => {
     expect(m.pestana(pestana).props).toMatchObject({ accessibilityState: { selected: true } });
   });
 
-  it('Más: "Mi perfil" deshabilitado con "Próximamente (E3-B)" y "Cerrar sesión" que cierra la sesión', async () => {
+  it('Más: "Mi perfil" abre el perfil y "Cerrar sesión" cierra la sesión', async () => {
     const m = await montar(ARRENDADOR(), ['(arrendador)', '(pestanas)', 'mas-arrendador']);
     expect(m.textos()).toContain('Mi perfil');
-    expect(m.textos()).toContain('Próximamente (E3-B)');
+    expect(m.textos()).not.toContain('Próximamente (E3-B)');
     expect(m.etiquetasTabs()).toHaveLength(5);
-    // "Mi perfil" no es un botón: no abre nada.
-    expect(
-      m.raiz.root.findAll(
-        (n) => n.props.accessibilityRole === 'button' && n.props.accessibilityLabel === 'Mi perfil',
-      ),
-    ).toHaveLength(0);
+    // "Mi perfil" ya es una fila activa que abre /perfil.
+    const fila = m.raiz.root.find(
+      (n) =>
+        n.props.accessibilityRole === 'button' &&
+        n.findAll((h) => h.props.children === 'Mi perfil').length > 0,
+    );
+    await m.rt.act(async () => fila.props.onPress());
+    expect(mockPush).toHaveBeenCalledWith('/perfil');
 
     const errores = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     const cerrar = m.raiz.root.find(
@@ -325,5 +385,47 @@ describe('guardias reales: quién entra a las rutas del arrendador', () => {
     const m = await montar(ARRENDADOR(), ['(inquilino)', 'contratos']);
     expect(m.etiquetasTabs()).toEqual([]);
     expect(m.textos().join('|')).not.toContain('Hola, Camila Ruiz');
+  });
+});
+
+describe('rutas de la pila del arrendador (perfil y unidades) con los layouts reales', () => {
+  it('perfil: el arrendador lo ve, fuera de la barra de pestañas', async () => {
+    const m = await montar(ARRENDADOR(), ['(arrendador)', 'perfil']);
+    expect(m.textos()).toContain('No se puede cambiar.');
+    expect(m.etiquetasTabs()).toEqual([]);
+  });
+
+  it('nueva unidad y editar unidad cargan sus pantallas', async () => {
+    const nueva = await montar(ARRENDADOR(), [
+      '(arrendador)',
+      'inmueble',
+      '[id]',
+      'unidad',
+      'nueva',
+    ]);
+    expect(nueva.textos()).toContain('Podrás agregar la foto después de crearla.');
+    const editar = await montar(ARRENDADOR(), [
+      '(arrendador)',
+      'inmueble',
+      '[id]',
+      'unidad',
+      '[unidadId]',
+    ]);
+    expect(editar.textos()).toContain('Eliminar unidad');
+  });
+
+  it('un inquilino NO accede al perfil ni a las unidades del arrendador', async () => {
+    const perfil = await montar(INQUILINO(), ['(arrendador)', 'perfil']);
+    expect(perfil.textos()).not.toContain('No se puede cambiar.');
+    expect(mockPerfil).not.toHaveBeenCalled();
+    const unidad = await montar(INQUILINO(), [
+      '(arrendador)',
+      'inmueble',
+      '[id]',
+      'unidad',
+      'nueva',
+    ]);
+    expect(unidad.textos()).not.toContain('Podrás agregar la foto después de crearla.');
+    expect(mockObtener).not.toHaveBeenCalled();
   });
 });

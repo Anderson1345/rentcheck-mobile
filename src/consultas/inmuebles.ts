@@ -3,13 +3,20 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { marcarPortadaCambiada } from '../inmuebles/claveImagen';
 import {
   actualizarInmueble,
+  actualizarUnidad,
   type ArchivoFoto,
+  crearUnidad,
   crearInmuebleConFoto,
   type DatosActualizarInmueble,
+  type DatosActualizarUnidad,
   type DatosCrearInmueble,
+  type DatosCrearUnidad,
+  eliminarInmueble,
+  eliminarUnidad,
   listarInmuebles,
   obtenerInmueble,
   subirFotoPortada,
+  subirFotoUnidad,
 } from '../api/inmuebles';
 
 /**
@@ -33,11 +40,13 @@ export function useInmuebles() {
   });
 }
 
-export function useInmueble(id: string) {
+/** `habilitada` en false evita pedir el detalle (p. ej. mientras se elimina el inmueble). */
+export function useInmueble(id: string, habilitada = true) {
   return useQuery({
     queryKey: clavesInmuebles.detalle(id),
     queryFn: () => obtenerInmueble(id),
     staleTime: STALE_TIME_INMUEBLES_MS,
+    enabled: habilitada,
   });
 }
 
@@ -79,6 +88,65 @@ export function useSubirPortada(id: string) {
       marcarPortadaCambiada(id);
       if (inmueble?.id) cliente.setQueryData(clavesInmuebles.detalle(id), inmueble);
       return invalidar();
+    },
+  });
+}
+
+export function useCrearUnidad(inmuebleId: string) {
+  const invalidar = useInvalidarInmuebles();
+  return useMutation({
+    mutationFn: (datos: DatosCrearUnidad) => crearUnidad(inmuebleId, datos),
+    onSuccess: invalidar,
+  });
+}
+
+export function useActualizarUnidad(inmuebleId: string, unidadId: string) {
+  const invalidar = useInvalidarInmuebles();
+  return useMutation({
+    mutationFn: (cambios: DatosActualizarUnidad) => actualizarUnidad(inmuebleId, unidadId, cambios),
+    onSuccess: invalidar,
+  });
+}
+
+export function useEliminarUnidad(inmuebleId: string, unidadId: string) {
+  const invalidar = useInvalidarInmuebles();
+  return useMutation({
+    mutationFn: () => eliminarUnidad(inmuebleId, unidadId),
+    // Sin esperar el refresco: la pantalla de la unidad vuelve al detalle de inmediato y no llega a
+    // pedir una unidad que ya no existe.
+    onSuccess: () => {
+      void invalidar();
+    },
+  });
+}
+
+/** La clave de caché de la foto de una unidad lleva el prefijo "unidad:". */
+export const claveFotoUnidad = (unidadId: string) => `unidad:${unidadId}`;
+
+export function useSubirFotoUnidad(inmuebleId: string, unidadId: string) {
+  const invalidar = useInvalidarInmuebles();
+  return useMutation({
+    mutationFn: (foto: ArchivoFoto) => subirFotoUnidad(inmuebleId, unidadId, foto),
+    onSuccess: () => {
+      // La ruta de la foto no cambia al reemplazarla: se renueva la clave de caché de la imagen.
+      marcarPortadaCambiada(claveFotoUnidad(unidadId));
+      return invalidar();
+    },
+  });
+}
+
+/**
+ * Elimina el inmueble. Al éxito se quita su detalle de la caché ANTES de refrescar: pedirlo otra vez
+ * daría 404. La pantalla debe dejar de consultarlo (useInmueble con habilitada en false) y volver a
+ * la lista.
+ */
+export function useEliminarInmueble(inmuebleId: string) {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: () => eliminarInmueble(inmuebleId),
+    onSuccess: () => {
+      cliente.removeQueries({ queryKey: clavesInmuebles.detalle(inmuebleId) });
+      return cliente.invalidateQueries({ queryKey: clavesInmuebles.lista });
     },
   });
 }

@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { claveCachePortada } from '../../inmuebles/claveImagen';
 import { colores, radios, tintaAlfa } from '../../tema';
-import { Icono } from '../iconos/Icono';
+import { Icono, type NombreIcono } from '../iconos/Icono';
 import { MotivoCurvas } from '../motivo/MotivoCurvas';
 
 export type VariantePortada = 'miniatura' | 'grande';
@@ -15,6 +15,10 @@ interface Props {
   variante: VariantePortada;
   /** Inmueble de la foto: con él la imagen usa una clave de caché estable (ver claveImagen). */
   inmuebleId?: string;
+  /** Documentos sensibles (cédula): 'memory' no guarda la imagen en disco. Por defecto memory-disk. */
+  cachePolicy?: 'memory' | 'memory-disk';
+  /** Icono del marcador sin foto. */
+  icono?: NombreIcono;
   /** Lo que lee el lector de pantalla; sin él la imagen se trata como decorativa. */
   descripcion?: string;
   /**
@@ -31,7 +35,15 @@ const REFRESCOS_AUTOMATICOS = 1;
  * Portada del inmueble. Sin foto, o si la imagen no carga, se ve el marcador con el motivo de
  * curvas (nunca un cuadro roto). Cuando llega una URL distinta, se vuelve a intentar con la imagen.
  */
-export function PortadaInmueble({ url, variante, inmuebleId, descripcion, alFallarUrl }: Props) {
+export function PortadaInmueble({
+  url,
+  variante,
+  inmuebleId,
+  cachePolicy = 'memory-disk',
+  icono = 'inmuebles',
+  descripcion,
+  alFallarUrl,
+}: Props) {
   const [urlFallida, setUrlFallida] = useState<string | null>(null);
   const refrescos = useRef(0);
   const grande = variante === 'grande';
@@ -58,7 +70,7 @@ export function PortadaInmueble({ url, variante, inmuebleId, descripcion, alFall
         <Image
           source={cacheKey ? { uri: url, cacheKey } : { uri: url }}
           contentFit="cover"
-          cachePolicy="memory-disk"
+          cachePolicy={cachePolicy}
           transition={150}
           accessibilityLabel={descripcion}
           accessible={descripcion !== undefined}
@@ -68,7 +80,7 @@ export function PortadaInmueble({ url, variante, inmuebleId, descripcion, alFall
       ) : (
         <View testID="portada-marcador" style={estilos.marcador}>
           <MotivoCurvas opacidad={grande ? 0.16 : 0.22} />
-          <Icono nombre="inmuebles" tamano={grande ? 40 : 24} color={colores.lima} grosor={1.7} />
+          <Icono nombre={icono} tamano={grande ? 40 : 24} color={colores.lima} grosor={1.7} />
         </View>
       )}
     </View>

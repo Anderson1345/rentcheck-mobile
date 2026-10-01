@@ -49,6 +49,9 @@ export interface Inmueble {
   unidades: UnidadInmueble[];
 }
 
+export type DatosCrearUnidad = components['schemas']['CrearUnidadDto'];
+export type DatosActualizarUnidad = components['schemas']['ActualizarUnidadDto'];
+
 export const listarInmuebles = () => api.get<Inmueble[]>('/inmuebles');
 
 export const obtenerInmueble = (id: string) =>
@@ -90,3 +93,32 @@ export async function crearInmuebleConFoto(
     return { inmueble: creado, fotoSubida: false, errorFoto };
   }
 }
+
+const rutaUnidades = (inmuebleId: string) =>
+  `/inmuebles/${encodeURIComponent(inmuebleId)}/unidades`;
+
+export const crearUnidad = (inmuebleId: string, datos: DatosCrearUnidad) =>
+  api.post<UnidadInmueble>(rutaUnidades(inmuebleId), datos);
+
+/** Solo los campos que cambian. */
+export const actualizarUnidad = (
+  inmuebleId: string,
+  unidadId: string,
+  cambios: DatosActualizarUnidad,
+) =>
+  api.patch<UnidadInmueble>(`${rutaUnidades(inmuebleId)}/${encodeURIComponent(unidadId)}`, cambios);
+
+export const eliminarUnidad = (inmuebleId: string, unidadId: string) =>
+  api.delete<UnidadInmueble>(`${rutaUnidades(inmuebleId)}/${encodeURIComponent(unidadId)}`);
+
+/** Campo multipart "foto"; responde la unidad con foto_principal_url firmada. */
+export const subirFotoUnidad = (inmuebleId: string, unidadId: string, foto: ArchivoFoto) =>
+  api.subirArchivo<UnidadInmueble>(
+    `${rutaUnidades(inmuebleId)}/${encodeURIComponent(unidadId)}/foto-principal`,
+    'foto',
+    foto,
+  );
+
+/** 409 si tiene unidades (texto) o documentos (INMUEBLE_CON_DOCUMENTOS). */
+export const eliminarInmueble = (id: string) =>
+  api.delete<Inmueble>(`/inmuebles/${encodeURIComponent(id)}`);
