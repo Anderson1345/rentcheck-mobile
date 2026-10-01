@@ -84,6 +84,10 @@ export default function NuevoContrato() {
   const huboIntentoSinRespuesta = useRef(false);
   const salidaPermitida = useRef(false);
   const preseleccionHecha = useRef(false);
+  // El inicio sugerido por una unidad ocupada se retira si luego se elige una libre, salvo que la
+  // persona haya escogido la fecha a mano.
+  const sugerenciaAplicada = useRef(false);
+  const inicioManual = useRef(false);
 
   const {
     control,
@@ -143,19 +147,41 @@ export default function NuevoContrato() {
   const elegirUnidad = useCallback(
     (inmueble: Inmueble, unidad: UnidadInmueble) => {
       const info = ocupacion[unidad.id];
+      const habiaSugerencia = sugerenciaAplicada.current;
+      sugerenciaAplicada.current = Boolean(info?.fechaInicioSugerida);
       cambiar({
         inmuebleId: inmueble.id,
         unidadId: unidad.id,
         plantilla: plantillaParaUnidad(unidad.tipo, unidad.uso_permitido),
-        // Si la unidad tiene un contrato, el inicio sugerido es el día siguiente a su fin.
-        ...(info?.fechaInicioSugerida ? { fechaInicio: info.fechaInicioSugerida } : {}),
+        // Si la unidad tiene un contrato, el inicio sugerido es el día siguiente a su fin; si es
+        // libre y antes se había sugerido otra fecha, vuelve a hoy.
+        ...(info?.fechaInicioSugerida
+          ? { fechaInicio: info.fechaInicioSugerida }
+          : habiaSugerencia && !inicioManual.current
+            ? { fechaInicio: hoy }
+            : {}),
         ...(unidad.canon_base_centavos > 0 && getValues('canonCentavos') === null
           ? { canonCentavos: unidad.canon_base_centavos }
           : {}),
       });
     },
-    [cambiar, getValues, ocupacion],
+    [cambiar, getValues, ocupacion, hoy],
   );
+
+  /** Cambios que hace la persona en el paso de fechas: el inicio elegido a mano no se pisa. */
+  const cambiarFechas = useCallback(
+    (parcial: Partial<BorradorContrato>) => {
+      if ('fechaInicio' in parcial) inicioManual.current = true;
+      cambiar(parcial);
+    },
+    [cambiar],
+  );
+
+  /** Atrás un paso: también retira el error del servidor que se estaba mostrando. */
+  const retroceder = useCallback(() => {
+    setError(null);
+    irAPaso(pasoRef.current - 1);
+  }, [irAPaso]);
 
   // Entrada desde el detalle de un inmueble (o de una unidad): arranca ahí.
   useEffect(() => {
@@ -180,9 +206,14 @@ export default function NuevoContrato() {
   useEffect(() => {
     return navigation.addListener('beforeRemove', (evento) => {
       if (salidaPermitida.current) return;
+      // Con el contrato enviándose, Atrás no hace nada (no se puede salir ni cambiar de paso).
+      if (enCurso.current) {
+        evento.preventDefault();
+        return;
+      }
       if (pasoRef.current > 0) {
         evento.preventDefault();
-        irAPaso(pasoRef.current - 1);
+        retroceder();
         return;
       }
       if (!dirtyRef.current) return;
@@ -199,7 +230,7 @@ export default function NuevoContrato() {
         },
       ]);
     });
-  }, [navigation, irAPaso]);
+  }, [navigation, retroceder]);
 
   function irAlExito(id: string) {
     salidaPermitida.current = true;
@@ -414,7 +445,7 @@ export default function NuevoContrato() {
         <PasoPago valores={valores} errores={erroresPlanos} cambiar={cambiar} />
       ) : null}
       {paso === PASO.FECHAS ? (
-        <PasoFechas valores={valores} errores={erroresPlanos} hoy={hoy} cambiar={cambiar} />
+        <PasoFechas valores={valores} errores={erroresPlanos} hoy={hoy} cambiar={cambiarFechas} />
       ) : null}
       {paso === PASO.GARANTIAS ? <PasoGarantias valores={valores} cambiar={cambiar} /> : null}
       {paso === PASO.RESUMEN ? (
@@ -459,7 +490,7 @@ export default function NuevoContrato() {
             variante="secundario"
             ancho="completo"
             deshabilitado={enviando}
-            onPress={() => irAPaso(paso - 1)}
+            onPress={retroceder}
           />
         ) : null}
       </View>

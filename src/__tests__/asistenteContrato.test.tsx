@@ -6,7 +6,7 @@ import Creado from '../../app/(arrendador)/contrato/[id]/creado';
 import Nuevo from '../../app/(arrendador)/contrato/nuevo';
 import { ErrorApi, ErrorSinConexion, ErrorTimeout } from '../api/cliente';
 import type { ContratoDetalle, ContratoResumen } from '../api/contratos';
-import { hoyBogota } from '../utilidades/fechas';
+import { formatearFechaLarga, hoyBogota } from '../utilidades/fechas';
 import { inmuebleEjemplo, unidadEjemplo } from '../pruebas/datosInmuebles';
 import {
   botonDe,
@@ -17,11 +17,15 @@ import {
   textosDe,
 } from '../pruebas/pantallas';
 
+// Con la suite completa en paralelo, montar la pantalla real puede tardar más de 5 s.
+jest.setTimeout(60_000);
+
 const mockGet = jest.fn();
 const mockPost = jest.fn();
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
 const mockDispatch = jest.fn();
+const mockCopiar = jest.fn();
 const mockListeners: ((e: unknown) => void)[] = [];
 let mockParams: Record<string, string> = {};
 const mockNavegacion = {
@@ -60,6 +64,16 @@ jest.mock('@react-native-community/datetimepicker', () => {
     default: (props: Record<string, unknown>) => <View testID="selector-fecha" {...props} />,
   };
 });
+jest.mock('react-native-qrcode-svg', () => {
+  const { View } = jest.requireActual('react-native');
+  return {
+    __esModule: true,
+    default: (props: Record<string, unknown>) => <View testID="codigo-qr" {...props} />,
+  };
+});
+jest.mock('expo-clipboard', () => ({
+  setStringAsync: (...a: unknown[]) => mockCopiar(...a),
+}));
 jest.mock('../api/cliente', () => ({
   ...jest.requireActual('../api/cliente'),
   api: {
@@ -202,7 +216,9 @@ async function llegarAlResumen(raiz: Raiz, unidad = 'Apto 302') {
 
 beforeEach(() => {
   jest.restoreAllMocks();
-  for (const m of [mockGet, mockPost, mockPush, mockReplace, mockDispatch]) m.mockReset();
+  for (const m of [mockGet, mockPost, mockPush, mockReplace, mockDispatch, mockCopiar])
+    m.mockReset();
+  mockCopiar.mockResolvedValue(true);
   mockListeners.length = 0;
   mockParams = {};
   Object.assign(datos, {
@@ -530,6 +546,89 @@ describe('Asistente: navegación hacia atrás', () => {
   });
 });
 
+describe('Asistente: correcciones de E4-A', () => {
+  const contratoEnLocal = () => [
+    {
+      ...resumenDesdeCuerpo({
+        unidad_id: 'u2',
+        fecha_inicio: '2026-01-01',
+        fecha_fin: '2027-09-30',
+        canon_centavos: 1,
+      }),
+      id: 'viejo',
+    },
+  ];
+  const irAFechas = async (raiz: Raiz) => {
+    await pulsar(raiz, 'Siguiente');
+    await llenarInquilinoNuevo(raiz);
+    await pulsar(raiz, 'Siguiente');
+    await llenarPago(raiz);
+    await pulsar(raiz, 'Siguiente');
+  };
+
+  it('1. elegir una unidad libre después de una ocupada devuelve el inicio a hoy', async () => {
+    datos.contratos = contratoEnLocal();
+    const { raiz } = await montar({ inmuebleId: 'i1' });
+    await pulsar(raiz, 'Local 1');
+    await pulsar(raiz, 'Apto 302');
+    await irAFechas(raiz);
+    expect(textosDe(raiz)).toContain(formatearFechaLarga(HOY));
+    expect(textosDe(raiz)).not.toContain('1 de octubre de 2027');
+  });
+
+  it('1b. si el usuario cambió el inicio a mano, no se le pisa al elegir otra unidad', async () => {
+    datos.contratos = contratoEnLocal();
+    const { raiz } = await montar({ inmuebleId: 'i1' });
+    await pulsar(raiz, 'Local 1');
+    await irAFechas(raiz);
+    await elegirFecha(raiz, 'Fecha de inicio', new Date(2030, 2, 15, 12));
+    await pulsar(raiz, 'Atrás');
+    await pulsar(raiz, 'Atrás');
+    await pulsar(raiz, 'Atrás');
+    await pulsar(raiz, 'Apto 302');
+    await irAFechas(raiz);
+    expect(textosDe(raiz)).toContain('15 de marzo de 2030');
+  });
+
+  it('2. el botón físico Atrás se ignora mientras se está enviando', async () => {
+    const alerta = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    mockPost.mockReturnValue(new Promise(() => undefined));
+    const { raiz } = await montar();
+    await llegarAlResumen(raiz);
+    await pulsar(raiz, 'Confirmar y crear contrato');
+    const evento = { preventDefault: jest.fn(), data: { action: { type: 'GO_BACK' } } };
+    await act(async () => mockListeners[mockListeners.length - 1](evento));
+    expect(evento.preventDefault).toHaveBeenCalled();
+    expect(titulo(raiz)).toBe('Paso 6 de 6 · Resumen');
+    expect(alerta).not.toHaveBeenCalled();
+  });
+
+  it('3. al volver con "Atrás" se limpia el error visible', async () => {
+    mockPost.mockRejectedValue(
+      new ErrorApi({ status: 400, codigo: 'VALIDACION', mensaje: 'x', detalles: ['algo'] }),
+    );
+    const { raiz } = await montar();
+    await llegarAlResumen(raiz);
+    await pulsar(raiz, 'Confirmar y crear contrato');
+    expect(textosDe(raiz)).toContain('Revisa los datos: alguno no es válido.');
+    await pulsar(raiz, 'Atrás');
+    expect(titulo(raiz)).toBe('Paso 5 de 6 · Garantías');
+    expect(textosDe(raiz).join('|')).not.toContain('Revisa los datos');
+  });
+
+  it('3b. y también con el Atrás del encabezado o el físico', async () => {
+    mockPost.mockRejectedValue(
+      new ErrorApi({ status: 400, codigo: 'VALIDACION', mensaje: 'x', detalles: ['algo'] }),
+    );
+    const { raiz } = await montar();
+    await llegarAlResumen(raiz);
+    await pulsar(raiz, 'Confirmar y crear contrato');
+    const evento = { preventDefault: jest.fn(), data: { action: { type: 'GO_BACK' } } };
+    await act(async () => mockListeners[mockListeners.length - 1](evento));
+    expect(textosDe(raiz).join('|')).not.toContain('Revisa los datos');
+  });
+});
+
 describe('Asistente: envío', () => {
   it('éxito: replace a la pantalla de éxito (el asistente no queda en la pila) y no pide confirmar al salir', async () => {
     const { raiz } = await montar();
@@ -836,5 +935,66 @@ describe('Contrato creado', () => {
     );
     await pulsar(raiz, 'Reintentar');
     expect(textosDe(raiz)).toContain('RC-AB3D-9KPX');
+  });
+});
+
+describe('Contrato creado: QR, copiar código e inventario (E4-B)', () => {
+  const montarCreado = async () => {
+    mockParams = { id: 'c1' };
+    datos.detalle = DETALLE;
+    const r = await renderizarPantalla(<Creado />);
+    await esperar();
+    return r;
+  };
+  const qr = (raiz: Raiz) => raiz.root.findAll((n) => n.props.testID === 'codigo-qr')[0];
+
+  it('muestra el código también como QR que lleva SOLO el texto del código (sin enlace)', async () => {
+    const { raiz } = await montarCreado();
+    expect(qr(raiz).props.value).toBe('RC-AB3D-9KPX');
+    expect(qr(raiz).props.value).not.toMatch(/https?:|rentcheck:/);
+    expect(textosDe(raiz)).toContain('RC-AB3D-9KPX');
+  });
+
+  it('"Copiar código" copia solo el texto del código y avisa "Copiado"', async () => {
+    const { raiz } = await montarCreado();
+    expect(textosDe(raiz)).not.toContain('Copiado');
+    await pulsar(raiz, 'Copiar código');
+    expect(mockCopiar).toHaveBeenCalledTimes(1);
+    expect(mockCopiar).toHaveBeenCalledWith('RC-AB3D-9KPX');
+    expect(textosDe(raiz)).toContain('Copiado');
+  });
+
+  it('si no se puede copiar, avisa sin mostrar el código en el mensaje', async () => {
+    mockCopiar.mockRejectedValue(new Error('RC-AB3D-9KPX no copiado'));
+    const { raiz } = await montarCreado();
+    await pulsar(raiz, 'Copiar código');
+    const avisos = textosDe(raiz).filter((t) => t.includes('copiar'));
+    expect(avisos).toContain('No pudimos copiar el código.');
+    expect(avisos.join('|')).not.toContain('RC-');
+  });
+
+  it('"Registrar inventario de entrega" abre el inventario del contrato', async () => {
+    const { raiz } = await montarCreado();
+    await pulsar(raiz, 'Registrar inventario de entrega');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/contrato/[id]/inventario',
+      params: { id: 'c1' },
+    });
+  });
+
+  it('compartir sigue funcionando junto al QR', async () => {
+    const compartir = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
+    const { raiz } = await montarCreado();
+    await pulsar(raiz, 'Compartir código');
+    expect(compartir).toHaveBeenCalledTimes(1);
+  });
+
+  it('el código no se escribe en los logs', async () => {
+    const espias = (['log', 'info', 'warn', 'error', 'debug'] as const).map((m) =>
+      jest.spyOn(console, m).mockImplementation(() => undefined),
+    );
+    const { raiz } = await montarCreado();
+    await pulsar(raiz, 'Copiar código');
+    expect(JSON.stringify(espias.flatMap((e) => e.mock.calls))).not.toContain('RC-AB3D-9KPX');
   });
 });
