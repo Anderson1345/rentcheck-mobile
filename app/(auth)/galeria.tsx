@@ -285,14 +285,10 @@ export default function Galeria() {
             <Superficie style={estilos.pila}>
               {ESCALA.map(({ variante, muestra }) => (
                 <View key={variante} style={estilos.filaEscala}>
-                  <Texto
-                    variante="secundario"
-                    color={colores.textoSecundario}
-                    style={estilos.nombreEscala}
-                  >
+                  <Texto variante="secundario" color={colores.textoSecundario}>
                     {variante}
                   </Texto>
-                  <Texto variante={variante} cifras numberOfLines={1} style={estilos.flex}>
+                  <Texto variante={variante} cifras>
                     {muestra}
                   </Texto>
                 </View>
@@ -491,7 +487,7 @@ export default function Galeria() {
                     <View style={estilos.mosaicoIcono}>
                       <Icono nombre={nombre} tamano={28} />
                     </View>
-                    <Texto variante="secundario" color={colores.textoFuerte} numberOfLines={1}>
+                    <Texto variante="secundario" color={colores.textoFuerte}>
                       {nombre}
                     </Texto>
                   </View>
@@ -565,12 +561,12 @@ export default function Galeria() {
                 avatar="Andrés Velásquez"
                 titulo="Andrés Velásquez"
                 detalle={
-                  <View style={estilos.filaDetalle}>
+                  <>
                     <ChipEstado tipo="pago" estado="PENDIENTE" />
                     <Texto variante="secundario" color={colores.textoSecundario}>
                       Octubre
                     </Texto>
-                  </View>
+                  </>
                 }
                 valor={centavosAPesosTexto(320_000_000)}
               />
@@ -603,10 +599,8 @@ export default function Galeria() {
                 {PERSONAS.map((p) => (
                   <View key={p.nombre} style={estilos.persona}>
                     <AvatarRelieve nombre={p.nombre} tamano={56} />
-                    <Texto variante="etiqueta" numberOfLines={1}>
-                      {p.nombre}
-                    </Texto>
-                    <Texto variante="secundario" color={colores.textoSecundario} numberOfLines={1}>
+                    <Texto variante="etiqueta">{p.nombre}</Texto>
+                    <Texto variante="secundario" color={colores.textoSecundario}>
                       {p.detalle}
                     </Texto>
                   </View>
@@ -740,8 +734,8 @@ const estilos = StyleSheet.create({
   filaSaludo: { flexDirection: 'row', alignItems: 'center', gap: espaciado.sm },
   cifra: { gap: espaciado.xs },
   filaCifra: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
-  filaEscala: { flexDirection: 'row', alignItems: 'center', gap: espaciado.sm },
-  nombreEscala: { width: 118 },
+  // El nombre va sobre la muestra: la cifra protagonista (46 sp) necesita todo el ancho.
+  filaEscala: { gap: 2 },
   muestraColor: { width: 96, gap: 2 },
   cuadroColor: {
     height: 44,
@@ -759,7 +753,7 @@ const estilos = StyleSheet.create({
   },
   grupoEstado: { gap: espaciado.xs },
   rejillaIconos: { flexDirection: 'row', flexWrap: 'wrap', gap: espaciado.xs },
-  celdaIcono: { width: 72, alignItems: 'center', gap: 4, marginBottom: espaciado.xs },
+  celdaIcono: { minWidth: 72, alignItems: 'center', gap: 4, marginBottom: espaciado.xs },
   mosaicoIcono: {
     width: 56,
     height: 56,
@@ -768,7 +762,6 @@ const estilos = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  filaDetalle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   persona: { width: 96, gap: 4, marginBottom: espaciado.xs },
   filaTamanos: { flexDirection: 'row', alignItems: 'flex-end', gap: 14 },
   variante: { alignItems: 'center', gap: 2 },

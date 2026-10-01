@@ -9,7 +9,7 @@ import { Texto } from './Texto';
 interface Props {
   titulo: string;
   subtitulo?: string;
-  /** Contenido bajo el título en lugar del subtítulo (p. ej. un ChipEstado y el mes). */
+  /** Contenido bajo el título en lugar del subtítulo (p. ej. un ChipEstado y el mes). Se pasa en línea: la fila lo envuelve y hace salto de línea si no cabe. */
   detalle?: ReactNode;
   /** Valor a la derecha: texto (monto ya formateado) o cualquier nodo (contador, chip). */
   valor?: ReactNode;
@@ -46,23 +46,24 @@ export function FilaLista({
         </View>
       ) : null}
       <View style={estilos.textos}>
-        <Texto variante="filaTitulo" numberOfLines={1}>
+        <Texto variante="filaTitulo" numberOfLines={2}>
           {titulo}
         </Texto>
-        {detalle ??
-          (subtitulo ? (
-            <Texto variante="secundario" color={colores.textoSecundario} numberOfLines={1}>
-              {subtitulo}
-            </Texto>
-          ) : null)}
+        {detalle ? (
+          <View style={estilos.detalle}>{detalle}</View>
+        ) : subtitulo ? (
+          <Texto variante="secundario" color={colores.textoSecundario} numberOfLines={2}>
+            {subtitulo}
+          </Texto>
+        ) : null}
       </View>
       {typeof valor === 'string' ? (
-        <Texto variante="valor" cifras>
+        <Texto variante="valor" cifras style={estilos.valor}>
           {valor}
         </Texto>
-      ) : (
-        valor
-      )}
+      ) : valor ? (
+        <View style={estilos.valor}>{valor}</View>
+      ) : null}
       {conChevron ? (
         <Icono nombre="adelante" tamano={20} color={colores.iconoTenue} grosor={1.8} />
       ) : null}
@@ -71,7 +72,9 @@ export function FilaLista({
 
   return (
     <View>
-      {separador ? <View style={estilos.separador} /> : null}
+      {separador ? (
+        <View style={[estilos.separador, { marginLeft: avatar || icono ? 74 : espaciado.md }]} />
+      ) : null}
       {onPress ? (
         <Pressable
           accessibilityRole="button"
@@ -105,5 +108,14 @@ const estilos = StyleSheet.create({
     justifyContent: 'center',
   },
   textos: { flex: 1, minWidth: 0, gap: 2 },
-  separador: { height: 1, backgroundColor: tintaAlfa(0.07), marginLeft: 74 },
+  detalle: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    columnGap: 6,
+    rowGap: 4,
+  },
+  // El valor no cede espacio; si es muy largo (una fecha), salta de línea antes que aplastar el texto.
+  valor: { flexShrink: 0, maxWidth: '55%', textAlign: 'right' },
+  separador: { height: 1, backgroundColor: tintaAlfa(0.07) },
 });
