@@ -338,7 +338,25 @@ describe('Crear inmueble: foto de portada', () => {
     expect(mockPost).toHaveBeenCalledTimes(1);
     expect(mockReplace).toHaveBeenCalledWith({
       pathname: '/inmueble/[id]',
-      params: { id: 'nuevo', foto: 'fallida' },
+      params: { id: 'nuevo', foto: 'fallida', detalle: 'HTTP 415 · ERROR_415' },
+    });
+  });
+
+  it('si el cargador no responde, la ruta lleva el detalle técnico saneado', async () => {
+    mockSubir.mockRejectedValue(new ErrorSinConexion(new Error('Network request failed')));
+    const raiz = await conFoto();
+
+    await pulsar(raiz, 'Crear inmueble');
+    await esperar();
+
+    expect(mockPost).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/inmueble/[id]',
+      params: {
+        id: 'nuevo',
+        foto: 'fallida',
+        detalle: 'Sin respuesta · Error: Network request failed',
+      },
     });
   });
 

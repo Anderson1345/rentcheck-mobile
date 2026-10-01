@@ -59,8 +59,10 @@ describe('mensajeDeErrorFoto', () => {
     );
   });
 
-  it('sin conexión y tiempo agotado usan los mensajes generales', () => {
-    expect(mensajeDeErrorFoto(new ErrorSinConexion())).toBe(MENSAJE_SIN_CONEXION);
+  it('sin respuesta al subir (ya no se afirma que falte internet) y tiempo agotado', () => {
+    expect(mensajeDeErrorFoto(new ErrorSinConexion())).toBe(
+      'No pudimos subir la foto. Revisa tu conexión e inténtalo de nuevo.',
+    );
     expect(mensajeDeErrorFoto(new ErrorTimeout())).toBe(MENSAJE_TIMEOUT);
   });
 

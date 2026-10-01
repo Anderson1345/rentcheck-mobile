@@ -4,11 +4,11 @@
 import * as ImagePicker from 'expo-image-picker';
 
 import type { ArchivoFoto } from '../api/inmuebles';
+import { TAMANO_MAXIMO_FOTO_BYTES } from '../api/mensajesArchivo';
 
 /** Compresión del propio selector: una foto de teléfono queda en 1 a 3 MB, muy por debajo de 10 MB. */
 export const CALIDAD_FOTO = 0.7;
-/** Máximo que acepta el servidor (413 por encima). */
-export const TAMANO_MAXIMO_FOTO_BYTES = 10 * 1024 * 1024;
+export { TAMANO_MAXIMO_FOTO_BYTES };
 
 export type OrigenFoto = 'camara' | 'galeria';
 

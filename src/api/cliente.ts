@@ -1,6 +1,14 @@
 // Cliente de la API de RentCheck: fetch con tiempo de espera y errores tipados.
 // Sin reintentos automáticos: un 401 fuera de /auth/* cierra la sesión (no hay refresh token hasta B0.6-B).
 
+import * as FileSystem from 'expo-file-system/legacy';
+
+import {
+  MENSAJE_FOTO_GRANDE,
+  MENSAJE_FOTO_ILEGIBLE,
+  TAMANO_MAXIMO_FOTO_BYTES,
+} from './mensajesArchivo';
+
 /** Render gratis duerme: la primera petición (o la que sigue a un largo silencio) puede tardar ~60 s. */
 export const TIMEOUT_PRIMERA_PETICION_MS = 60_000;
 export const TIMEOUT_PETICION_MS = 20_000;
@@ -38,17 +46,58 @@ export class ErrorApi extends ErrorRentCheck {
   }
 }
 
+const LARGO_MAXIMO_CAUSA = 120;
+
+/**
+ * Texto del error original para el "detalle técnico": sin URLs, tokens ni rutas de archivos del
+ * teléfono o de Windows, y recortado a 120 caracteres. Nunca debe filtrar datos sensibles.
+ */
+export function sanearCausa(causa: unknown): string | undefined {
+  let texto: string;
+  if (causa instanceof Error) texto = `${causa.name}: ${causa.message}`;
+  else if (typeof causa === 'string') texto = causa;
+  else return undefined;
+
+  texto = texto
+    .replace(/\b[a-z][a-z0-9+.-]*:\/\/\S*/gi, '[url]')
+    .replace(/\bBearer\s+\S+/gi, '[token]')
+    .replace(/\beyJ[\w-]+\.[\w-]+\.[\w-]+/g, '[token]')
+    .replace(/\b[a-z]:\\\S*/gi, '[ruta]')
+    .replace(/(^|[\s(:'"])(?:\/[\w.@-]+){2,}\/?/g, '$1[ruta]')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return texto === '' ? undefined : texto.slice(0, LARGO_MAXIMO_CAUSA);
+}
+
 /** El servidor no respondió dentro del tiempo permitido. */
 export class ErrorTimeout extends ErrorRentCheck {
-  constructor() {
+  /** Nombre y mensaje del error original, saneados (ver sanearCausa). */
+  readonly causa?: string;
+
+  constructor(causaCruda?: unknown) {
     super('El servidor no respondió a tiempo.');
+    this.causa = sanearCausa(causaCruda);
   }
 }
 
-/** La petición no llegó al servidor (sin red, sin DNS, conexión cortada). */
+/** La petición no llegó al servidor (sin red, sin DNS, conexión cortada, fallo del cargador nativo). */
 export class ErrorSinConexion extends ErrorRentCheck {
-  constructor() {
+  /** Nombre y mensaje del error original, saneados (ver sanearCausa). */
+  readonly causa?: string;
+
+  constructor(causaCruda?: unknown) {
     super('No hay conexión con el servidor.');
+    this.causa = sanearCausa(causaCruda);
+  }
+}
+
+/** La foto elegida no se puede subir (no se lee o pesa más de 10 MB): se detecta antes de subirla. */
+export class ErrorArchivo extends ErrorRentCheck {
+  readonly motivo: 'ilegible' | 'grande';
+
+  constructor(motivo: 'ilegible' | 'grande') {
+    super(motivo === 'ilegible' ? MENSAJE_FOTO_ILEGIBLE : MENSAJE_FOTO_GRANDE);
+    this.motivo = motivo;
   }
 }
 
@@ -69,6 +118,39 @@ export function establecerManejador401(manejador: (tokenEnviado: string) => void
   manejador401 = manejador;
 }
 
+/** Respuesta del cargador nativo: estado HTTP y cuerpo en texto. */
+export interface RespuestaSubida {
+  status: number;
+  body: string;
+}
+
+/**
+ * Sube el archivo con multipart. `registrarCancelacion` entrega la función que aborta la subida
+ * (el cliente la llama al agotarse el tiempo).
+ */
+export type SubirImpl = (
+  url: string,
+  uri: string,
+  opciones: FileSystem.FileSystemUploadOptions,
+  registrarCancelacion?: (cancelar: () => Promise<void>) => void,
+) => Promise<RespuestaSubida>;
+
+export type InfoArchivoImpl = (uri: string) => Promise<{ exists: boolean; size?: number }>;
+
+/** Cargador nativo de Expo: lee el archivo por su URI y arma el multipart, sin pasar por fetch. */
+const subirNativo: SubirImpl = async (url, uri, opciones, registrarCancelacion) => {
+  const tarea = FileSystem.createUploadTask(url, uri, opciones);
+  registrarCancelacion?.(() => tarea.cancelAsync());
+  const respuesta = await tarea.uploadAsync();
+  if (!respuesta) throw new Error('Subida cancelada');
+  return respuesta;
+};
+
+const infoNativa: InfoArchivoImpl = async (uri) => {
+  const info = await FileSystem.getInfoAsync(uri);
+  return info.exists ? { exists: true, size: info.size } : { exists: false };
+};
+
 export interface OpcionesCliente {
   /** Por defecto, EXPO_PUBLIC_API_URL. */
   baseUrl?: string;
@@ -78,6 +160,10 @@ export interface OpcionesCliente {
   ahora?: () => number;
   /** Se llama ante un 401 de un endpoint que no es de acceso, con el token que se envió. */
   alRecibir401?: (tokenEnviado: string) => void;
+  /** Cargador de archivos; por defecto el nativo de expo-file-system. Se inyecta en las pruebas. */
+  subirImpl?: SubirImpl;
+  /** Lee existencia y tamaño de un archivo local; por defecto getInfoAsync. */
+  infoImpl?: InfoArchivoImpl;
 }
 
 type Metodo = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -140,6 +226,8 @@ export function crearClienteApi(opciones: OpcionesCliente = {}): ClienteApi {
   const fetchImpl = opciones.fetchImpl ?? ((url, init) => fetch(url, init));
   const obtenerToken = opciones.obtenerToken ?? (() => proveedorToken());
   const ahora = opciones.ahora ?? (() => Date.now());
+  const subirImpl = opciones.subirImpl ?? subirNativo;
+  const infoImpl = opciones.infoImpl ?? infoNativa;
   const alRecibir401 =
     opciones.alRecibir401 ?? ((tokenEnviado: string) => manejador401(tokenEnviado));
   let ultimaRespuestaEn: number | null = null;
@@ -191,8 +279,8 @@ export function crearClienteApi(opciones: OpcionesCliente = {}): ClienteApi {
         ultimaRespuestaEn = ahora();
         status = respuesta.status;
         texto = await respuesta.text();
-      } catch {
-        throw vencido ? new ErrorTimeout() : new ErrorSinConexion();
+      } catch (causa) {
+        throw vencido ? new ErrorTimeout(causa) : new ErrorSinConexion(causa);
       }
 
       const contenido = leerCuerpo(texto);
@@ -215,16 +303,67 @@ export function crearClienteApi(opciones: OpcionesCliente = {}): ClienteApi {
     );
   }
 
-  function subirArchivo<T>(
+  /**
+   * Sube el archivo con el cargador NATIVO (multipart): el fetch de React Native no logra enviar un
+   * FormData con archivos locales en Android. Antes comprueba que el archivo exista, no esté vacío
+   * y no pase de 10 MB.
+   */
+  async function subirArchivo<T>(
     ruta: string,
     campo: string,
     archivo: ArchivoSubida,
-    extras: Record<string, string> = {},
+    extras?: Record<string, string>,
   ): Promise<T> {
-    const formulario = new FormData();
-    for (const [nombre, valor] of Object.entries(extras)) formulario.append(nombre, valor);
-    formulario.append(campo, archivo as unknown as Blob);
-    return ejecutar<T>('POST', ruta, { cuerpo: formulario, tiempo: TIMEOUT_SUBIDA_MS });
+    const info = await infoImpl(archivo.uri).catch(() => null);
+    if (info !== null) {
+      if (!info.exists || !info.size) throw new ErrorArchivo('ilegible');
+      if (info.size > TAMANO_MAXIMO_FOTO_BYTES) throw new ErrorArchivo('grande');
+    }
+
+    const token = await obtenerToken();
+    const encabezados: Record<string, string> = { Accept: 'application/json' };
+    if (token) encabezados.Authorization = `Bearer ${token}`;
+    // Sin Content-Type: el cargador lo calcula con el boundary.
+    const opcionesSubida: FileSystem.FileSystemUploadOptions = {
+      httpMethod: 'POST',
+      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+      fieldName: campo,
+      mimeType: archivo.type,
+      headers: encabezados,
+      ...(extras && Object.keys(extras).length > 0 ? { parameters: extras } : {}),
+    };
+
+    let cancelar: (() => Promise<void>) | null = null;
+    let temporizador: ReturnType<typeof setTimeout> | undefined;
+    const vencimiento = new Promise<never>((_resolver, rechazar) => {
+      temporizador = setTimeout(() => {
+        void cancelar?.().catch(() => undefined);
+        rechazar(new ErrorTimeout());
+      }, TIMEOUT_SUBIDA_MS);
+    });
+
+    let respuesta: RespuestaSubida;
+    try {
+      respuesta = await Promise.race([
+        subirImpl(`${urlBase()}${ruta}`, archivo.uri, opcionesSubida, (c) => {
+          cancelar = c;
+        }),
+        vencimiento,
+      ]);
+    } catch (causa) {
+      if (causa instanceof ErrorTimeout) throw causa;
+      throw new ErrorSinConexion(causa);
+    } finally {
+      clearTimeout(temporizador);
+    }
+    ultimaRespuestaEn = ahora();
+
+    const contenido = leerCuerpo(respuesta.body);
+    if (respuesta.status === 401 && token && !esRutaDeAcceso(ruta)) alRecibir401(token);
+    if (respuesta.status < 200 || respuesta.status >= 300) {
+      throw aErrorApi(respuesta.status, contenido);
+    }
+    return contenido as T;
   }
 
   return {

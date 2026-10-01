@@ -2,11 +2,12 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 
-import { ErrorApi } from '@/api/cliente';
-import { mensajeDeError, mensajeDeErrorFoto } from '@/api/errores';
+import { ErrorApi, sanearCausa } from '@/api/cliente';
+import { detalleTecnico, mensajeDeError, mensajeDeErrorFoto } from '@/api/errores';
 import type { ArchivoFoto, Inmueble } from '@/api/inmuebles';
 import { Aviso } from '@/componentes/Aviso';
 import { Boton } from '@/componentes/Boton';
+import { DetalleTecnico } from '@/componentes/DetalleTecnico';
 import { EsqueletoCarga } from '@/componentes/EsqueletoCarga';
 import { EstadoMensaje } from '@/componentes/EstadoMensaje';
 import { FilaUnidad } from '@/componentes/inmuebles/FilaUnidad';
@@ -24,7 +25,11 @@ const AVISO_FOTO_FALLIDA =
 
 export default function DetalleInmueble() {
   const router = useRouter();
-  const { id, foto } = useLocalSearchParams<{ id: string; foto?: string }>();
+  const { id, foto, detalle } = useLocalSearchParams<{
+    id: string;
+    foto?: string;
+    detalle?: string;
+  }>();
   const consulta = useInmueble(id);
   const subirPortada = useSubirPortada(id);
   const { data: inmueble, isPending, isError, error, refetch } = consulta;
@@ -33,8 +38,12 @@ export default function DetalleInmueble() {
   // Foto elegida que se está subiendo (o que falló): se ve como vista previa y se puede reintentar.
   const [pendiente, setPendiente] = useState<ArchivoFoto | null>(null);
   const [subiendo, setSubiendo] = useState(false);
-  const [errorFoto, setErrorFoto] = useState<string | null>(null);
+  const [errorFoto, setErrorFoto] = useState<{ mensaje: string; detalle: string | null } | null>(
+    null,
+  );
   const [avisoFotoFallida, setAvisoFotoFallida] = useState(foto === 'fallida');
+  // Llega por la ruta desde el formulario: se vuelve a sanear por si la ruta vino de otro lado.
+  const detalleAviso = typeof detalle === 'string' ? (sanearCausa(detalle) ?? null) : null;
   useRefrescarAlEnfocar(refetch);
 
   function volver() {
@@ -62,7 +71,7 @@ export default function DetalleInmueble() {
       setAvisoFotoFallida(false);
       setVerOpciones(false);
     } catch (falla) {
-      setErrorFoto(mensajeDeErrorFoto(falla));
+      setErrorFoto({ mensaje: mensajeDeErrorFoto(falla), detalle: detalleTecnico(falla) });
     } finally {
       setSubiendo(false);
     }
@@ -105,7 +114,12 @@ export default function DetalleInmueble() {
     <PantallaPila
       refreshControl={<RefreshControl refreshing={refrescando} onRefresh={arrastrar} />}
     >
-      {avisoFotoFallida ? <Aviso mensaje={AVISO_FOTO_FALLIDA} tono="advertencia" /> : null}
+      {avisoFotoFallida ? (
+        <View style={estilos.grupo}>
+          <Aviso mensaje={AVISO_FOTO_FALLIDA} tono="advertencia" />
+          <DetalleTecnico detalle={detalleAviso} />
+        </View>
+      ) : null}
 
       <PortadaInmueble
         url={pendiente?.uri ?? inmueble.foto_portada_url}
@@ -120,7 +134,8 @@ export default function DetalleInmueble() {
       ) : null}
       {errorFoto && pendiente ? (
         <View style={estilos.grupo}>
-          <Aviso mensaje={errorFoto} />
+          <Aviso mensaje={errorFoto.mensaje} />
+          <DetalleTecnico detalle={errorFoto.detalle} />
           <Boton
             titulo="Reintentar"
             variante="secundario"

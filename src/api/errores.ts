@@ -1,4 +1,5 @@
-import { ErrorApi, ErrorSinConexion, ErrorTimeout } from './cliente';
+import { ErrorApi, ErrorArchivo, ErrorSinConexion, ErrorTimeout } from './cliente';
+import { MENSAJE_FOTO_GRANDE } from './mensajesArchivo';
 
 export const MENSAJE_GENERICO = 'Ocurrió un error inesperado. Inténtalo de nuevo.';
 export const MENSAJE_SIN_CONEXION =
@@ -143,8 +144,8 @@ export function mensajeDeErrorVinculacion(error: unknown): string {
 }
 
 const MENSAJE_FOTO_NO_VALIDA = 'Esa foto no es válida. Usa una imagen JPG o PNG.';
-const MENSAJE_FOTO_GRANDE =
-  'La foto es demasiado grande (máximo 10 MB). Elige otra o tómala de nuevo.';
+const MENSAJE_FOTO_SIN_RESPUESTA =
+  'No pudimos subir la foto. Revisa tu conexión e inténtalo de nuevo.';
 const MENSAJE_FOTO_AUSENTE = 'No se recibió la foto. Elígela de nuevo.';
 
 /**
@@ -153,6 +154,10 @@ const MENSAJE_FOTO_AUSENTE = 'No se recibió la foto. Elígela de nuevo.';
  * y 400 si no llegó la foto.
  */
 export function mensajeDeErrorFoto(error: unknown): string {
+  // La foto se revisa antes de subirla: no se lee o pesa más de 10 MB.
+  if (error instanceof ErrorArchivo) return error.message;
+  // Sin respuesta al subir: no se afirma que falte internet (a veces falla el envío del archivo).
+  if (error instanceof ErrorSinConexion) return MENSAJE_FOTO_SIN_RESPUESTA;
   if (error instanceof ErrorApi) {
     if (error.status === 415) return MENSAJE_FOTO_NO_VALIDA;
     if (error.status === 413 || error.codigo === 'CARGA_DEMASIADO_GRANDE') {
@@ -177,4 +182,25 @@ export function mensajeDeErrorInmueble(error: unknown): string {
     return error.mensaje;
   }
   return mensajeDeError(error);
+}
+
+/**
+ * Resumen corto del fallo para mostrar bajo el mensaje en español ("Detalle técnico: …") y poder
+ * diagnosticar sin conectar el teléfono. Solo estado, código y causa ya saneada: nunca URLs,
+ * tokens ni rutas. Devuelve null si el error no aporta nada útil.
+ */
+export function detalleTecnico(error: unknown): string | null {
+  if (error instanceof ErrorApi) {
+    return error.codigo ? `HTTP ${error.status} · ${error.codigo}` : `HTTP ${error.status}`;
+  }
+  if (error instanceof ErrorTimeout) {
+    return error.causa ? `Tiempo agotado · ${error.causa}` : 'Tiempo agotado';
+  }
+  if (error instanceof ErrorSinConexion) {
+    return error.causa ? `Sin respuesta · ${error.causa}` : 'Sin respuesta';
+  }
+  if (error instanceof ErrorArchivo) {
+    return error.motivo === 'grande' ? 'Archivo demasiado grande' : 'Archivo no legible';
+  }
+  return null;
 }

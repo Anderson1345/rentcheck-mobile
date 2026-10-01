@@ -4,7 +4,7 @@ import { Image, Linking } from 'react-native';
 import { act } from 'react-test-renderer';
 
 import Detalle from '../../app/(arrendador)/inmueble/[id]/index';
-import { ErrorApi } from '../api/cliente';
+import { ErrorApi, ErrorSinConexion } from '../api/cliente';
 import { inmuebleEjemplo, unidadEjemplo, unidadPrincipalNueva } from '../pruebas/datosInmuebles';
 import { botonDe, hayBoton, renderizarPantalla, textosDe } from '../pruebas/pantallas';
 
@@ -269,6 +269,58 @@ describe('Detalle: cambiar la foto de portada', () => {
     expect(mockSubirFoto).toHaveBeenCalledTimes(2);
     expect(mockSubirFoto).toHaveBeenLastCalledWith('i1', FOTO);
     expect(textosDe(raiz).join('|')).not.toContain('no es válida');
+  });
+
+  it('si el cargador no logra enviar la foto: mensaje nuevo (sin decir que no hay internet) y detalle técnico', async () => {
+    mockElegir.mockResolvedValue({ tipo: 'elegida', archivo: FOTO });
+    mockSubirFoto.mockRejectedValue(new ErrorSinConexion(new Error('Network request failed')));
+    const { raiz } = await renderizarPantalla(<Detalle />);
+
+    await pulsar(raiz, 'Cambiar foto');
+    await pulsar(raiz, 'Elegir de la galería');
+    await esperar();
+
+    const textos = textosDe(raiz);
+    expect(textos).toContain('No pudimos subir la foto. Revisa tu conexión e inténtalo de nuevo.');
+    expect(textos).toContain('Detalle técnico: Sin respuesta · Error: Network request failed');
+    expect(textos.join('|')).not.toContain('No hay conexión a internet');
+  });
+
+  it('un error del servidor al subir muestra su estado y código como detalle técnico', async () => {
+    mockElegir.mockResolvedValue({ tipo: 'elegida', archivo: FOTO });
+    mockSubirFoto.mockRejectedValue(
+      new ErrorApi({ status: 413, codigo: 'CARGA_DEMASIADO_GRANDE', mensaje: 'x' }),
+    );
+    const { raiz } = await renderizarPantalla(<Detalle />);
+
+    await pulsar(raiz, 'Cambiar foto');
+    await pulsar(raiz, 'Elegir de la galería');
+    await esperar();
+
+    expect(textosDe(raiz)).toContain('Detalle técnico: HTTP 413 · CARGA_DEMASIADO_GRANDE');
+  });
+
+  it('sin fallo no hay línea de detalle técnico', async () => {
+    const { raiz } = await renderizarPantalla(<Detalle />);
+    expect(textosDe(raiz).join('|')).not.toContain('Detalle técnico');
+  });
+
+  it('el aviso posterior a crear muestra el detalle técnico que llegó por la ruta', async () => {
+    mockParams = { id: 'i1', foto: 'fallida', detalle: 'HTTP 415 · ERROR_415' };
+    const { raiz } = await renderizarPantalla(<Detalle />);
+    expect(textosDe(raiz)).toContain('Detalle técnico: HTTP 415 · ERROR_415');
+  });
+
+  it('el detalle de la ruta se sanea otra vez al mostrarlo (nada de URLs ni tokens)', async () => {
+    mockParams = {
+      id: 'i1',
+      foto: 'fallida',
+      detalle: 'Sin respuesta · https://x.test/a Bearer secreto',
+    };
+    const { raiz } = await renderizarPantalla(<Detalle />);
+    const todo = textosDe(raiz).join('|');
+    expect(todo).toContain('Detalle técnico: Sin respuesta');
+    expect(todo).not.toMatch(/https?:|Bearer|secreto/);
   });
 
   it('el aviso de "foto no se pudo subir" desaparece cuando la nueva subida funciona', async () => {
