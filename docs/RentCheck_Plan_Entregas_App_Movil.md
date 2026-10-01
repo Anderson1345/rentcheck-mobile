@@ -63,7 +63,11 @@ Cada ficha: objetivo · pantallas · reglas clave · referencias · prueba manua
 - **Prueba manual**: registrar arrendador; cerrar y abrir la app (sigue la sesión); cerrar sesión; probar contraseña mala (mensaje por código); activar un contrato con código de prueba.
 - **Fuera**: refresh token y cierre de todas las sesiones (B0.6 + E12); biometría (E12).
 
-### E3 — Inmuebles y unidades
+### E3 — Inmuebles y unidades (se hace en dos entregas: E3-A y E3-B)
+
+- **E3-A (inmuebles y navegación)**: barra inferior del arrendador (Panel, Inmuebles, Contratos, Pagos, Más; Contratos y Pagos como pantallas "Próximamente" hasta E5 y E7), lista y detalle de inmuebles con sus unidades en solo lectura, crear y editar inmueble (`uso_unidad_principal`, estrato), foto de portada con cámara o galería y `subirArchivo` multipart en el cliente de API.
+- **E3-B (unidades y perfil)**: crear, editar y eliminar unidad con campos condicionales por uso, foto principal de la unidad, eliminar inmueble (exige eliminar antes sus unidades), perfil del arrendador con cédula y foto de cédula. Los documentos del inmueble (`/inmuebles/:id/documentos`) no están en ninguna entrega: se decide en E3-B si entran.
+- Lo siguiente es la ficha original de E3.
 
 - **Pantallas**: lista de inmuebles, detalle con unidades, crear/editar inmueble (incluye `uso_unidad_principal`), foto de portada (cámara o galería), crear/editar/eliminar unidad con campos condicionales por tipo, perfil del arrendador con cédula.
 - **Reglas**: la unidad principal aparece "por completar"; eliminar unidad o inmueble con contratos se rechaza según la API (mostrar el mensaje por código); campos de la unidad cambian según el uso.
