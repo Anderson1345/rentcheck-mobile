@@ -49,7 +49,12 @@ Cada ficha: objetivo · pantallas · reglas clave · referencias · prueba manua
 - **D1-b (código)**: `expo-font` + `@expo-google-fonts/manrope`; `src/tema.ts` con los tokens del diseño; componentes en `src/componentes/` (botones y estados, chip de estado por enumeración real, control segmentado, navegación inferior con píldora, iconos, avatar de relieve por nombre, cabecera de tinta, superficie, esqueleto de carga, pantalla "Conectando"); gráficas con `react-native-svg` y `expo-linear-gradient` (área de ingresos, anillo de recaudo, mini-plano de ocupación, línea de tiempo de períodos); pantalla Galería de pruebas; bienvenida y diagnóstico restilizados; ícono y splash reales; corrección de `src/utilidades/fechas.ts` (un ISO con hora se trata como instante, salvo medianoche UTC exacta, que es un `@db.Date`). Sin pantallas de negocio ni animaciones complejas (Reanimated queda para E12).
 - **Fuera**: pantallas de negocio (E2+), modo oscuro, animaciones.
 
-### E2 — Autenticación
+### E2 — Autenticación (se hace en dos entregas: E2-A y E2-B)
+
+- **E2-A (sesión y acceso)**: cliente de API con manejo global de 401 (cierra la sesión y avisa); sesión en `expo-secure-store` (el JWT dura 7 días; no hay refresh hasta B0.6-B, así que al vencer se pide iniciar sesión otra vez); rol leído del payload del JWT (`id` = arrendador, `inquilinoId` = inquilino); guardias por rol con `Stack.Protected`; login y registro del arrendador, login del inquilino, cerrar sesión; pantallas de inicio provisionales con el nombre del usuario.
+- **E2-B (activación y correo)**: activación por código (validar → crear cuenta, o iniciar sesión si ya tiene cuenta y vincular), enlace `rentcheck://activar/<codigo>`, verificación de correo y recuperación de contraseña (ambas apagadas en producción: pruebas automáticas, manual solo cuando haya proveedor de correo).
+- Lo siguiente es la ficha original de E2.
+
 
 - **Objetivo**: entrar y salir de la app con el rol correcto.
 - **Pantallas**: login (ambos roles), registro de arrendador, activación por código (validar → crear cuenta), "ya tengo cuenta" → agregar contrato, verificación de correo por código (oculta mientras el backend la tenga apagada; la app lee si está activa), cerrar sesión.
