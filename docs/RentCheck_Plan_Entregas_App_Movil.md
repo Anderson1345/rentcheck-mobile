@@ -1,6 +1,6 @@
 # RentCheck — Plan de entregas de la app móvil (E1 a E12)
 
-**Versión 1.0 — 30/09/2026.** Documento de guía para las entregas de la Fase 1 (repositorio `rentcheck-mobile`).
+**Versión 1.1 — 30/09/2026.** Documento de guía para las entregas de la Fase 1 (repositorio `rentcheck-mobile`).
 
 ## 0. Para qué sirve y qué lugar ocupa
 
@@ -38,8 +38,16 @@ Cada ficha: objetivo · pantallas · reglas clave · referencias · prueba manua
 
 - **Objetivo**: repositorio que arranca en el teléfono con la estructura, las reglas persistentes y las piezas que usarán todas las entregas.
 - **Incluye**: proyecto Expo + TypeScript estricto + Expo Router; estructura de Plan Técnico §6; `AGENTS.md` y `CLAUDE.md` (texto en instrucciones §5.2); `docs/` con Contexto, Plan, instrucciones y este documento, más `docs/api/openapi.json`; cliente de API (`fetch`, tiempos de espera 60 s la primera y 20 s las siguientes, errores tipados con `codigo`, inyección de token lista pero sin sesión aún); `npm run api:tipos`; `tema.ts`; `dinero.ts` y `fechas.ts` con pruebas; `errores.ts`; proveedor de TanStack Query; pantalla de bienvenida "Soy arrendador / Soy inquilino" (aún sin login); una pantalla de diagnóstico que llama a un endpoint público (estado del servidor) y muestra "Conectando…"; `eas.json` con perfiles `development` y `preview` (sin ejecutar compilaciones).
-- **Fuera**: login, sesión, pantallas de negocio (E2+), NativeWind (se decide si se usa al definir el diseño; por ahora `tema.ts`).
+- **Fuera**: login, sesión, pantallas de negocio (E2+), NativeWind (se decide en D1; por ahora `tema.ts`).
+- **Resultado real (30/09/2026, commit `9dbc794`)**: SDK 57; rutas por rol `/panel` (arrendador) y `/contratos` (inquilino), porque dos grupos no pueden compartir la misma URL; el cliente espera 60 s en frío y 20 s con el servidor despierto (vuelve a 60 s tras 10 min sin respuestas); dinero y fechas sin `Intl` (desfase fijo −5 h); el Diagnóstico usa `GET /auth/capacidades` (sin `/health`: B-57); `eas.json` sin compilaciones. Tipos de ruta (`typedRoutes`) se generan al correr `expo start`: `tsc` no los comprueba hasta entonces.
 - **Prueba manual**: abrir en Expo Go, ver bienvenida, tocar cada rol, ver la pantalla de diagnóstico hablar con producción.
+
+### D1 — Diseño de la app (entre E1 y E2)
+
+- **Por qué**: E1 deja un tema neutro provisional (`tema.ts`). Sin una entrega de diseño, la app queda genérica.
+- **D1-a (en el chat de Claude, tipo Design)**: Jesús aporta 2–3 apps de referencia, la sensación deseada (confiable y sobrio / cercano y amable / moderno y vivo) y logo o colores si existen. Claude propone identidad (paleta, tipografías gratuitas de Google Fonts, logo provisional), kit de componentes (botón, campo, tarjeta, chip de estado, lista vacía, error, cargando) y unas 6 pantallas clave: bienvenida, login, lista de inmuebles, detalle de contrato, reportar pago, panel. Jesús elige entre variantes y aprueba.
+- **D1-b (prompt de código)**: aplicar el diseño aprobado en `src/tema.ts` y `src/componentes/`; íconos y splash reales (reemplazar los de la plantilla); fuentes con `expo-font`/`@expo-google-fonts` (gratis); y corregir `src/utilidades/fechas.ts`: hoy un ISO con hora se toma como día calendario, y debe tratarse así solo si es medianoche UTC exacta (campo `@db.Date`); cualquier otra hora es un instante y se convierte al día de Bogotá (con pruebas, rojo primero).
+- **Fuera**: pantallas de negocio (E2+). Modo oscuro: se decide en D1-a (por defecto, solo claro, como `userInterfaceStyle: light`).
 
 ### E2 — Autenticación
 
@@ -125,4 +133,4 @@ Cada ficha: objetivo · pantallas · reglas clave · referencias · prueba manua
 
 ## 5. Orden y dependencias
 
-E1 → E2 → E3 → E4 → E5 → E6 → E7 → E8 → (B0.6 en paralelo) → E9 → E10 → E11 → E12. Mismo orden que el documento de instrucciones §8; no se cambia sin pedirlo.
+E1 → D1 → E2 → E3 → E4 → E5 → E6 → E7 → E8 → (B0.6 en paralelo) → E9 → E10 → E11 → E12. Mismo orden que el documento de instrucciones §8; no se cambia sin pedirlo.
