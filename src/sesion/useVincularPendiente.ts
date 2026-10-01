@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { type ContratoVinculado, vincularContrato } from '../api/auth';
 import { mensajeDeErrorVinculacion } from '../api/errores';
@@ -21,9 +21,17 @@ export function useVincularPendiente(): ResultadoVinculacion {
     hayCodigoPendiente() ? { estado: 'vinculando' } : { estado: 'ninguno' },
   );
 
+  // Hay una petición en curso (sobrevive al doble efecto de StrictMode, que repite el efecto).
+  const enCurso = useRef(false);
+
   useEffect(() => {
     const codigo = consumirCodigoPendiente();
-    if (codigo === null) return;
+    if (codigo === null) {
+      // El código ya no existe: sin petición en curso no hay nada que esperar.
+      if (!enCurso.current) setResultado({ estado: 'ninguno' });
+      return;
+    }
+    enCurso.current = true;
     vincularContrato(codigo).then(
       (contrato) => setResultado({ estado: 'vinculado', contrato }),
       (error: unknown) =>

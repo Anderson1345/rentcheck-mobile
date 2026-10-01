@@ -7,7 +7,7 @@ export default function ContratosInquilino() {
   const vinculacion = useVincularPendiente();
 
   return (
-    <InicioProvisional rol="Inquilino" entrega="E4">
+    <InicioProvisional rol="Inquilino" entrega="E6">
       {vinculacion.estado === 'vinculando' ? (
         <Aviso tono="informacion" mensaje="Agregando tu contrato…" />
       ) : vinculacion.estado === 'vinculado' ? (

@@ -143,6 +143,31 @@ describe('verificación: el código', () => {
   });
 });
 
+describe('verificación: al entrar, el reenvío ya está en cuenta regresiva', () => {
+  // El código se acaba de enviar (al registrarse o al reenviar desde el login): no se puede pedir
+  // otro hasta que pasen los 60 s que exige el servidor.
+  it.each([
+    ['recién registrado (sin reenviar)', { correo: 'camilo@ejemplo.com', rol: 'inquilino' }],
+    [
+      'desde el login (reenvío automático)',
+      { correo: 'camilo@ejemplo.com', rol: 'inquilino', reenviar: '1' },
+    ],
+    ['arrendador recién registrado', { correo: 'marta@ejemplo.com', rol: 'arrendador' }],
+  ])(
+    '%s: "Reenviar código" arranca deshabilitado con la cuenta regresiva',
+    async (_caso, params) => {
+      mockParams = params;
+      mockReenviar.mockResolvedValue({});
+      const { raiz } = await renderizarPantalla(<VerificaCorreo />);
+      const boton = botonDe(raiz, 'Reenviar código (60 s)');
+      expect(boton.props.disabled).toBe(true);
+      expect(boton.props.accessibilityState).toMatchObject({ disabled: true });
+      await act(async () => jest.advanceTimersByTime(1000));
+      expect(botonDe(raiz, 'Reenviar código (59 s)').props.disabled).toBe(true);
+    },
+  );
+});
+
 describe('verificación: reenviar código con cuenta regresiva de 60 s', () => {
   it('empieza bloqueado y muestra los segundos que faltan', async () => {
     const { raiz } = await renderizarPantalla(<VerificaCorreo />);

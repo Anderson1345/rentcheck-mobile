@@ -1,8 +1,15 @@
-import { createContext, type ReactNode, useContext, useEffect, useSyncExternalStore } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useSyncExternalStore,
+} from 'react';
 
 import type { RespuestaAutenticacion } from '../api/auth';
 import type { ControladorSesion } from './controlador';
-import type { InstantaneaSesion } from './tipos';
+import type { EstadoSesion, InstantaneaSesion } from './tipos';
 
 const Contexto = createContext<ControladorSesion | null>(null);
 
@@ -23,6 +30,13 @@ export function SesionProvider({ controlador, children }: Props) {
 export interface SesionActual extends InstantaneaSesion {
   iniciarSesion: (respuesta: RespuestaAutenticacion) => Promise<void>;
   cerrarSesion: () => Promise<void>;
+  /**
+   * Estado ACTUAL de la sesión, leído del controlador en el momento de llamar (no del último render).
+   * Sirve para los cleanup de efectos: el controlador publica antes de que React vuelva a
+   * renderizar, y un desmontaje puede ocurrir en el mismo commit en que cambia la sesión.
+   * No expone el token.
+   */
+  leerEstado: () => EstadoSesion;
 }
 
 export function useSesion(): SesionActual {
@@ -33,9 +47,12 @@ export function useSesion(): SesionActual {
     controlador.obtener,
     controlador.obtener,
   );
+  // Estable entre renders: se puede poner en las dependencias de un efecto.
+  const leerEstado = useCallback(() => controlador.obtener().estado, [controlador]);
   return {
     ...instantanea,
     iniciarSesion: controlador.iniciarSesion,
     cerrarSesion: () => controlador.cerrarSesion(),
+    leerEstado,
   };
 }

@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 
 import { iniciarSesionInquilino } from '@/api/auth';
 import { Aviso } from '@/componentes/Aviso';
@@ -14,26 +14,24 @@ import { colores } from '@/tema';
 
 export default function LoginInquilino() {
   const router = useRouter();
-  const { estado } = useSesion();
+  const { leerEstado } = useSesion();
   const { correo, codigo } = useLocalSearchParams<{ correo?: string; codigo?: string }>();
 
   // "Ya tengo cuenta": el código de la activación espera, solo en memoria, a que inicie sesión.
   const resultado = validarCodigo(typeof codigo === 'string' ? codigo : '');
   const codigoPendiente = resultado.valido ? resultado.codigo : null;
 
-  const estadoActual = useRef(estado);
-  useEffect(() => {
-    estadoActual.current = estado;
-  }, [estado]);
-
   useEffect(() => {
     if (codigoPendiente === null) return undefined;
     guardarCodigoPendiente(codigoPendiente);
     return () => {
-      // Si se sale sin haber iniciado sesión, el código no debe quedar para otra cuenta.
-      if (estadoActual.current !== 'inquilino') limpiarCodigoPendiente();
+      // Si se sale sin haber iniciado sesión, el código no debe quedar para otra cuenta. Al iniciar
+      // sesión, Stack.Protected desmonta este grupo en el mismo commit en que la sesión pasa a
+      // inquilino: por eso se lee el estado del controlador en este instante (síncrono), no un valor
+      // guardado por un efecto que ya no corre.
+      if (leerEstado() !== 'inquilino') limpiarCodigoPendiente();
     };
-  }, [codigoPendiente]);
+  }, [codigoPendiente, leerEstado]);
 
   return (
     <PantallaFormulario titulo="Soy inquilino" subtitulo="Inicia sesión en tu cuenta">

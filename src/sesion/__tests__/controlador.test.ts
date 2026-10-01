@@ -5,6 +5,12 @@ import type {
 import { crearToken } from '../../pruebas/crearToken';
 import type { AlmacenSesion } from '../almacen';
 import { crearControladorSesion } from '../controlador';
+import {
+  consumirCodigoPendiente,
+  guardarCodigoPendiente,
+  hayCodigoPendiente,
+  limpiarCodigoPendiente,
+} from '../codigoPendiente';
 import type { DatosSesion } from '../tipos';
 
 const AHORA_MS = 1_000_000; // 1000 s
@@ -263,5 +269,47 @@ describe('suscripción', () => {
     oyente.mockClear();
     await controlador.cerrarSesion();
     expect(oyente).not.toHaveBeenCalled();
+  });
+});
+
+describe('código de activación pendiente y cambios de sesión', () => {
+  const respuestaArrendadorLocal = (): RespuestaAutenticacionArrendador => respuestaArrendador();
+
+  beforeEach(() => limpiarCodigoPendiente());
+
+  it('iniciar sesión como ARRENDADOR borra el código pendiente (no debe sobrevivir a una sesión ajena)', async () => {
+    guardarCodigoPendiente('RC-AB3D-9KPX');
+    const { controlador } = crear();
+    await controlador.arrancar();
+    await controlador.iniciarSesion(respuestaArrendadorLocal());
+    expect(hayCodigoPendiente()).toBe(false);
+  });
+
+  it('iniciar sesión como INQUILINO conserva el código pendiente (es el que se va a vincular)', async () => {
+    guardarCodigoPendiente('RC-AB3D-9KPX');
+    const { controlador } = crear();
+    await controlador.arrancar();
+    await controlador.iniciarSesion(respuestaInquilino());
+    expect(consumirCodigoPendiente()).toBe('RC-AB3D-9KPX');
+  });
+
+  it('cerrar sesión borra el código pendiente', async () => {
+    const { controlador } = crear();
+    await controlador.arrancar();
+    await controlador.iniciarSesion(respuestaInquilino());
+    guardarCodigoPendiente('RC-AB3D-9KPX');
+    await controlador.cerrarSesion();
+    expect(hayCodigoPendiente()).toBe(false);
+  });
+
+  it('un 401 que cierra la sesión también lo borra', async () => {
+    const { controlador } = crear();
+    await controlador.arrancar();
+    const respuesta = respuestaInquilino();
+    await controlador.iniciarSesion(respuesta);
+    guardarCodigoPendiente('RC-AB3D-9KPX');
+    controlador.alRecibir401(respuesta.access_token);
+    await esperar();
+    expect(hayCodigoPendiente()).toBe(false);
   });
 });

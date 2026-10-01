@@ -3,6 +3,7 @@
 
 import type { RespuestaAutenticacion } from '../api/auth';
 import type { AlmacenSesion } from './almacen';
+import { limpiarCodigoPendiente } from './codigoPendiente';
 import { decodificarToken, estaVencido } from './jwt';
 import type { AvisoSesion, DatosSesion, InstantaneaSesion, UsuarioSesion } from './tipos';
 
@@ -78,6 +79,8 @@ export function crearControladorSesion({
 
   async function cerrar(aviso: AvisoSesion) {
     token = null;
+    // Un código de activación pendiente no debe sobrevivir a la sesión que se cierra.
+    limpiarCodigoPendiente();
     publicar({ estado: 'anonimo', usuario: null, aviso });
     await intentar(() => almacen.borrar());
     limpiarCache();
@@ -116,6 +119,8 @@ export function crearControladorSesion({
 
     async iniciarSesion(respuesta) {
       const datos = datosDeRespuesta(respuesta, ahora());
+      // Solo el inquilino vincula contratos con un código: en otra sesión no debe quedar pendiente.
+      if (datos.rol === 'arrendador') limpiarCodigoPendiente();
       token = datos.token;
       publicar({ estado: datos.rol, usuario: datos.usuario, aviso: null });
       await intentar(() => almacen.guardar(datos));
