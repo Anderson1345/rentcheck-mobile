@@ -1,8 +1,13 @@
 # RentCheck — Plan técnico de la app móvil
 
-> **Versión 3.14 — 30 de septiembre de 2026.** Reemplaza a la versión 3.13.
+> **Versión 3.15 — 1 de octubre de 2026.** Reemplaza a la versión 3.14.
 > Complementa a `RentCheck_Contexto_App_Movil.md` (qué hace el producto) con el **cómo**: qué se reutiliza, qué se corrige primero en el backend, qué tecnologías se usan y cuánto cuesta publicar. Es el único documento donde se nombran tecnologías concretas.
 > La forma de trabajar día a día (tamaño de los prompts, plantilla, verificación, estado del avance) está en `RentCheck_instrucciones_desarrollo_movil.md`.
+
+**Qué cambió en la versión 3.15:**
+
+- **Nuevo B-60 (menor, sección 3.7):** `POST /contratos` no acepta el encabezado `Idempotency-Key` (sí lo aceptan `POST /pagos` y `POST /solicitudes-mantenimiento`). Detectado en E4-A (01/10/2026) al leer el código real; el Plan de Entregas lo daba por hecho. Mitigación ya aplicada en la app: botón bloqueado y verificación con `GET /contratos` si no hay respuesta; los contratos no se encolan sin conexión.
+- E4-A, E4-B y E5-A (app) cerradas; sin cambios de reglas de negocio ni de contrato del backend.
 
 **Qué cambió en la versión 3.14:**
 
@@ -366,6 +371,7 @@ Revisión complementaria hecha sobre 30 escenarios operativos concretos (documen
 | B-57 | Menor (nuevo) | Contrato OpenAPI incompleto: `GET /auth/capacidades` sin schema de respuesta; `GET /` devuelve texto `text/html` ("Hello World!") pero se declara JSON; no hay endpoint de estado (`/health`) para la pantalla Diagnóstico ni para despertar Render; las respuestas de login, registro y completar-registro tampoco tienen schema (`access_token` y `arrendador`/`inquilino`), así que la app las tipa a mano. Detectado en E1 y E2-A | 0.6 | ⬜ |
 | B-58 | Importante (nuevo) | No existe un endpoint del Panel del arrendador (Contexto §9: ingresos del mes, recaudo esperado vs. real con su desglose aprobado / en revisión / sin reportar, ocupación, cartera en mora, tendencia de ingresos de 6 meses y centro de pendientes). La app no debe calcular reglas de negocio ni recorrer todas las listas. Detectado al contrastar el diseño D1-a | 0.6-A | ⬜ |
 | B-59 | Menor (nuevo; **decidido sí el 01/10/2026**) | `PATCH /pagos/:id/rechazar` no recibe ni guarda un motivo: el inquilino ve el pago Rechazado sin saber por qué. Propuesta: motivo de una lista fija (monto no coincide / no se ve el pago / comprobante ilegible / otro) y mensaje opcional de hasta 200 caracteres; una columna nullable (migración aditiva); se muestra al inquilino en el pago rechazado y en su alerta. Cambia Contexto §5.10 | 0.6-A | ⬜ |
+| B-60 | Menor (nuevo) | `POST /contratos` no acepta `Idempotency-Key`: si la respuesta se pierde (timeout o corte de red) el arrendador no sabe si el contrato se creó, y un reintento podría duplicarlo (el 409 por traslape de fechas frena casi todos los casos, pero no un cambio de fechas entre intentos). La app lo mitiga bloqueando el botón y verificando con `GET /contratos` (E4-A). Corrección esperada: aceptar el encabezado con el mismo patrón de `ClaveIdempotencia` (por arrendador y endpoint, misma clave y mismo contenido devuelve el mismo contrato; el PDF se genera una sola vez) | Sin bloque asignado (baja prioridad; 0.6 si hay hueco) | ⬜ |
 
 Para el detalle de cada escenario (qué pasa hoy, qué debería pasar, cómo probarlo a mano), ver el documento completo. Cuando se dé el prompt de cada bloque, se referencia el escenario correspondiente además del ID.
 
