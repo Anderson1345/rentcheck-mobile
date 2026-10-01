@@ -1,3 +1,4 @@
+import { formatearFechaCorta } from '../utilidades/fechas';
 import { ErrorApi, ErrorArchivo, ErrorSinConexion, ErrorTimeout } from './cliente';
 import { MENSAJE_FOTO_GRANDE } from './mensajesArchivo';
 
@@ -203,4 +204,72 @@ export function detalleTecnico(error: unknown): string | null {
     return error.motivo === 'grande' ? 'Archivo demasiado grande' : 'Archivo no legible';
   }
   return null;
+}
+
+/** Paso del asistente de contrato al que lleva un error del servidor ("cedula" = pantalla de cédula). */
+export type PasoDeError = 'unidad' | 'inquilino' | 'pago' | 'fechas' | 'cedula';
+
+function textoDeDetalles(error: ErrorApi): Record<string, unknown> {
+  return typeof error.detalles === 'object' &&
+    error.detalles !== null &&
+    !Array.isArray(error.detalles)
+    ? (error.detalles as Record<string, unknown>)
+    : {};
+}
+
+/**
+ * Crear contrato: igual que mensajeDeError, pero con SOLICITUD_INVALIDA o CONFLICTO y un texto del
+ * servidor se muestra ese texto (viene en español), y el traslape dice con qué contrato choca.
+ */
+export function mensajeDeErrorContrato(error: unknown): string {
+  if (error instanceof ErrorApi) {
+    if (error.codigo === 'TRASLAPE_DE_CONTRATOS') {
+      const { fecha_inicio: inicio, fecha_fin: fin } = textoDeDetalles(error);
+      if (typeof inicio === 'string' && typeof fin === 'string') {
+        try {
+          return `Choca con el contrato del ${formatearFechaCorta(inicio)} al ${formatearFechaCorta(fin)}.`;
+        } catch {
+          // Fechas con formato inesperado: se usa el mensaje del diccionario.
+        }
+      }
+    }
+    if (
+      (error.codigo === 'SOLICITUD_INVALIDA' || error.codigo === 'CONFLICTO') &&
+      error.mensaje.trim() !== ''
+    ) {
+      return error.mensaje;
+    }
+  }
+  return mensajeDeError(error);
+}
+
+/** Textos de "detalles" de una VALIDACION (lista de mensajes del servidor). */
+export function detallesDeErrorContrato(error: unknown): string[] {
+  if (!(error instanceof ErrorApi) || !Array.isArray(error.detalles)) return [];
+  return error.detalles.filter((d): d is string => typeof d === 'string');
+}
+
+/** A qué paso del asistente hay que volver para corregir el error; null si no hay uno claro. */
+export function pasoDeErrorContrato(error: unknown): PasoDeError | null {
+  if (!(error instanceof ErrorApi)) return null;
+  switch (error.codigo) {
+    case 'FECHA_FIN_PASADA':
+    case 'TRASLAPE_DE_CONTRATOS':
+    case 'CONFLICTO':
+      return 'fechas';
+    case 'DEPOSITO_NO_PERMITIDO_VIVIENDA':
+      return 'pago';
+    case 'INQUILINO_AMBIGUO':
+    case 'INQUILINO_REQUERIDO':
+    case 'INQUILINO_DATOS_INVALIDOS':
+    case 'SOLICITUD_INVALIDA':
+      return 'inquilino';
+    case 'PLANTILLA_NO_CORRESPONDE_A_UNIDAD':
+    case 'NO_ENCONTRADO':
+      return 'unidad';
+    case 'CEDULA_ARRENDADOR_REQUERIDA':
+      return 'cedula';
+    default:
+      return null;
+  }
 }

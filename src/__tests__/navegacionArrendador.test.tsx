@@ -53,6 +53,23 @@ jest.mock('../api/inmuebles', () => ({
   listarInmuebles: (...a: unknown[]) => mockListar(...a),
   obtenerInmueble: (...a: unknown[]) => mockObtener(...a),
 }));
+jest.mock('../api/contratos', () => ({
+  ...jest.requireActual('../api/contratos'),
+  listarContratos: async () => [],
+  listarInquilinos: async () => [],
+  obtenerContrato: async () => ({
+    id: 'c1',
+    estado: 'ACTIVO',
+    fecha_inicio: '2026-10-01T00:00:00.000Z',
+    fecha_fin: '2027-09-30T00:00:00.000Z',
+    canon_centavos: 1,
+    tipo_plantilla: 'LOCAL_COMERCIAL',
+    vinculado: false,
+    inquilino: { id: 'q', nombre: 'Camilo Pardo' },
+    unidad: { id: 'u', nombre: 'Local 1', tipo: 'LOCAL' },
+    codigo_acceso: { codigo: 'RC-AB3D-9KPX', expira_en: '2026-10-31T15:00:00.000Z' },
+  }),
+}));
 jest.mock('../api/perfil', () => ({
   ...jest.requireActual('../api/perfil'),
   obtenerPerfil: (...a: unknown[]) => mockPerfil(...a),
@@ -133,6 +150,7 @@ jest.mock('expo-router', () => {
       canGoBack: () => true,
     }),
     useLocalSearchParams: () => ({ id: 'i1', unidadId: 'u1' }),
+    useNavigation: () => ({ addListener: () => () => undefined, dispatch: jest.fn() }),
     useFocusEffect: () => undefined,
   };
 });
@@ -184,6 +202,9 @@ async function montar(guardado: string | null, ruta: string[]): Promise<Montaje>
     '(arrendador)/(pestanas)/mas-arrendador':
       require('../../app/(arrendador)/(pestanas)/mas-arrendador').default,
     '(arrendador)/perfil': require('../../app/(arrendador)/perfil').default,
+    '(arrendador)/contrato/nuevo': require('../../app/(arrendador)/contrato/nuevo').default,
+    '(arrendador)/contrato/[id]/creado': require('../../app/(arrendador)/contrato/[id]/creado')
+      .default,
     '(arrendador)/inmueble/[id]/unidad/nueva':
       require('../../app/(arrendador)/inmueble/[id]/unidad/nueva').default,
     '(arrendador)/inmueble/[id]/unidad/[unidadId]':
@@ -270,7 +291,7 @@ beforeEach(() => {
     nombre: 'Camila Ruiz',
     correo: 'c@x.co',
     telefono: '300',
-    cedula: null,
+    cedula: '1020304050',
     foto_cedula_nit_url: null,
     creado_en: 'x',
   });
@@ -312,13 +333,27 @@ describe('barra inferior del arrendador (layouts reales)', () => {
     expect(m.etiquetasTabs()).toHaveLength(5);
   });
 
-  it.each([
-    ['contratos-arrendador', 'Contratos', 'Próximamente (E5)'],
-    ['pagos-arrendador', 'Pagos', 'Próximamente (E7)'],
-  ])('%s: pantalla "Próximamente" sin lógica', async (ruta, pestana, texto) => {
-    const m = await montar(ARRENDADOR(), ['(arrendador)', '(pestanas)', ruta]);
-    expect(m.textos()).toContain(texto);
-    expect(m.pestana(pestana).props).toMatchObject({ accessibilityState: { selected: true } });
+  it.each([['pagos-arrendador', 'Pagos', 'Próximamente (E7)']])(
+    '%s: pantalla "Próximamente" sin lógica',
+    async (ruta, pestana, texto) => {
+      const m = await montar(ARRENDADOR(), ['(arrendador)', '(pestanas)', ruta]);
+      expect(m.textos()).toContain(texto);
+      expect(m.pestana(pestana).props).toMatchObject({ accessibilityState: { selected: true } });
+    },
+  );
+
+  it('Contratos ya no es "Próximamente": texto, botón "Nuevo contrato" y pestaña activa', async () => {
+    const m = await montar(ARRENDADOR(), ['(arrendador)', '(pestanas)', 'contratos-arrendador']);
+    expect(m.textos()).toContain('Aquí verás tus contratos.');
+    expect(m.textos().join('|')).not.toContain('Próximamente');
+    expect(m.pestana('Contratos').props).toMatchObject({ accessibilityState: { selected: true } });
+    const boton = m.raiz.root.find(
+      (n) =>
+        n.props.accessibilityRole === 'button' &&
+        n.findAll((h) => h.props.children === 'Nuevo contrato').length > 0,
+    );
+    await m.rt.act(async () => boton.props.onPress());
+    expect(mockPush).toHaveBeenCalledWith('/contrato/nuevo');
   });
 
   it('Más: "Mi perfil" abre el perfil y "Cerrar sesión" cierra la sesión', async () => {
@@ -427,5 +462,31 @@ describe('rutas de la pila del arrendador (perfil y unidades) con los layouts re
     ]);
     expect(unidad.textos()).not.toContain('Podrás agregar la foto después de crearla.');
     expect(mockObtener).not.toHaveBeenCalled();
+  });
+});
+
+describe('asistente de contrato con los layouts reales', () => {
+  it('el arrendador llega al asistente (con cédula en su perfil) y a la pantalla de éxito', async () => {
+    const asistente = await montar(ARRENDADOR(), ['(arrendador)', 'contrato', 'nuevo']);
+    await asistente.rt.act(async () => {
+      await new Promise<void>((r) => setTimeout(r, 20));
+    });
+    expect(asistente.textos()).toContain('Paso 1 de 6 · Unidad');
+    expect(asistente.etiquetasTabs()).toEqual([]);
+
+    const creado = await montar(ARRENDADOR(), ['(arrendador)', 'contrato', '[id]', 'creado']);
+    await creado.rt.act(async () => {
+      await new Promise<void>((r) => setTimeout(r, 20));
+    });
+    expect(creado.textos()).toContain('Contrato creado');
+    expect(creado.textos()).toContain('RC-AB3D-9KPX');
+  });
+
+  it('un inquilino NO accede al asistente ni a "Contrato creado"', async () => {
+    const a = await montar(INQUILINO(), ['(arrendador)', 'contrato', 'nuevo']);
+    expect(a.textos().join('|')).not.toContain('Paso 1 de 6');
+    const b = await montar(INQUILINO(), ['(arrendador)', 'contrato', '[id]', 'creado']);
+    expect(b.textos()).not.toContain('Contrato creado');
+    expect(mockPerfil).not.toHaveBeenCalled();
   });
 });

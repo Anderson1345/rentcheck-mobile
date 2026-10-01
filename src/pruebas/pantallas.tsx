@@ -14,7 +14,7 @@ export type Controlador = ReturnType<typeof crearControladorSesion>;
 export async function renderizarPantalla(
   pantalla: ReactElement,
   guardado: DatosSesion | null = null,
-): Promise<{ raiz: ReactTestRenderer; controlador: Controlador }> {
+): Promise<{ raiz: ReactTestRenderer; controlador: Controlador; cliente: QueryClient }> {
   const controlador = crearControladorSesion({
     almacen: {
       guardar: async () => undefined,
@@ -46,7 +46,7 @@ export async function renderizarPantalla(
       await new Promise<void>((resolver) => setTimeout(resolver, 10));
     });
   }
-  return { raiz, controlador };
+  return { raiz, controlador, cliente };
 }
 
 /** Texto de cada <Text>, con sus hijos de texto unidos ("Hola, " + nombre → "Hola, Camilo"). */
