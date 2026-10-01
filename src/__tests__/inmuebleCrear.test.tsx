@@ -1,6 +1,7 @@
 // Crear inmueble: validación local (estrato según el uso), las dos llamadas en orden cuando hay foto
 // y qué pasa si la foto falla. El cliente de API se simula; los errores y hooks son los reales.
-import { Image, TextInput } from 'react-native';
+import { Image } from 'expo-image';
+import { TextInput } from 'react-native';
 import { act } from 'react-test-renderer';
 
 import Nuevo from '../../app/(arrendador)/inmueble/nuevo';
@@ -297,7 +298,7 @@ describe('Crear inmueble: foto de portada', () => {
     const raiz = await conFoto();
     const vista = raiz.root.findAllByType(Image);
     expect(vista).toHaveLength(1);
-    expect(vista[0].props.source).toEqual({ uri: FOTO.uri });
+    expect(vista[0].props.source).toMatchObject({ uri: FOTO.uri });
 
     await pulsar(raiz, 'Quitar foto');
     expect(raiz.root.findAllByType(Image)).toHaveLength(0);

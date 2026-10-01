@@ -1,7 +1,9 @@
+import { Image } from 'expo-image';
 import { useRef, useState } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { colores, radios } from '../../tema';
+import { claveCachePortada } from '../../inmuebles/claveImagen';
+import { colores, radios, tintaAlfa } from '../../tema';
 import { Icono } from '../iconos/Icono';
 import { MotivoCurvas } from '../motivo/MotivoCurvas';
 
@@ -11,6 +13,8 @@ interface Props {
   /** URL firmada de la portada (expira en 1 hora), una imagen local de vista previa o null. */
   url: string | null;
   variante: VariantePortada;
+  /** Inmueble de la foto: con él la imagen usa una clave de caché estable (ver claveImagen). */
+  inmuebleId?: string;
   /** Lo que lee el lector de pantalla; sin él la imagen se trata como decorativa. */
   descripcion?: string;
   /**
@@ -27,11 +31,12 @@ const REFRESCOS_AUTOMATICOS = 1;
  * Portada del inmueble. Sin foto, o si la imagen no carga, se ve el marcador con el motivo de
  * curvas (nunca un cuadro roto). Cuando llega una URL distinta, se vuelve a intentar con la imagen.
  */
-export function PortadaInmueble({ url, variante, descripcion, alFallarUrl }: Props) {
+export function PortadaInmueble({ url, variante, inmuebleId, descripcion, alFallarUrl }: Props) {
   const [urlFallida, setUrlFallida] = useState<string | null>(null);
   const refrescos = useRef(0);
   const grande = variante === 'grande';
   const mostrarImagen = url !== null && url !== urlFallida;
+  const cacheKey = inmuebleId ? claveCachePortada(inmuebleId, url) : null;
 
   function alFallarImagen() {
     setUrlFallida(url);
@@ -42,11 +47,19 @@ export function PortadaInmueble({ url, variante, descripcion, alFallarUrl }: Pro
   }
 
   return (
-    <View style={[estilos.base, grande ? estilos.grande : estilos.miniatura]}>
+    <View
+      style={[
+        estilos.base,
+        grande ? estilos.grande : estilos.miniatura,
+        mostrarImagen ? estilos.cargando : estilos.marco,
+      ]}
+    >
       {mostrarImagen ? (
         <Image
-          source={{ uri: url }}
-          resizeMode="cover"
+          source={cacheKey ? { uri: url, cacheKey } : { uri: url }}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={150}
           accessibilityLabel={descripcion}
           accessible={descripcion !== undefined}
           onError={alFallarImagen}
@@ -63,7 +76,10 @@ export function PortadaInmueble({ url, variante, descripcion, alFallarUrl }: Pro
 }
 
 const estilos = StyleSheet.create({
-  base: { overflow: 'hidden', backgroundColor: colores.tinta },
+  base: { overflow: 'hidden' },
+  // Fondo neutro mientras la imagen carga; la tinta queda para el marcador sin foto.
+  cargando: { backgroundColor: tintaAlfa(0.06) },
+  marco: { backgroundColor: colores.tinta },
   miniatura: { width: 56, height: 56, borderRadius: radios.medio, flexShrink: 0 },
   grande: { width: '100%', height: 200, borderRadius: radios.grande },
   marcador: {

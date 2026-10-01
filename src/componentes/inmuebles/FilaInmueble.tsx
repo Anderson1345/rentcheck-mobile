@@ -20,6 +20,7 @@ export function FilaInmueble({ inmueble, separador, onPress, alFallarPortada }: 
     <FilaLista
       miniatura={
         <PortadaInmueble
+          inmuebleId={inmueble.id}
           url={inmueble.foto_portada_url}
           variante="miniatura"
           alFallarUrl={alFallarPortada}

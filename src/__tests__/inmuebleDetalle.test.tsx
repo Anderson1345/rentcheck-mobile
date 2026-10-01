@@ -1,6 +1,7 @@
 // Detalle del inmueble: datos, unidades en solo lectura ("Por completar"), 404, portada expirada
 // y cambio de foto (picker simulado).
-import { Image, Linking } from 'react-native';
+import { Image } from 'expo-image';
+import { Linking } from 'react-native';
 import { act } from 'react-test-renderer';
 
 import Detalle from '../../app/(arrendador)/inmueble/[id]/index';
@@ -187,14 +188,14 @@ describe('Detalle: portada con URL firmada que expira', () => {
       .mockResolvedValueOnce(inmuebleEjemplo({ foto_portada_url: 'https://firmada/vencida' }))
       .mockResolvedValue(inmuebleEjemplo({ foto_portada_url: 'https://firmada/nueva' }));
     const { raiz } = await renderizarPantalla(<Detalle />);
-    expect(imagenes(raiz)[0].props.source).toEqual({ uri: 'https://firmada/vencida' });
+    expect(imagenes(raiz)[0].props.source).toMatchObject({ uri: 'https://firmada/vencida' });
 
     await act(async () => imagenes(raiz)[0].props.onError({}));
     await esperar();
 
     expect(mockObtener).toHaveBeenCalledTimes(2);
     expect(imagenes(raiz)).toHaveLength(1);
-    expect(imagenes(raiz)[0].props.source).toEqual({ uri: 'https://firmada/nueva' });
+    expect(imagenes(raiz)[0].props.source).toMatchObject({ uri: 'https://firmada/nueva' });
   });
 
   it('si el servidor sigue devolviendo una URL que no carga, queda el marcador y no se repite el refresco', async () => {
@@ -241,7 +242,7 @@ describe('Detalle: cambiar la foto de portada', () => {
     await pulsar(raiz, 'Cambiar foto');
     await pulsar(raiz, 'Tomar foto');
 
-    expect(imagenes(raiz)[0].props.source).toEqual({ uri: FOTO.uri });
+    expect(imagenes(raiz)[0].props.source).toMatchObject({ uri: FOTO.uri });
     expect(textosDe(raiz)).toContain('Subiendo foto…');
 
     await act(async () => terminar(inmuebleEjemplo()));

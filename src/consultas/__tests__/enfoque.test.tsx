@@ -15,10 +15,17 @@ jest.mock('expo-router', () => {
   };
 });
 
-function Pantalla({ refrescar }: { refrescar: () => unknown }) {
-  useRefrescarAlEnfocar(refrescar);
+type Consulta = { isStale: boolean; isError: boolean; refetch: () => unknown };
+
+function Pantalla({ consulta }: { consulta: Consulta }) {
+  useRefrescarAlEnfocar(consulta);
   return null;
 }
+
+const enfocar = () =>
+  act(() => {
+    mockEnfoques[mockEnfoques.length - 1]();
+  });
 
 beforeEach(() => {
   mockEnfoques.length = 0;
@@ -26,42 +33,53 @@ beforeEach(() => {
 
 describe('useRefrescarAlEnfocar', () => {
   it('no refresca en el primer enfoque (la consulta ya carga al montar)', async () => {
-    const refrescar = jest.fn();
+    const refetch = jest.fn();
     await act(async () => {
-      create(<Pantalla refrescar={refrescar} />);
+      create(<Pantalla consulta={{ isStale: true, isError: false, refetch }} />);
     });
-    expect(refrescar).not.toHaveBeenCalled();
+    expect(refetch).not.toHaveBeenCalled();
   });
 
-  it('refresca cada vez que la pantalla vuelve a enfocarse', async () => {
-    const refrescar = jest.fn();
+  it('con datos frescos NO pide nada al volver a enfocar', async () => {
+    const refetch = jest.fn();
     await act(async () => {
-      create(<Pantalla refrescar={refrescar} />);
+      create(<Pantalla consulta={{ isStale: false, isError: false, refetch }} />);
     });
-    act(() => {
-      mockEnfoques[mockEnfoques.length - 1]();
-    });
-    expect(refrescar).toHaveBeenCalledTimes(1);
-    act(() => {
-      mockEnfoques[mockEnfoques.length - 1]();
-    });
-    expect(refrescar).toHaveBeenCalledTimes(2);
+    enfocar();
+    enfocar();
+    expect(refetch).not.toHaveBeenCalled();
   });
 
-  it('usa siempre la última función de refresco', async () => {
-    const primera = jest.fn();
-    const segunda = jest.fn();
+  it('con datos viejos SÍ refresca al volver a enfocar', async () => {
+    const refetch = jest.fn();
+    await act(async () => {
+      create(<Pantalla consulta={{ isStale: true, isError: false, refetch }} />);
+    });
+    enfocar();
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('con error refresca aunque los datos no estén viejos', async () => {
+    const refetch = jest.fn();
+    await act(async () => {
+      create(<Pantalla consulta={{ isStale: false, isError: true, refetch }} />);
+    });
+    enfocar();
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('usa el estado más reciente de la consulta: fresca al montar, vieja después', async () => {
+    const refetch = jest.fn();
     let raiz!: ReturnType<typeof create>;
     await act(async () => {
-      raiz = create(<Pantalla refrescar={primera} />);
+      raiz = create(<Pantalla consulta={{ isStale: false, isError: false, refetch }} />);
     });
+    enfocar();
+    expect(refetch).not.toHaveBeenCalled();
     await act(async () => {
-      raiz.update(<Pantalla refrescar={segunda} />);
+      raiz.update(<Pantalla consulta={{ isStale: true, isError: false, refetch }} />);
     });
-    act(() => {
-      mockEnfoques[mockEnfoques.length - 1]();
-    });
-    expect(primera).not.toHaveBeenCalled();
-    expect(segunda).toHaveBeenCalledTimes(1);
+    enfocar();
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 });

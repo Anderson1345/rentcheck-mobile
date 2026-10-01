@@ -1,5 +1,6 @@
 // Lista de inmuebles del arrendador: cargando, vacío, error con reintento, con datos y refresco.
-import { Image, RefreshControl, ScrollView } from 'react-native';
+import { Image } from 'expo-image';
+import { RefreshControl, ScrollView } from 'react-native';
 import { act } from 'react-test-renderer';
 
 import Inmuebles from '../../app/(arrendador)/(pestanas)/inmuebles';
@@ -127,7 +128,7 @@ describe('Inmuebles (lista)', () => {
     const { raiz } = await renderizarPantalla(<Inmuebles />);
     const imagenes = raiz.root.findAllByType(Image);
     expect(imagenes).toHaveLength(1);
-    expect(imagenes[0].props.source).toEqual({ uri: 'https://firmada/portada' });
+    expect(imagenes[0].props.source).toMatchObject({ uri: 'https://firmada/portada' });
     expect(
       raiz.root.findAll((n) => typeof n.type === 'string' && n.props.testID === 'portada-marcador'),
     ).toHaveLength(1);

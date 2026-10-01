@@ -22,7 +22,7 @@ export default function Inmuebles() {
   const consulta = useInmuebles();
   const { data, isPending, isError, error, refetch } = consulta;
   const [refrescando, setRefrescando] = useState(false);
-  useRefrescarAlEnfocar(refetch);
+  useRefrescarAlEnfocar(consulta);
 
   async function arrastrar() {
     setRefrescando(true);

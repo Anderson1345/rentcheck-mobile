@@ -37,7 +37,8 @@
           "cameraPermission": "RentCheck usa la cámara para tomar la foto de portada de tu inmueble.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true,

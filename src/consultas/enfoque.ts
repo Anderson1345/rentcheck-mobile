@@ -1,16 +1,25 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
 
+interface ConsultaRefrescable {
+  /** Los datos ya pasaron su staleTime (lo calcula TanStack Query). */
+  isStale: boolean;
+  isError: boolean;
+  refetch: () => unknown;
+}
+
 /**
- * Vuelve a pedir los datos cada vez que la pantalla recupera el foco (volver de otra pestaña o de
- * una pantalla de la pila). El primer enfoque no cuenta: la consulta ya carga al montar. Así las
- * URLs firmadas de las fotos (1 hora) no se quedan viejas en pantallas que siguen montadas.
+ * Al volver a enfocar la pantalla (otra pestaña, o volver desde la pila) refresca SOLO si hace
+ * falta: cuando los datos ya están viejos según el staleTime de la consulta, o si la última
+ * petición falló. Con datos frescos no hay petición ni cambio de URLs firmadas, así que las
+ * imágenes no parpadean. Las mutaciones ya invalidan la caché, por eso no se pierde ninguna
+ * actualización. El primer enfoque no cuenta: la consulta carga al montar.
  */
-export function useRefrescarAlEnfocar(refrescar: () => unknown): void {
+export function useRefrescarAlEnfocar(consulta: ConsultaRefrescable): void {
   const primerEnfoque = useRef(true);
-  const ultimoRefresco = useRef(refrescar);
+  const ultima = useRef(consulta);
   useEffect(() => {
-    ultimoRefresco.current = refrescar;
+    ultima.current = consulta;
   });
 
   useFocusEffect(
@@ -19,7 +28,8 @@ export function useRefrescarAlEnfocar(refrescar: () => unknown): void {
         primerEnfoque.current = false;
         return;
       }
-      void ultimoRefresco.current();
+      const { isStale, isError, refetch } = ultima.current;
+      if (isStale || isError) void refetch();
     }, []),
   );
 }

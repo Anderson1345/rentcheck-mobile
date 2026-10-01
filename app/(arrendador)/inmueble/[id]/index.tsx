@@ -44,7 +44,7 @@ export default function DetalleInmueble() {
   const [avisoFotoFallida, setAvisoFotoFallida] = useState(foto === 'fallida');
   // Llega por la ruta desde el formulario: se vuelve a sanear por si la ruta vino de otro lado.
   const detalleAviso = typeof detalle === 'string' ? (sanearCausa(detalle) ?? null) : null;
-  useRefrescarAlEnfocar(refetch);
+  useRefrescarAlEnfocar(consulta);
 
   function volver() {
     if (router.canGoBack()) router.back();
@@ -122,6 +122,7 @@ export default function DetalleInmueble() {
       ) : null}
 
       <PortadaInmueble
+        inmuebleId={inmueble.id}
         url={pendiente?.uri ?? inmueble.foto_portada_url}
         variante="grande"
         descripcion={`Foto de portada de ${inmueble.direccion}`}

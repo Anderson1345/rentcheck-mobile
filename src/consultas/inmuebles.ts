@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { marcarPortadaCambiada } from '../inmuebles/claveImagen';
 import {
   actualizarInmueble,
   type ArchivoFoto,
@@ -74,6 +75,8 @@ export function useSubirPortada(id: string) {
     mutationFn: (foto: ArchivoFoto) => subirFotoPortada(id, foto),
     onSuccess: (inmueble) => {
       // La respuesta ya trae el inmueble con la portada nueva: se ve al instante, sin esperar al refresco.
+      // La ruta de la foto no cambia al reemplazarla: se renueva la clave de caché de la imagen.
+      marcarPortadaCambiada(id);
       if (inmueble?.id) cliente.setQueryData(clavesInmuebles.detalle(id), inmueble);
       return invalidar();
     },
