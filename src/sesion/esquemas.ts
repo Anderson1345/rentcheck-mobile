@@ -46,3 +46,51 @@ export const esquemaRegistro = z.object({
 
 export type DatosLogin = z.infer<typeof esquemaLogin>;
 export type DatosRegistro = z.infer<typeof esquemaRegistro>;
+
+/** Código de verificación o de restablecimiento: exactamente 6 dígitos. */
+export const esquemaCodigoSeisDigitos = z
+  .string()
+  .trim()
+  .min(1, 'Escribe el código de 6 dígitos.')
+  .regex(/^\d{6}$/, 'El código tiene 6 dígitos.');
+
+const MENSAJE_NO_COINCIDEN = 'Las contraseñas no coinciden.';
+
+/** Que la confirmación sea igual a la contraseña; el error cae en el campo de confirmación. */
+function exigirConfirmacion<T extends z.ZodType<Record<string, string>>>(
+  esquema: T,
+  campo: string,
+) {
+  return esquema.superRefine((datos, contexto) => {
+    if (datos.confirmacion !== '' && datos.confirmacion !== datos[campo]) {
+      contexto.addIssue({ code: 'custom', message: MENSAJE_NO_COINCIDEN, path: ['confirmacion'] });
+    }
+  });
+}
+
+const confirmacion = z.string().min(1, 'Confirma tu contraseña.');
+
+/** Activación del inquilino (paso 2): correo y contraseña nueva con confirmación. */
+export const esquemaActivacion = exigirConfirmacion(
+  z.object({ correo: esquemaCorreo, contrasena: esquemaContrasenaNueva, confirmacion }),
+  'contrasena',
+);
+
+export const esquemaVerificacion = z.object({ codigo: esquemaCodigoSeisDigitos });
+
+export const esquemaRecuperar = z.object({ correo: esquemaCorreo });
+
+export const esquemaRestablecer = exigirConfirmacion(
+  z.object({
+    correo: esquemaCorreo,
+    codigo: esquemaCodigoSeisDigitos,
+    nueva_contrasena: esquemaContrasenaNueva,
+    confirmacion,
+  }),
+  'nueva_contrasena',
+);
+
+export type DatosActivacionForm = z.infer<typeof esquemaActivacion>;
+export type DatosVerificacion = z.infer<typeof esquemaVerificacion>;
+export type DatosRecuperar = z.infer<typeof esquemaRecuperar>;
+export type DatosRestablecerForm = z.infer<typeof esquemaRestablecer>;

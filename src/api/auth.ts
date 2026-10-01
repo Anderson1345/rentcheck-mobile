@@ -48,8 +48,8 @@ export interface DatosRegistroArrendador {
   contrasena: string;
 }
 
-export function requiereVerificacion(
-  respuesta: RespuestaAutenticacionArrendador | RespuestaRequiereVerificacion,
+export function requiereVerificacion<T extends object>(
+  respuesta: T | RespuestaRequiereVerificacion,
 ): respuesta is RespuestaRequiereVerificacion {
   return 'requiere_verificacion' in respuesta && respuesta.requiere_verificacion === true;
 }
@@ -70,4 +70,89 @@ export function registrarArrendador(datos: DatosRegistroArrendador) {
 
 export function iniciarSesionInquilino(correo: string, contrasena: string) {
   return api.post<RespuestaAutenticacionInquilino>('/auth/inquilino/login', { correo, contrasena });
+}
+
+export interface Capacidades {
+  verificacion_correo: boolean;
+  recuperacion_contrasena: boolean;
+}
+
+export interface RespuestaValidarCodigo {
+  requiere_inicio_sesion: boolean;
+  mensaje: string;
+  nombreInquilino?: string;
+  nombreUnidad?: string;
+  direccionInmueble?: string;
+}
+
+export interface DatosActivacion {
+  codigo: string;
+  correo: string;
+  contrasena: string;
+}
+
+export interface ContratoVinculado {
+  id: string;
+  estado: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  vinculado_en: string;
+  datos_recaudo: unknown;
+  unidad: { id: string; nombre: string; tipo: string };
+  inmueble: { id: string; direccion: string; ciudad: string };
+}
+
+export interface DatosRestablecer {
+  correo: string;
+  codigo: string;
+  nueva_contrasena: string;
+}
+
+export interface RespuestaCorreoVerificado {
+  correo_verificado: true;
+}
+
+export interface RespuestaContrasenaActualizada {
+  contrasena_actualizada: true;
+}
+
+/** GET /auth/capacidades: qué funciones dependen del proveedor de correo (apagado en producción). */
+export function obtenerCapacidades() {
+  return api.get<Capacidades>('/auth/capacidades');
+}
+
+/** El código se envía siempre en formato canónico RC-XXXX-XXXX (ver sesion/codigo.ts). */
+export function validarCodigoAcceso(codigo: string) {
+  return api.post<RespuestaValidarCodigo>('/auth/inquilino/validar-codigo', { codigo });
+}
+
+/** 200 { access_token, inquilino } sin proveedor de correo; 201 { requiere_verificacion, correo } con proveedor. */
+export function completarRegistroInquilino(datos: DatosActivacion) {
+  return api.post<RespuestaAutenticacionInquilino | RespuestaRequiereVerificacion>(
+    '/auth/inquilino/completar-registro',
+    datos,
+  );
+}
+
+export function verificarCorreo(correo: string, codigo: string) {
+  return api.post<RespuestaCorreoVerificado>('/auth/verificar-correo', { correo, codigo });
+}
+
+/** 202 siempre igual (60 s entre envíos, máximo 5 por hora). */
+export function reenviarVerificacion(correo: string) {
+  return api.post<unknown>('/auth/reenviar-verificacion', { correo });
+}
+
+/** 202 siempre igual: no revela si el correo tiene cuenta. */
+export function recuperarContrasena(correo: string) {
+  return api.post<unknown>('/auth/recuperar-contrasena', { correo });
+}
+
+export function restablecerContrasena(datos: DatosRestablecer) {
+  return api.post<RespuestaContrasenaActualizada>('/auth/restablecer-contrasena', datos);
+}
+
+/** Con sesión de inquilino. Idempotente para la misma cuenta; 404 si el código no es válido para ella. */
+export function vincularContrato(codigo: string) {
+  return api.post<ContratoVinculado>('/inquilino/contratos/vincular', { codigo });
 }

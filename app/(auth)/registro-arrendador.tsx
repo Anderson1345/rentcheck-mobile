@@ -35,7 +35,10 @@ export default function RegistroArrendador() {
       const respuesta = await registrarArrendador(datos);
       if (requiereVerificacion(respuesta)) {
         // Con correo activo el servidor no entrega token: no se inicia sesión.
-        router.replace({ pathname: '/verifica-correo', params: { correo: respuesta.correo } });
+        router.replace({
+          pathname: '/verifica-correo',
+          params: { correo: respuesta.correo, rol: 'arrendador' },
+        });
         return;
       }
       await iniciarSesion(respuesta);

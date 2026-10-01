@@ -1,5 +1,5 @@
 // Cliente de la API de RentCheck: fetch con tiempo de espera y errores tipados.
-// Sin reintentos automáticos (el de 401 llega en E2).
+// Sin reintentos automáticos: un 401 fuera de /auth/* cierra la sesión (no hay refresh token hasta B0.6-B).
 
 /** Render gratis duerme: la primera petición (o la que sigue a un largo silencio) puede tardar ~60 s. */
 export const TIMEOUT_PRIMERA_PETICION_MS = 60_000;
@@ -52,7 +52,8 @@ export class ErrorSinConexion extends ErrorRentCheck {
 
 export type ProveedorToken = () => string | null | Promise<string | null>;
 
-// Punto de inyección del token. Hoy no hay sesión (E2 lo reemplaza con el token de secure-store).
+// Punto de inyección del token: lo conecta el layout raíz con el controlador de sesión (el token
+// vive solo en expo-secure-store). Sin sesión devuelve null.
 let proveedorToken: ProveedorToken = () => null;
 
 export function establecerProveedorToken(proveedor: ProveedorToken): void {

@@ -25,9 +25,10 @@ export const MENSAJES_ERROR: Record<string, string> = {
   ERROR_INTERNO: 'Ocurrió un error en el servidor. Inténtalo de nuevo en unos minutos.',
 
   // Cuenta, correo y códigos de acceso
-  CODIGO_INVALIDO: 'El código no es válido o ya venció. Revisa e inténtalo de nuevo.',
-  DEMASIADOS_INTENTOS: 'Hiciste demasiados intentos. Espera unos minutos y vuelve a intentarlo.',
-  CORREO_NO_DISPONIBLE: 'El envío de correos no está disponible por ahora.',
+  CODIGO_INVALIDO: 'Código incorrecto o vencido.',
+  DEMASIADOS_INTENTOS:
+    'Demasiados intentos con códigos inválidos. Espera 15 minutos e inténtalo de nuevo.',
+  CORREO_NO_DISPONIBLE: 'Esta función no está disponible por ahora.',
   CORREO_NO_VERIFICADO: 'Debes verificar tu correo antes de iniciar sesión.',
   REQUIERE_INICIO_SESION: 'Ya tienes una cuenta. Inicia sesión para agregar este contrato.',
   CAMPO_NO_EDITABLE: 'Alguno de los datos que intentas cambiar no se puede editar.',
@@ -100,6 +101,9 @@ export const MENSAJES_ERROR: Record<string, string> = {
 };
 
 export const MENSAJE_SESION_VENCIDA = 'Tu sesión venció. Inicia sesión de nuevo.';
+const MENSAJE_CODIGO_NO_VALIDO = 'Código de acceso no válido.';
+const MENSAJE_CODIGO_NO_VALIDO_CUENTA =
+  'Este código no es válido para tu cuenta. Revisa que sea el que te dio tu arrendador.';
 const MENSAJE_REGISTRO_NO_COMPLETADO =
   'No pudimos completar el registro con esos datos. Si ya tienes una cuenta, inicia sesión.';
 
@@ -121,5 +125,17 @@ export function mensajeDeError(error: unknown): string {
  */
 export function mensajeDeErrorRegistro(error: unknown): string {
   if (error instanceof ErrorApi && error.status === 409) return MENSAJE_REGISTRO_NO_COMPLETADO;
+  return mensajeDeError(error);
+}
+
+/** Activación con código: un 404 dice "Código de acceso no válido." (el servidor no distingue la causa). */
+export function mensajeDeErrorActivacion(error: unknown): string {
+  if (error instanceof ErrorApi && error.status === 404) return MENSAJE_CODIGO_NO_VALIDO;
+  return mensajeDeErrorRegistro(error);
+}
+
+/** Vincular un contrato con sesión abierta: el 404 es "este código no es válido para tu cuenta". */
+export function mensajeDeErrorVinculacion(error: unknown): string {
+  if (error instanceof ErrorApi && error.status === 404) return MENSAJE_CODIGO_NO_VALIDO_CUENTA;
   return mensajeDeError(error);
 }

@@ -6,12 +6,17 @@ import type { ReactElement } from 'react';
 import { StyleSheet, Text, TextInput, type TextStyle } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
+import NoEncontrada from '../../app/+not-found';
 import PanelArrendador from '../../app/(arrendador)/panel';
 import ContratosInquilino from '../../app/(inquilino)/contratos';
 import Bienvenida from '../../app/(auth)/index';
+import Activar from '../../app/(auth)/activar';
+import ActivarConEnlace from '../../app/(auth)/activar/[codigo]';
 import LoginArrendador from '../../app/(auth)/login-arrendador';
 import LoginInquilino from '../../app/(auth)/login-inquilino';
+import RecuperarContrasena from '../../app/(auth)/recuperar-contrasena';
 import RegistroArrendador from '../../app/(auth)/registro-arrendador';
+import RestablecerContrasena from '../../app/(auth)/restablecer-contrasena';
 import VerificaCorreo from '../../app/(auth)/verifica-correo';
 import Diagnostico from '../../app/(auth)/diagnostico';
 import Galeria from '../../app/(auth)/galeria';
@@ -29,6 +34,11 @@ jest.mock(
   'react-native-safe-area-context',
   () => jest.requireActual('react-native-safe-area-context/jest/mock').default,
 );
+// Los logins consultan las capacidades del servidor: aquí, apagadas.
+jest.mock('../api/auth', () => ({
+  ...jest.requireActual('../api/auth'),
+  obtenerCapacidades: async () => ({ verificacion_correo: false, recuperacion_contrasena: false }),
+}));
 // El Diagnóstico queda "conectando" (la petición no termina) para no salir a la red.
 jest.mock('../api/cliente', () => ({
   ...jest.requireActual('../api/cliente'),
@@ -117,6 +127,11 @@ describe.each([
   ['Registro del arrendador', () => <RegistroArrendador />],
   ['Login del inquilino', () => <LoginInquilino />],
   ['Revisa tu correo', () => <VerificaCorreo />],
+  ['Activar (paso 1)', () => <Activar />],
+  ['Activar con enlace', () => <ActivarConEnlace />],
+  ['Recuperar contraseña', () => <RecuperarContrasena />],
+  ['Restablecer contraseña', () => <RestablecerContrasena />],
+  ['Página no disponible', () => <NoEncontrada />],
   ['Panel provisional del arrendador', () => <PanelArrendador />, true],
   ['Contratos provisional del inquilino', () => <ContratosInquilino />, true],
 ])('%s', (_nombre, pantalla, conArrendador = false) => {

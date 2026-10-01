@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { iniciarSesionArrendador } from '@/api/auth';
 import { Boton } from '@/componentes/Boton';
@@ -9,10 +9,13 @@ import { colores } from '@/tema';
 
 export default function LoginArrendador() {
   const router = useRouter();
+  const { correo } = useLocalSearchParams<{ correo?: string }>();
 
   return (
     <PantallaFormulario titulo="Soy arrendador" subtitulo="Inicia sesión en tu cuenta">
       <FormularioLogin
+        rol="arrendador"
+        correoInicial={typeof correo === 'string' ? correo : ''}
         enviar={(datos) => iniciarSesionArrendador(datos.correo, datos.contrasena)}
       />
       <Texto variante="secundario" color={colores.textoSecundario}>

@@ -5,8 +5,8 @@ import { Texto } from './Texto';
 
 interface Props {
   mensaje: string;
-  /** peligro para errores; advertencia para avisos como "Tu sesión venció". */
-  tono?: Extract<TonoEstado, 'peligro' | 'advertencia' | 'informacion'>;
+  /** peligro para errores; advertencia para avisos como "Tu sesión venció"; éxito al confirmar. */
+  tono?: Extract<TonoEstado, 'peligro' | 'advertencia' | 'informacion' | 'exito'>;
 }
 
 /** Mensaje en línea con la "señal" vertical del sistema de estados. Lo lee el lector de pantalla. */

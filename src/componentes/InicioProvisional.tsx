@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { useSesion } from '../sesion/SesionProvider';
@@ -13,10 +14,12 @@ interface Props {
   rol: string;
   /** Entrega en la que llega la pantalla real ("E3"). */
   entrega: string;
+  /** Avisos bajo el saludo (p. ej. el resultado de agregar un contrato). */
+  children?: ReactNode;
 }
 
 /** Pantalla provisional de cada rol: saludo y "Cerrar sesión". Las reales llegan en E3 y E4. */
-export function InicioProvisional({ rol, entrega }: Props) {
+export function InicioProvisional({ rol, entrega, children }: Props) {
   const { usuario, cerrarSesion } = useSesion();
   const nombre = usuario?.nombre ?? '';
 
@@ -37,6 +40,7 @@ export function InicioProvisional({ rol, entrega }: Props) {
       </CabeceraTinta>
 
       <ContenidoBajoCabecera style={estilos.cuerpo}>
+        {children}
         <Superficie style={estilos.tarjeta}>
           <Texto variante="tituloSeccion">Tu cuenta está lista</Texto>
           <Texto variante="cuerpo" color={colores.textoSecundario}>

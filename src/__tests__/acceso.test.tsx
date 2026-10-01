@@ -19,6 +19,7 @@ import type { DatosSesion } from '../sesion/tipos';
 const mockReplace = jest.fn();
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: mockReplace }),
+  useLocalSearchParams: () => ({}),
 }));
 jest.mock(
   'react-native-safe-area-context',
@@ -33,6 +34,7 @@ const mockIniciarInquilino = jest.fn();
 const mockRegistrar = jest.fn();
 jest.mock('../api/auth', () => ({
   ...jest.requireActual('../api/auth'),
+  obtenerCapacidades: async () => ({ verificacion_correo: false, recuperacion_contrasena: false }),
   iniciarSesionArrendador: (...args: unknown[]) => mockIniciarArrendador(...args),
   iniciarSesionInquilino: (...args: unknown[]) => mockIniciarInquilino(...args),
   registrarArrendador: (...args: unknown[]) => mockRegistrar(...args),
@@ -289,7 +291,7 @@ describe('registro del arrendador', () => {
     expect(controlador.obtenerToken()).toBeNull();
     expect(mockReplace).toHaveBeenCalledWith({
       pathname: '/verifica-correo',
-      params: { correo: 'marta@ejemplo.com' },
+      params: { correo: 'marta@ejemplo.com', rol: 'arrendador' },
     });
   });
 
