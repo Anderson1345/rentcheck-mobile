@@ -1,6 +1,6 @@
 # RentCheck — Plan de entregas de la app móvil (E1 a E12)
 
-**Versión 1.1 — 30/09/2026.** Documento de guía para las entregas de la Fase 1 (repositorio `rentcheck-mobile`).
+**Versión 1.2 — 30/09/2026.** Documento de guía para las entregas de la Fase 1 (repositorio `rentcheck-mobile`).
 
 ## 0. Para qué sirve y qué lugar ocupa
 
@@ -44,10 +44,10 @@ Cada ficha: objetivo · pantallas · reglas clave · referencias · prueba manua
 
 ### D1 — Diseño de la app (entre E1 y E2)
 
-- **Por qué**: E1 deja un tema neutro provisional (`tema.ts`). Sin una entrega de diseño, la app queda genérica.
-- **D1-a (en el chat de Claude, tipo Design)**: Jesús aporta 2–3 apps de referencia, la sensación deseada (confiable y sobrio / cercano y amable / moderno y vivo) y logo o colores si existen. Claude propone identidad (paleta, tipografías gratuitas de Google Fonts, logo provisional), kit de componentes (botón, campo, tarjeta, chip de estado, lista vacía, error, cargando) y unas 6 pantallas clave: bienvenida, login, lista de inmuebles, detalle de contrato, reportar pago, panel. Jesús elige entre variantes y aprueba.
-- **D1-b (prompt de código)**: aplicar el diseño aprobado en `src/tema.ts` y `src/componentes/`; íconos y splash reales (reemplazar los de la plantilla); fuentes con `expo-font`/`@expo-google-fonts` (gratis); y corregir `src/utilidades/fechas.ts`: hoy un ISO con hora se toma como día calendario, y debe tratarse así solo si es medianoche UTC exacta (campo `@db.Date`); cualquier otra hora es un instante y se convierte al día de Bogotá (con pruebas, rojo primero).
-- **Fuera**: pantallas de negocio (E2+). Modo oscuro: se decide en D1-a (por defecto, solo claro, como `userInterfaceStyle: light`).
+- **D1-a (hecha)**: Jesús eligió la dirección **Medianoche** en Claude Design (lienzo "RentCheck · Direcciones visuales R2", fila A). Referencia visual en HTML: `docs/diseno/medianoche/` (Panel, Pago, Inquilino, Componentes). Lenguaje: cabecera de tinta profunda con motivo de curvas de nivel, cifra protagonista, acento lima para acciones y datos clave, superficies claras con sombras teñidas, Manrope, iconos propios (contorno y duotono), avatares de relieve generados por persona (sin rostros), estados con "señal" vertical luminosa más texto, gráficas de área, anillo, mini-plano de unidades y línea de tiempo.
+- **Correcciones al diseño** (se aplican en D1-b y en las pantallas de E5–E9): (1) un período con comprobante pendiente es **En revisión**, nunca Vencido; solo vuelve a Vencido si se rechaza; (2) en los documentos del inquilino no existe "Acta de entrega" (solo contrato original, otrosíes y comprobantes aprobados); (3) etiquetas de la barra inferior a 12 sp si no caben en 360 dp; (4) el motivo y el mensaje del rechazo dependen de B-59; (5) "11 de 11 a tiempo" y los días de mora salen de la API: si no los devuelve, no se muestran.
+- **D1-b (código)**: `expo-font` + `@expo-google-fonts/manrope`; `src/tema.ts` con los tokens del diseño; componentes en `src/componentes/` (botones y estados, chip de estado por enumeración real, control segmentado, navegación inferior con píldora, iconos, avatar de relieve por nombre, cabecera de tinta, superficie, esqueleto de carga, pantalla "Conectando"); gráficas con `react-native-svg` y `expo-linear-gradient` (área de ingresos, anillo de recaudo, mini-plano de ocupación, línea de tiempo de períodos); pantalla Galería de pruebas; bienvenida y diagnóstico restilizados; ícono y splash reales; corrección de `src/utilidades/fechas.ts` (un ISO con hora se trata como instante, salvo medianoche UTC exacta, que es un `@db.Date`). Sin pantallas de negocio ni animaciones complejas (Reanimated queda para E12).
+- **Fuera**: pantallas de negocio (E2+), modo oscuro, animaciones.
 
 ### E2 — Autenticación
 
@@ -90,7 +90,7 @@ Cada ficha: objetivo · pantallas · reglas clave · referencias · prueba manua
 - **Inquilino**: lista de períodos (por vencer, vencidos, en revisión), datos de recaudo, reportar pago (período sugerido, monto, fecha, comprobante por cámara, galería o PDF).
 - **Arrendador**: cola de validación con monto esperado vs. reportado, aprobar o rechazar (con motivo) con confirmación.
 - **Reglas**: dinero en centavos; el comprobante nunca se borra (valor legal); "anular aprobación" llega con B0.6 (B-45) y se agrega entonces.
-- **Referencias**: Contexto F5, §5.10, §7.3; Plan B-xx de pagos (mora, períodos).
+- **Referencias**: Contexto F5, §5.10, §7.3; Plan B-xx de pagos (mora, períodos). **Depende de B0.6-A** para el motivo y el mensaje del rechazo (B-59); hasta entonces el rechazo no los guarda.
 - **Prueba manual**: reportar pago con foto; aprobarlo desde la otra cuenta; rechazar otro y ver el estado.
 
 ### E8 — Mantenimiento
@@ -102,13 +102,13 @@ Cada ficha: objetivo · pantallas · reglas clave · referencias · prueba manua
 ### E9 — Alertas y panel
 
 - **Pantallas**: bandeja de alertas de ambos roles con enlace al recurso; Panel del arrendador (ingresos, recaudo esperado vs. real, ocupación, pendientes, tendencia).
-- **Depende de B0.6** (alertas del inquilino, B-18). Las del arrendador ya existen.
+- **Depende de B0.6-A** (endpoint del Panel del arrendador, B-58) y de **B0.6-B** (alertas del inquilino, B-18). Las alertas del arrendador ya existen.
 - **Referencias**: Contexto §11, §9.
 
 ### E10 — Notificaciones push
 
 - **Incluye**: permisos, registro del token en el backend, recepción y navegación al recurso, preferencias por tipo.
-- **Depende de B0.6** (tokens y envío). **Requiere development build** y credencial FCM (Firebase plan gratis subida a EAS). Aquí se da el primer uso de una compilación EAS; se confirma antes la cuota vigente.
+- **Depende de B0.6-B** (tokens y envío). **Requiere development build** y credencial FCM (Firebase plan gratis subida a EAS). Aquí se da el primer uso de una compilación EAS; se confirma antes la cuota vigente.
 
 ### E11 — Sin conexión
 
@@ -117,7 +117,7 @@ Cada ficha: objetivo · pantallas · reglas clave · referencias · prueba manua
 
 ### E12 — Endurecimiento y APK
 
-- **Incluye**: biometría en acciones sensibles, borrado de datos locales al cerrar sesión, versión mínima de la app, renovación de sesión y cierre de todas las sesiones (B0.6), APK `preview` por EAS, recorrido completo F1 a F11 con el checklist de Contexto §14–§15, revisión de permisos de Android y ficha de privacidad.
+- **Incluye**: biometría en acciones sensibles, borrado de datos locales al cerrar sesión, versión mínima de la app, renovación de sesión y cierre de todas las sesiones (B0.6-B), APK `preview` por EAS, recorrido completo F1 a F11 con el checklist de Contexto §14–§15, revisión de permisos de Android y ficha de privacidad.
 - **Fuera de V1**: publicación en Play Store (cuesta; se decide aparte), iOS.
 
 ## 4. Riesgos conocidos
@@ -133,4 +133,4 @@ Cada ficha: objetivo · pantallas · reglas clave · referencias · prueba manua
 
 ## 5. Orden y dependencias
 
-E1 → D1 → E2 → E3 → E4 → E5 → E6 → E7 → E8 → (B0.6 en paralelo) → E9 → E10 → E11 → E12. Mismo orden que el documento de instrucciones §8; no se cambia sin pedirlo.
+E1 → D1 → E2 → E3 → E4 → E5 → E6 → B0.6-A → E7 → E8 → B0.6-B → E9 → E10 → E11 → E12. Mismo orden que el documento de instrucciones §8; no se cambia sin pedirlo.
