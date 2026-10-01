@@ -1,0 +1,103 @@
+import { ErrorApi, ErrorSinConexion, ErrorTimeout } from './cliente';
+
+export const MENSAJE_GENERICO = 'Ocurrió un error inesperado. Inténtalo de nuevo.';
+export const MENSAJE_SIN_CONEXION = 'No hay conexión a internet. Revisa tu red e inténtalo de nuevo.';
+export const MENSAJE_TIMEOUT = 'El servidor tardó demasiado en responder. Inténtalo de nuevo.';
+
+/**
+ * Código de la API (`error.codigo`) → mensaje en español de Colombia.
+ * Los códigos salen de docs/api/openapi.json, del filtro global de errores del backend
+ * y de respuestas reales de producción. Si el backend agrega uno nuevo, se agrega aquí;
+ * mientras tanto se muestra el mensaje genérico.
+ */
+export const MENSAJES_ERROR: Record<string, string> = {
+  // Genéricos del filtro global (por estado HTTP)
+  SOLICITUD_INVALIDA: 'La solicitud no es válida.',
+  VALIDACION: 'Revisa los datos: alguno no es válido.',
+  NO_AUTENTICADO: 'No pudimos verificar tu identidad. Revisa tus datos o inicia sesión de nuevo.',
+  PROHIBIDO: 'No tienes permiso para hacer esto.',
+  NO_ENCONTRADO: 'No encontrado. Puede que ya no exista o que no tengas acceso.',
+  CONFLICTO: 'Esto choca con información que ya existe. Revisa e inténtalo de nuevo.',
+  CARGA_DEMASIADO_GRANDE: 'El archivo es demasiado grande.',
+  DEMASIADAS_SOLICITUDES: 'Estás haciendo demasiadas solicitudes. Espera un momento e inténtalo de nuevo.',
+  ERROR_INTERNO: 'Ocurrió un error en el servidor. Inténtalo de nuevo en unos minutos.',
+
+  // Cuenta, correo y códigos de acceso
+  CODIGO_INVALIDO: 'El código no es válido o ya venció. Revisa e inténtalo de nuevo.',
+  DEMASIADOS_INTENTOS: 'Hiciste demasiados intentos. Espera unos minutos y vuelve a intentarlo.',
+  CORREO_NO_DISPONIBLE: 'El envío de correos no está disponible por ahora.',
+  CORREO_NO_VERIFICADO: 'Debes verificar tu correo antes de iniciar sesión.',
+  REQUIERE_INICIO_SESION: 'Ya tienes una cuenta. Inicia sesión para agregar este contrato.',
+  CAMPO_NO_EDITABLE: 'Alguno de los datos que intentas cambiar no se puede editar.',
+  SIN_CAMPOS: 'No enviaste ningún dato para cambiar.',
+
+  // Archivos
+  ARCHIVO_CONTENIDO_INVALIDO:
+    'El contenido del archivo no coincide con su tipo. Usa una foto (JPG o PNG), un PDF o un video MP4 válido.',
+  DOCUMENTO_NO_GENERADO: 'No se pudo generar el documento del contrato. Inténtalo de nuevo.',
+
+  // Inmuebles y unidades
+  ESTRATO_REQUERIDO: 'Debes indicar el estrato del inmueble.',
+  CAMPOS_RESIDENCIALES_REQUERIDOS:
+    'Para una unidad residencial debes indicar área, habitaciones, baños y ocupantes.',
+  INMUEBLE_CON_DOCUMENTOS: 'Este inmueble tiene documentos y no se puede eliminar.',
+  UNIDAD_CON_CONTRATO_ACTIVO: 'La unidad tiene un contrato activo y esta acción no se puede hacer.',
+
+  // Contratos
+  CEDULA_ARRENDADOR_REQUERIDA: 'Antes de crear un contrato debes registrar tu cédula o NIT en tu perfil.',
+  INQUILINO_REQUERIDO: 'Debes indicar el inquilino del contrato.',
+  INQUILINO_AMBIGUO: 'Indica un inquilino existente o uno nuevo, no los dos.',
+  INQUILINO_DATOS_INVALIDOS: 'Los datos del inquilino no son válidos.',
+  PLANTILLA_NO_CORRESPONDE_A_UNIDAD: 'La plantilla elegida no corresponde a esta unidad.',
+  FECHA_FIN_PASADA: 'La fecha de fin del contrato debe ser posterior a hoy.',
+  TRASLAPE_DE_CONTRATOS: 'Las fechas se cruzan con otro contrato de esta unidad.',
+  DEPOSITO_NO_PERMITIDO_VIVIENDA: 'En vivienda urbana no se puede exigir depósito (Ley 820 de 2003).',
+  CONTRATO_NO_ACTIVO: 'El contrato no está activo.',
+  CONTRATO_NO_PROGRAMADO: 'El contrato no está programado.',
+  CONTRATO_NO_EDITABLE: 'Este contrato ya no se puede corregir.',
+  CONTRATO_YA_VINCULADO: 'El inquilino ya vinculó este contrato, por lo que ya no se puede corregir.',
+  TRANSICION_INVALIDA: 'Ese cambio de estado no está permitido.',
+
+  // Incrementos, prórrogas y avisos
+  INCREMENTO_ANTES_DE_12_MESES:
+    'El incremento solo se puede aplicar cuando pasen 12 meses desde el inicio o desde el último incremento.',
+  INCREMENTO_YA_APLICADO: 'El incremento ya se aplicó.',
+  IPC_NO_CONFIGURADO: 'No hay un IPC configurado para el año que se necesita.',
+  PORCENTAJE_SUPERIOR_AL_IPC: 'En vivienda el incremento no puede superar el IPC del año anterior.',
+  PRORROGA_FUERA_DE_VENTANA: 'La prórroga solo se puede hacer dentro de los 90 días anteriores al vencimiento.',
+  PRORROGA_YA_APLICADA: 'La prórroga ya se aplicó.',
+  AVISO_YA_DADO: 'Ya hay un aviso de no renovación para este contrato.',
+  AVISO_NO_DADO: 'No hay un aviso de no renovación para cancelar.',
+  AVISO_FUERA_DE_PLAZO: 'El aviso de no renovación está fuera del plazo permitido.',
+  NO_PUEDE_CANCELAR_AVISO_AJENO: 'Solo quien dio el aviso de no renovación puede cancelarlo.',
+
+  // Terminación anticipada
+  TERMINACION_YA_SOLICITADA: 'Ya hay una solicitud de terminación pendiente.',
+  TERMINACION_NO_SOLICITADA: 'No hay una solicitud de terminación pendiente.',
+  TERMINACION_YA_CONFIRMADA: 'La terminación ya fue confirmada.',
+  NO_PUEDE_CONFIRMAR_SU_PROPIA_SOLICITUD: 'La otra parte es quien debe confirmar la solicitud.',
+  NO_PUEDE_CANCELAR_SOLICITUD_AJENA: 'Solo quien hizo la solicitud puede cancelarla.',
+  FECHA_EFECTIVA_INVALIDA: 'La fecha efectiva no es válida.',
+
+  // Pagos
+  PERIODO_INVALIDO: 'El período elegido no es válido.',
+  PERIODO_YA_PAGADO: 'Ese período ya está pagado.',
+  SIN_PERIODOS_PENDIENTES: 'No hay períodos pendientes de pago.',
+  FECHA_REPORTADA_ANTERIOR_A_INICIO: 'La fecha del pago no puede ser anterior al inicio del contrato.',
+  PAGO_YA_PROCESADO: 'Este pago ya fue aprobado o rechazado.',
+
+  // Solicitudes y envíos repetidos
+  SOLICITUD_EN_PROCESO: 'Ya hay una solicitud en proceso.',
+  IDEMPOTENCY_KEY_INVALIDA: 'No se pudo identificar el envío. Inténtalo de nuevo.',
+  IDEMPOTENCY_KEY_REUTILIZADA: 'Este envío ya se había hecho con otros datos. Inténtalo de nuevo.',
+};
+
+/** Mensaje en español para mostrar al usuario ante cualquier error. */
+export function mensajeDeError(error: unknown): string {
+  if (error instanceof ErrorSinConexion) return MENSAJE_SIN_CONEXION;
+  if (error instanceof ErrorTimeout) return MENSAJE_TIMEOUT;
+  if (error instanceof ErrorApi && error.codigo !== null) {
+    return MENSAJES_ERROR[error.codigo] ?? MENSAJE_GENERICO;
+  }
+  return MENSAJE_GENERICO;
+}
