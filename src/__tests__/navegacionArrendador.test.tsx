@@ -342,9 +342,9 @@ describe('barra inferior del arrendador (layouts reales)', () => {
     },
   );
 
-  it('Contratos ya no es "Próximamente": texto, botón "Nuevo contrato" y pestaña activa', async () => {
+  it('Contratos ya no es "Próximamente": lista (vacía aquí), botón "Nuevo contrato" y pestaña activa', async () => {
     const m = await montar(ARRENDADOR(), ['(arrendador)', '(pestanas)', 'contratos-arrendador']);
-    expect(m.textos()).toContain('Aquí verás tus contratos.');
+    expect(m.textos()).toContain('Aún no tienes contratos');
     expect(m.textos().join('|')).not.toContain('Próximamente');
     expect(m.pestana('Contratos').props).toMatchObject({ accessibilityState: { selected: true } });
     const boton = m.raiz.root.find(

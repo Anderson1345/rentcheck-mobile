@@ -164,3 +164,13 @@ describe('pasoDeErrorContrato: a qué paso lleva cada error', () => {
     expect(pasoDeErrorContrato(error)).toBe(paso);
   });
 });
+
+describe('contratos: documentos y código (E5-A)', () => {
+  it('documentos: GET /contratos/:id/documentos; regenerar: POST sin cuerpo', async () => {
+    const { listarDocumentos, regenerarCodigo } = jest.requireActual('../contratos');
+    await listarDocumentos('c1');
+    expect(mockGet).toHaveBeenLastCalledWith('/contratos/c1/documentos');
+    await regenerarCodigo('c1');
+    expect(mockPost).toHaveBeenLastCalledWith('/contratos/c1/regenerar-codigo');
+  });
+});

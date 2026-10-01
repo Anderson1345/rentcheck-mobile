@@ -910,11 +910,14 @@ describe('Contrato creado', () => {
     });
   });
 
-  it('"Listo" vuelve a la pestaña Inmuebles', async () => {
+  it('"Listo" lleva al detalle del contrato', async () => {
     datos.detalle = DETALLE;
     const { raiz } = await montarCreado();
     await pulsar(raiz, 'Listo');
-    expect(mockReplace).toHaveBeenCalledWith('/inmuebles');
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/contrato/[id]',
+      params: { id: 'c1' },
+    });
   });
 
   it('el botón Atrás de Android no vuelve al asistente: lleva a Inmuebles', async () => {

@@ -4,15 +4,21 @@ import {
   type ContratoDetalle,
   crearContrato,
   listarContratos,
+  listarDocumentos,
   listarInquilinos,
   obtenerContrato,
+  regenerarCodigo,
 } from '../api/contratos';
 import type { CuerpoCrearContrato } from '../contratos/cuerpo';
 
 /** Máximo permitido: 5 min. */
 export const STALE_TIME_CONTRATOS_MS = 2 * 60_000;
 
+/** Las URLs firmadas de los documentos caducan: máximo 1 minuto. */
+export const STALE_TIME_DOCUMENTOS_MS = 60_000;
+
 export const clavesContratos = {
+  documentos: (id: string) => ['contratos', 'documentos', id] as const,
   todos: ['contratos'] as const,
   detalle: (id: string) => ['contratos', 'detalle', id] as const,
   inquilinos: ['inquilinos'] as const,
@@ -61,6 +67,29 @@ export function useCrearContrato() {
     // Sin esperar el refresco: la pantalla pasa de inmediato al éxito.
     onSuccess: (creado) => {
       void refrescar(creado);
+    },
+  });
+}
+
+export function useDocumentos(id: string) {
+  return useQuery({
+    queryKey: clavesContratos.documentos(id),
+    queryFn: () => listarDocumentos(id),
+    staleTime: STALE_TIME_DOCUMENTOS_MS,
+  });
+}
+
+/** Tras regenerar, el detalle muestra de inmediato el código nuevo y la lista se vuelve a pedir. */
+export function useRegenerarCodigo(id: string) {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: () => regenerarCodigo(id),
+    onSuccess: (codigo) => {
+      cliente.setQueryData<ContratoDetalle>(clavesContratos.detalle(id), (actual) =>
+        actual ? { ...actual, codigo_acceso: codigo } : actual,
+      );
+      // Solo la lista: el detalle ya tiene el código nuevo (no hace falta volver a pedirlo).
+      void cliente.invalidateQueries({ queryKey: clavesContratos.todos, exact: true });
     },
   });
 }
