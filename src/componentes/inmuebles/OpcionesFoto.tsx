@@ -11,13 +11,15 @@ interface Props {
   /** Recibe la foto ya validada (JPG o PNG, hasta 10 MB). */
   onElegida: (archivo: ArchivoFoto) => void;
   deshabilitado?: boolean;
+  /** Se llama antes de abrir la cámara o la galería; si devuelve false, no se abre (p. ej. falta la zona). */
+  antesDeElegir?: () => boolean;
 }
 
 /**
  * "Tomar foto" y "Elegir de la galería". Si falta el permiso de la cámara explica cómo activarlo
  * (y, si se negó para siempre, ofrece abrir los ajustes); el resto de la pantalla sigue funcionando.
  */
-export function OpcionesFoto({ onElegida, deshabilitado = false }: Props) {
+export function OpcionesFoto({ onElegida, deshabilitado = false, antesDeElegir }: Props) {
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [verAjustes, setVerAjustes] = useState(false);
   const [abierto, setAbierto] = useState(false);
@@ -26,6 +28,7 @@ export function OpcionesFoto({ onElegida, deshabilitado = false }: Props) {
 
   async function elegir(origen: OrigenFoto) {
     if (enCurso.current || deshabilitado) return;
+    if (antesDeElegir && !antesDeElegir()) return;
     enCurso.current = true;
     setAbierto(true);
     setMensaje(null);

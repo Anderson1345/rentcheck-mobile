@@ -1,5 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import * as Clipboard from 'expo-clipboard';
+import { useEffect, useState } from 'react';
+import QRCode from 'react-native-qrcode-svg';
 import { BackHandler, Share, StyleSheet, View } from 'react-native';
 
 import { mensajeDeError } from '@/api/errores';
@@ -11,7 +13,7 @@ import { PantallaPila } from '@/componentes/PantallaPila';
 import { Superficie } from '@/componentes/Superficie';
 import { Texto } from '@/componentes/Texto';
 import { useContrato } from '@/consultas/contratos';
-import { colores, espaciado } from '@/tema';
+import { colores, espaciado, radios } from '@/tema';
 import { formatearFechaLarga } from '@/utilidades/fechas';
 
 export default function ContratoCreado() {
@@ -20,6 +22,7 @@ export default function ContratoCreado() {
   const { data: contrato, isPending, error, refetch } = useContrato(id);
 
   const irAInmuebles = () => router.replace('/inmuebles');
+  const [copia, setCopia] = useState<'copiado' | 'error' | null>(null);
 
   // El asistente ya no existe en la pila; Atrás (físico) lleva a Inmuebles, no a un paso viejo.
   useEffect(() => {
@@ -59,6 +62,17 @@ export default function ContratoCreado() {
     void Share.share({ message: mensaje });
   }
 
+  // Se copia SOLO el texto del código. Si falla, el aviso no repite el código.
+  async function copiar() {
+    if (!acceso) return;
+    try {
+      await Clipboard.setStringAsync(acceso.codigo);
+      setCopia('copiado');
+    } catch {
+      setCopia('error');
+    }
+  }
+
   return (
     <PantallaPila>
       <Texto variante="titulo" accessibilityRole="header">
@@ -86,13 +100,40 @@ export default function ContratoCreado() {
             {acceso.codigo}
           </Texto>
           <Texto variante="cuerpo">{`Vence el ${formatearFechaLarga(acceso.expira_en)}`}</Texto>
+          {/* El QR lleva solo el texto del código (RC-XXXX-XXXX), sin enlace. */}
+          <View accessible accessibilityLabel="Código QR del código de acceso" style={estilos.qr}>
+            <QRCode value={acceso.codigo} size={176} />
+          </View>
+          {copia === 'copiado' ? <Aviso tono="exito" mensaje="Copiado" /> : null}
+          {copia === 'error' ? <Aviso mensaje="No pudimos copiar el código." /> : null}
         </Superficie>
       ) : null}
 
       <View style={estilos.botones}>
         {acceso ? (
-          <Boton titulo="Compartir código" icono="compartir" ancho="completo" onPress={compartir} />
+          <>
+            <Boton
+              titulo="Copiar código"
+              variante="secundario"
+              ancho="completo"
+              onPress={() => void copiar()}
+            />
+            <Boton
+              titulo="Compartir código"
+              icono="compartir"
+              ancho="completo"
+              onPress={compartir}
+            />
+          </>
         ) : null}
+        <Boton
+          titulo="Registrar inventario de entrega"
+          variante="secundario"
+          ancho="completo"
+          onPress={() =>
+            router.push({ pathname: '/contrato/[id]/inventario', params: { id: contrato.id } })
+          }
+        />
         <Boton titulo="Listo" variante="secundario" ancho="completo" onPress={irAInmuebles} />
       </View>
     </PantallaPila>
@@ -102,4 +143,10 @@ export default function ContratoCreado() {
 const estilos = StyleSheet.create({
   tarjeta: { gap: espaciado.xs },
   botones: { gap: espaciado.xs, marginTop: espaciado.sm },
+  qr: {
+    alignSelf: 'center',
+    padding: espaciado.sm,
+    borderRadius: radios.medio,
+    backgroundColor: '#FFFFFF',
+  },
 });
