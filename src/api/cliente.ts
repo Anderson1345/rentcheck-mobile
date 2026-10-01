@@ -22,7 +22,12 @@ export class ErrorApi extends ErrorRentCheck {
   readonly mensaje: string;
   readonly detalles?: unknown;
 
-  constructor(datos: { status: number; codigo: string | null; mensaje: string; detalles?: unknown }) {
+  constructor(datos: {
+    status: number;
+    codigo: string | null;
+    mensaje: string;
+    detalles?: unknown;
+  }) {
     super(datos.mensaje || `Error ${datos.status}`);
     this.status = datos.status;
     this.codigo = datos.codigo;
@@ -54,6 +59,13 @@ export function establecerProveedorToken(proveedor: ProveedorToken): void {
   proveedorToken = proveedor;
 }
 
+// Punto de inyección del manejo global de 401 (lo conecta SesionProvider).
+let manejador401: (tokenEnviado: string) => void = () => undefined;
+
+export function establecerManejador401(manejador: (tokenEnviado: string) => void): void {
+  manejador401 = manejador;
+}
+
 export interface OpcionesCliente {
   /** Por defecto, EXPO_PUBLIC_API_URL. */
   baseUrl?: string;
@@ -61,6 +73,8 @@ export interface OpcionesCliente {
   obtenerToken?: ProveedorToken;
   /** Reloj en milisegundos; se inyecta en las pruebas. */
   ahora?: () => number;
+  /** Se llama ante un 401 de un endpoint que no es de acceso, con el token que se envió. */
+  alRecibir401?: (tokenEnviado: string) => void;
 }
 
 type Metodo = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -84,7 +98,8 @@ function leerCuerpo(texto: string): unknown {
 }
 
 function aErrorApi(status: number, cuerpo: unknown): ErrorApi {
-  const objeto = typeof cuerpo === 'object' && cuerpo !== null ? (cuerpo as Record<string, unknown>) : {};
+  const objeto =
+    typeof cuerpo === 'object' && cuerpo !== null ? (cuerpo as Record<string, unknown>) : {};
   const mensaje =
     typeof objeto.mensaje === 'string'
       ? objeto.mensaje
@@ -99,10 +114,17 @@ function aErrorApi(status: number, cuerpo: unknown): ErrorApi {
   });
 }
 
+/** Endpoints públicos de acceso (/auth/*): un 401 ahí es "credenciales inválidas", no una sesión vencida. */
+export function esRutaDeAcceso(ruta: string): boolean {
+  return ruta.startsWith('/auth/');
+}
+
 export function crearClienteApi(opciones: OpcionesCliente = {}): ClienteApi {
   const fetchImpl = opciones.fetchImpl ?? ((url, init) => fetch(url, init));
   const obtenerToken = opciones.obtenerToken ?? (() => proveedorToken());
   const ahora = opciones.ahora ?? (() => Date.now());
+  const alRecibir401 =
+    opciones.alRecibir401 ?? ((tokenEnviado: string) => manejador401(tokenEnviado));
   let ultimaRespuestaEn: number | null = null;
 
   function urlBase(): string {
@@ -149,6 +171,8 @@ export function crearClienteApi(opciones: OpcionesCliente = {}): ClienteApi {
       }
 
       const contenido = leerCuerpo(texto);
+      // Un 401 con token fuera de los endpoints de acceso es una sesión vencida o revocada.
+      if (status === 401 && token && !esRutaDeAcceso(ruta)) alRecibir401(token);
       if (status < 200 || status >= 300) throw aErrorApi(status, contenido);
       return contenido as T;
     } finally {

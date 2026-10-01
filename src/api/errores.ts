@@ -1,7 +1,8 @@
 import { ErrorApi, ErrorSinConexion, ErrorTimeout } from './cliente';
 
 export const MENSAJE_GENERICO = 'Ocurrió un error inesperado. Inténtalo de nuevo.';
-export const MENSAJE_SIN_CONEXION = 'No hay conexión a internet. Revisa tu red e inténtalo de nuevo.';
+export const MENSAJE_SIN_CONEXION =
+  'No hay conexión a internet. Revisa tu red e inténtalo de nuevo.';
 export const MENSAJE_TIMEOUT = 'El servidor tardó demasiado en responder. Inténtalo de nuevo.';
 
 /**
@@ -14,12 +15,13 @@ export const MENSAJES_ERROR: Record<string, string> = {
   // Genéricos del filtro global (por estado HTTP)
   SOLICITUD_INVALIDA: 'La solicitud no es válida.',
   VALIDACION: 'Revisa los datos: alguno no es válido.',
-  NO_AUTENTICADO: 'No pudimos verificar tu identidad. Revisa tus datos o inicia sesión de nuevo.',
+  // Fuera del acceso, un 401 cierra la sesión (MENSAJE_SESION_VENCIDA); aquí se ve en el login.
+  NO_AUTENTICADO: 'Credenciales inválidas. Revisa tu correo y tu contraseña.',
   PROHIBIDO: 'No tienes permiso para hacer esto.',
   NO_ENCONTRADO: 'No encontrado. Puede que ya no exista o que no tengas acceso.',
   CONFLICTO: 'Esto choca con información que ya existe. Revisa e inténtalo de nuevo.',
   CARGA_DEMASIADO_GRANDE: 'El archivo es demasiado grande.',
-  DEMASIADAS_SOLICITUDES: 'Estás haciendo demasiadas solicitudes. Espera un momento e inténtalo de nuevo.',
+  DEMASIADAS_SOLICITUDES: 'Demasiados intentos seguidos. Espera un momento e inténtalo de nuevo.',
   ERROR_INTERNO: 'Ocurrió un error en el servidor. Inténtalo de nuevo en unos minutos.',
 
   // Cuenta, correo y códigos de acceso
@@ -44,18 +46,21 @@ export const MENSAJES_ERROR: Record<string, string> = {
   UNIDAD_CON_CONTRATO_ACTIVO: 'La unidad tiene un contrato activo y esta acción no se puede hacer.',
 
   // Contratos
-  CEDULA_ARRENDADOR_REQUERIDA: 'Antes de crear un contrato debes registrar tu cédula o NIT en tu perfil.',
+  CEDULA_ARRENDADOR_REQUERIDA:
+    'Antes de crear un contrato debes registrar tu cédula o NIT en tu perfil.',
   INQUILINO_REQUERIDO: 'Debes indicar el inquilino del contrato.',
   INQUILINO_AMBIGUO: 'Indica un inquilino existente o uno nuevo, no los dos.',
   INQUILINO_DATOS_INVALIDOS: 'Los datos del inquilino no son válidos.',
   PLANTILLA_NO_CORRESPONDE_A_UNIDAD: 'La plantilla elegida no corresponde a esta unidad.',
   FECHA_FIN_PASADA: 'La fecha de fin del contrato debe ser posterior a hoy.',
   TRASLAPE_DE_CONTRATOS: 'Las fechas se cruzan con otro contrato de esta unidad.',
-  DEPOSITO_NO_PERMITIDO_VIVIENDA: 'En vivienda urbana no se puede exigir depósito (Ley 820 de 2003).',
+  DEPOSITO_NO_PERMITIDO_VIVIENDA:
+    'En vivienda urbana no se puede exigir depósito (Ley 820 de 2003).',
   CONTRATO_NO_ACTIVO: 'El contrato no está activo.',
   CONTRATO_NO_PROGRAMADO: 'El contrato no está programado.',
   CONTRATO_NO_EDITABLE: 'Este contrato ya no se puede corregir.',
-  CONTRATO_YA_VINCULADO: 'El inquilino ya vinculó este contrato, por lo que ya no se puede corregir.',
+  CONTRATO_YA_VINCULADO:
+    'El inquilino ya vinculó este contrato, por lo que ya no se puede corregir.',
   TRANSICION_INVALIDA: 'Ese cambio de estado no está permitido.',
 
   // Incrementos, prórrogas y avisos
@@ -64,7 +69,8 @@ export const MENSAJES_ERROR: Record<string, string> = {
   INCREMENTO_YA_APLICADO: 'El incremento ya se aplicó.',
   IPC_NO_CONFIGURADO: 'No hay un IPC configurado para el año que se necesita.',
   PORCENTAJE_SUPERIOR_AL_IPC: 'En vivienda el incremento no puede superar el IPC del año anterior.',
-  PRORROGA_FUERA_DE_VENTANA: 'La prórroga solo se puede hacer dentro de los 90 días anteriores al vencimiento.',
+  PRORROGA_FUERA_DE_VENTANA:
+    'La prórroga solo se puede hacer dentro de los 90 días anteriores al vencimiento.',
   PRORROGA_YA_APLICADA: 'La prórroga ya se aplicó.',
   AVISO_YA_DADO: 'Ya hay un aviso de no renovación para este contrato.',
   AVISO_NO_DADO: 'No hay un aviso de no renovación para cancelar.',
@@ -83,7 +89,8 @@ export const MENSAJES_ERROR: Record<string, string> = {
   PERIODO_INVALIDO: 'El período elegido no es válido.',
   PERIODO_YA_PAGADO: 'Ese período ya está pagado.',
   SIN_PERIODOS_PENDIENTES: 'No hay períodos pendientes de pago.',
-  FECHA_REPORTADA_ANTERIOR_A_INICIO: 'La fecha del pago no puede ser anterior al inicio del contrato.',
+  FECHA_REPORTADA_ANTERIOR_A_INICIO:
+    'La fecha del pago no puede ser anterior al inicio del contrato.',
   PAGO_YA_PROCESADO: 'Este pago ya fue aprobado o rechazado.',
 
   // Solicitudes y envíos repetidos
@@ -92,12 +99,27 @@ export const MENSAJES_ERROR: Record<string, string> = {
   IDEMPOTENCY_KEY_REUTILIZADA: 'Este envío ya se había hecho con otros datos. Inténtalo de nuevo.',
 };
 
+export const MENSAJE_SESION_VENCIDA = 'Tu sesión venció. Inicia sesión de nuevo.';
+const MENSAJE_REGISTRO_NO_COMPLETADO =
+  'No pudimos completar el registro con esos datos. Si ya tienes una cuenta, inicia sesión.';
+
 /** Mensaje en español para mostrar al usuario ante cualquier error. */
 export function mensajeDeError(error: unknown): string {
   if (error instanceof ErrorSinConexion) return MENSAJE_SIN_CONEXION;
   if (error instanceof ErrorTimeout) return MENSAJE_TIMEOUT;
-  if (error instanceof ErrorApi && error.codigo !== null) {
-    return MENSAJES_ERROR[error.codigo] ?? MENSAJE_GENERICO;
+  if (error instanceof ErrorApi) {
+    if (error.codigo !== null) return MENSAJES_ERROR[error.codigo] ?? MENSAJE_GENERICO;
+    // El límite de peticiones puede responder sin código propio.
+    if (error.status === 429) return MENSAJES_ERROR.DEMASIADAS_SOLICITUDES;
   }
   return MENSAJE_GENERICO;
+}
+
+/**
+ * Igual que mensajeDeError, pero un 409 del registro dice "no se pudo completar" sin revelar si
+ * el correo ya existe (el backend responde lo mismo a propósito).
+ */
+export function mensajeDeErrorRegistro(error: unknown): string {
+  if (error instanceof ErrorApi && error.status === 409) return MENSAJE_REGISTRO_NO_COMPLETADO;
+  return mensajeDeError(error);
 }

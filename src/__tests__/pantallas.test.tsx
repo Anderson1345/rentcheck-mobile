@@ -1,19 +1,29 @@
-// Prueba de humo de las pantallas de D1-b: que rendericen sin errores, que todo texto use Manrope
-// y ningún texto baje de 14 sp (12 sp solo en la barra inferior), y que la Galería muestre todos
-// los estados del Contexto. No reemplaza el recorrido en el teléfono.
+// Prueba de humo de las pantallas: que rendericen sin errores, que todo texto use Manrope y ningún
+// texto baje de 14 sp (12 sp solo en la barra inferior), y que la Galería muestre todos los estados
+// del Contexto. No reemplaza el recorrido en el teléfono.
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { StyleSheet, Text, TextInput, type TextStyle } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
+import PanelArrendador from '../../app/(arrendador)/panel';
+import ContratosInquilino from '../../app/(inquilino)/contratos';
 import Bienvenida from '../../app/(auth)/index';
+import LoginArrendador from '../../app/(auth)/login-arrendador';
+import LoginInquilino from '../../app/(auth)/login-inquilino';
+import RegistroArrendador from '../../app/(auth)/registro-arrendador';
+import VerificaCorreo from '../../app/(auth)/verifica-correo';
 import Diagnostico from '../../app/(auth)/diagnostico';
 import Galeria from '../../app/(auth)/galeria';
 import { MAPAS_ESTADO, URGENCIAS } from '../componentes/estados';
+import { crearToken } from '../pruebas/crearToken';
+import { crearControladorSesion } from '../sesion/controlador';
+import { SesionProvider } from '../sesion/SesionProvider';
 import { fuentes } from '../tema';
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({ push: jest.fn(), back: jest.fn(), replace: jest.fn(), dismissTo: jest.fn() }),
+  useLocalSearchParams: () => ({ correo: 'marta@ejemplo.com' }),
 }));
 jest.mock(
   'react-native-safe-area-context',
@@ -38,7 +48,32 @@ afterEach(() => {
   for (const cliente of clientes.splice(0)) cliente.clear();
 });
 
-async function renderizar(elemento: ReactElement): Promise<ReactTestRenderer> {
+/** Sesión de prueba: sin nada guardado (anónimo) o con un arrendador ya iniciado. */
+async function sesionDePrueba(conArrendador: boolean) {
+  const guardado = conArrendador
+    ? {
+        token: crearToken({ id: 'a1', exp: 4_102_444_800 }),
+        rol: 'arrendador' as const,
+        usuario: { id: 'a1', nombre: 'Marta Ríos', correo: 'marta@ejemplo.com' },
+      }
+    : null;
+  const controlador = crearControladorSesion({
+    almacen: {
+      guardar: async () => undefined,
+      leer: async () => guardado,
+      borrar: async () => undefined,
+    },
+    limpiarCache: () => undefined,
+  });
+  await controlador.arrancar();
+  return controlador;
+}
+
+async function renderizar(
+  elemento: ReactElement,
+  conArrendador = false,
+): Promise<ReactTestRenderer> {
+  const controlador = await sesionDePrueba(conArrendador);
   // gcTime infinito: sin el temporizador de limpieza de 5 min que dejaría vivo a Jest.
   const cliente = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },
@@ -46,7 +81,11 @@ async function renderizar(elemento: ReactElement): Promise<ReactTestRenderer> {
   clientes.push(cliente);
   let renderizado!: ReactTestRenderer;
   act(() => {
-    renderizado = create(<QueryClientProvider client={cliente}>{elemento}</QueryClientProvider>);
+    renderizado = create(
+      <QueryClientProvider client={cliente}>
+        <SesionProvider controlador={controlador}>{elemento}</SesionProvider>
+      </QueryClientProvider>,
+    );
   });
   return renderizado;
 }
@@ -74,9 +113,15 @@ describe.each([
   ['Bienvenida', () => <Bienvenida />],
   ['Diagnóstico', () => <Diagnostico />],
   ['Galería', () => <Galeria />],
-])('%s', (_nombre, pantalla) => {
+  ['Login del arrendador', () => <LoginArrendador />],
+  ['Registro del arrendador', () => <RegistroArrendador />],
+  ['Login del inquilino', () => <LoginInquilino />],
+  ['Revisa tu correo', () => <VerificaCorreo />],
+  ['Panel provisional del arrendador', () => <PanelArrendador />, true],
+  ['Contratos provisional del inquilino', () => <ContratosInquilino />, true],
+])('%s', (_nombre, pantalla, conArrendador = false) => {
   it('renderiza; todo texto usa Manrope y respeta el tamaño mínimo', async () => {
-    const raiz = await renderizar(pantalla());
+    const raiz = await renderizar(pantalla(), conArrendador);
     const lista = estilosDeTexto(raiz);
     expect(lista.length).toBeGreaterThan(0);
     for (const { estilo } of lista) {

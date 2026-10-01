@@ -2,15 +2,19 @@ import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { MENSAJE_SESION_VENCIDA } from '@/api/errores';
+import { Aviso } from '@/componentes/Aviso';
 import { Boton } from '@/componentes/Boton';
 import { CabeceraTinta, ContenidoBajoCabecera } from '@/componentes/CabeceraTinta';
 import { Marca } from '@/componentes/Marca';
 import { Texto } from '@/componentes/Texto';
+import { useSesion } from '@/sesion/SesionProvider';
 import { blancoAlfa, colores, espaciado } from '@/tema';
 
 export default function Bienvenida() {
   const router = useRouter();
   const { bottom } = useSafeAreaInsets();
+  const { aviso } = useSesion();
 
   return (
     <View style={estilos.pantalla}>
@@ -22,20 +26,23 @@ export default function Bienvenida() {
       </CabeceraTinta>
 
       <ContenidoBajoCabecera style={[estilos.cuerpo, { paddingBottom: bottom + espaciado.xs }]}>
+        {aviso === 'SESION_VENCIDA' ? (
+          <Aviso tono="advertencia" mensaje={MENSAJE_SESION_VENCIDA} />
+        ) : null}
         <Texto variante="tituloSeccion">¿Cómo vas a usar RentCheck?</Texto>
         <View style={estilos.acciones}>
           <Boton
             titulo="Soy arrendador"
             icono="inmuebles"
             ancho="completo"
-            onPress={() => router.push('/panel')}
+            onPress={() => router.push('/login-arrendador')}
           />
           <Boton
             titulo="Soy inquilino"
             icono="perfil"
             variante="secundario"
             ancho="completo"
-            onPress={() => router.push('/contratos')}
+            onPress={() => router.push('/login-inquilino')}
           />
         </View>
 

@@ -1,12 +1,5 @@
-import { Stack } from 'expo-router';
-
-import { Proximamente } from '@/componentes/Proximamente';
+import { InicioProvisional } from '@/componentes/InicioProvisional';
 
 export default function ContratosInquilino() {
-  return (
-    <>
-      <Stack.Screen options={{ title: 'Inquilino' }} />
-      <Proximamente titulo="Soy inquilino" entrega="E2" />
-    </>
-  );
+  return <InicioProvisional rol="Inquilino" entrega="E4" />;
 }

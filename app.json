@@ -9,6 +9,7 @@
     "userInterfaceStyle": "light",
     "android": {
       "package": "com.rentcheck.app",
+      "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#0A1A1F",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -27,7 +28,8 @@
           "imageWidth": 200
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

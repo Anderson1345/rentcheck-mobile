@@ -2,7 +2,7 @@ import { Stack } from 'expo-router';
 
 import { OPCIONES_STACK } from '@/componentes/navegacion/opcionesStack';
 
-// E2 agrega aquí la guardia por rol y la barra inferior (NavInferior).
+// El acceso por rol lo protege el layout raíz (Stack.Protected). E3/E4 agregan aquí la barra inferior.
 export default function LayoutInquilino() {
-  return <Stack screenOptions={OPCIONES_STACK} />;
+  return <Stack screenOptions={{ ...OPCIONES_STACK, headerShown: false }} />;
 }

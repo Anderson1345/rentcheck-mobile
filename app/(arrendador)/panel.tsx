@@ -1,12 +1,5 @@
-import { Stack } from 'expo-router';
-
-import { Proximamente } from '@/componentes/Proximamente';
+import { InicioProvisional } from '@/componentes/InicioProvisional';
 
 export default function PanelArrendador() {
-  return (
-    <>
-      <Stack.Screen options={{ title: 'Arrendador' }} />
-      <Proximamente titulo="Soy arrendador" entrega="E2" />
-    </>
-  );
+  return <InicioProvisional rol="Arrendador" entrega="E3" />;
 }
