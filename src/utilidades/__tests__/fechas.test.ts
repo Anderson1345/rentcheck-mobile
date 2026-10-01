@@ -1,9 +1,4 @@
-import {
-  compararFechas,
-  formatearFechaCorta,
-  formatearFechaLarga,
-  hoyBogota,
-} from '../fechas';
+import { compararFechas, formatearFechaCorta, formatearFechaLarga, hoyBogota } from '../fechas';
 
 describe('hoyBogota', () => {
   it('devuelve AAAA-MM-DD de Bogotá a mediodía', () => {
@@ -52,6 +47,28 @@ describe('formatearFechaLarga', () => {
 
   it('toma el día calendario de una fecha ISO de la API (@db.Date) sin correrlo de día', () => {
     expect(formatearFechaLarga('2026-10-01T00:00:00.000Z')).toBe('1 de octubre de 2026');
+    expect(formatearFechaLarga('2026-10-01T00:00:00Z')).toBe('1 de octubre de 2026');
+  });
+
+  it('un texto ISO con hora (que no es medianoche UTC exacta) es un instante y se pasa a Bogotá', () => {
+    // 03:00 UTC del 2 de octubre = 22:00 del 1 de octubre en Bogotá
+    expect(formatearFechaLarga('2026-10-02T03:00:00Z')).toBe('1 de octubre de 2026');
+    expect(formatearFechaLarga('2026-10-02T03:00:00.000Z')).toBe('1 de octubre de 2026');
+    // 05:00 UTC = medianoche en Bogotá: ya es el mismo día
+    expect(formatearFechaLarga('2026-10-02T05:00:00Z')).toBe('2 de octubre de 2026');
+    // Con desfase explícito
+    expect(formatearFechaLarga('2026-10-01T23:30:00-05:00')).toBe('1 de octubre de 2026');
+    expect(formatearFechaLarga('2026-10-02T00:30:00+02:00')).toBe('1 de octubre de 2026');
+  });
+
+  it('medianoche con otro desfase no es un @db.Date: es un instante', () => {
+    // 00:00 en UTC+2 = 22:00 UTC del día anterior = 17:00 en Bogotá del día anterior
+    expect(formatearFechaLarga('2026-10-02T00:00:00+02:00')).toBe('1 de octubre de 2026');
+  });
+
+  it('rechaza textos ISO con hora inválidos', () => {
+    expect(() => formatearFechaLarga('2026-10-02T25:00:00Z')).toThrow();
+    expect(() => formatearFechaLarga('2026-10-02Tbasura')).toThrow();
   });
 
   it('un instante (Date) se convierte al día de Bogotá', () => {
@@ -91,5 +108,16 @@ describe('compararFechas', () => {
 
   it('un instante cuenta por su día en Bogotá', () => {
     expect(compararFechas(new Date('2026-10-01T03:00:00Z'), '2026-09-30')).toBe(0);
+  });
+
+  it('un texto ISO con hora cuenta por su día en Bogotá', () => {
+    expect(compararFechas('2026-10-02T03:00:00Z', '2026-10-01')).toBe(0);
+    expect(compararFechas('2026-10-02T03:00:00Z', '2026-10-02T00:00:00.000Z')).toBeLessThan(0);
+  });
+});
+
+describe('formatearFechaCorta con texto ISO con hora', () => {
+  it('pasa el instante al día de Bogotá', () => {
+    expect(formatearFechaCorta('2026-10-02T03:00:00Z')).toBe('01/10/2026');
   });
 });

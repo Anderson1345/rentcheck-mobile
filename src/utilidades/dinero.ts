@@ -15,6 +15,26 @@ export function centavosAPesosTexto(centavos: number): string {
   return `${centavos < 0 ? '-' : ''}$ ${pesosConPuntos}${fraccion}`;
 }
 
+/**
+ * Versión corta para gráficas: desde un millón de pesos, en millones con hasta dos decimales
+ * ("$ 13,65 M", "$ 18 M"); por debajo, el formato completo.
+ */
+export function centavosAPesosAbreviado(centavos: number): string {
+  if (!Number.isSafeInteger(centavos)) {
+    throw new RangeError('El dinero debe ser un entero de centavos.');
+  }
+  const magnitud = Math.abs(centavos);
+  if (magnitud < 100_000_000) return centavosAPesosTexto(centavos);
+
+  const centesimasDeMillon = Math.round(magnitud / 1_000_000);
+  const millones = Math.floor(centesimasDeMillon / 100);
+  const decimales = String(centesimasDeMillon % 100)
+    .padStart(2, '0')
+    .replace(/0+$/, '');
+  const entero = String(millones).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${centavos < 0 ? '-' : ''}$ ${entero}${decimales ? `,${decimales}` : ''} M`;
+}
+
 const SOLO_DIGITOS = /^\d+$/;
 const MILES_CON_PUNTOS = /^\d{1,3}(\.\d{3})+$/;
 const MILES_CON_COMAS = /^\d{1,3}(,\d{3})+$/;

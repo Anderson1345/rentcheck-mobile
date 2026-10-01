@@ -1,11 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api, ErrorApi } from '@/api/cliente';
 import { mensajeDeError } from '@/api/errores';
 import { Boton } from '@/componentes/Boton';
-import { Pantalla } from '@/componentes/Pantalla';
-import { colores, espaciado, radios, tipografia } from '@/tema';
+import { CabeceraTinta, ContenidoBajoCabecera, TituloCabecera } from '@/componentes/CabeceraTinta';
+import { FilaLista } from '@/componentes/FilaLista';
+import { PantallaConectando } from '@/componentes/PantallaConectando';
+import { Superficie } from '@/componentes/Superficie';
+import { Texto } from '@/componentes/Texto';
+import { colores, coloresEstado, espaciado } from '@/tema';
 import { centavosAPesosTexto } from '@/utilidades/dinero';
 import { formatearFechaLarga, hoyBogota } from '@/utilidades/fechas';
 
@@ -22,6 +28,8 @@ function describirValor(valor: unknown): string {
 }
 
 export default function Diagnostico() {
+  const router = useRouter();
+  const { bottom } = useSafeAreaInsets();
   const consulta = useQuery({
     queryKey: ['diagnostico'],
     queryFn: consultarServidor,
@@ -32,73 +40,91 @@ export default function Diagnostico() {
   const hoy = hoyBogota();
 
   return (
-    <Pantalla>
-      <ScrollView contentContainerStyle={estilos.contenido}>
-        <Text style={estilos.servidor}>
-          Servidor: {process.env.EXPO_PUBLIC_API_URL ?? '(sin configurar)'}
-        </Text>
+    <View style={estilos.pantalla}>
+      <CabeceraTinta conSolapa>
+        <TituloCabecera
+          titulo="Diagnóstico"
+          subtitulo={`Servidor: ${process.env.EXPO_PUBLIC_API_URL ?? '(sin configurar)'}`}
+          onVolver={() => router.back()}
+        />
+      </CabeceraTinta>
 
-        {consulta.isFetching ? (
-          <View style={estilos.tarjeta}>
-            <ActivityIndicator color={colores.primario} />
-            <Text style={estilos.estado}>Conectando con el servidor…</Text>
-            <Text style={estilos.nota}>La primera vez puede tardar hasta un minuto.</Text>
-          </View>
-        ) : consulta.isError ? (
-          <View style={estilos.tarjeta}>
-            <Text style={[estilos.estado, { color: colores.peligro }]}>No pudimos conectar</Text>
-            <Text style={estilos.texto}>{mensajeDeError(consulta.error)}</Text>
-            {consulta.error instanceof ErrorApi ? (
-              <Text style={estilos.nota}>
-                Detalle: {consulta.error.status}
-                {consulta.error.codigo ? ` · ${consulta.error.codigo}` : ''}
-              </Text>
-            ) : null}
-            <Boton titulo="Reintentar" onPress={() => void consulta.refetch()} />
-          </View>
-        ) : (
-          <View style={estilos.tarjeta}>
-            <Text style={[estilos.estado, { color: colores.exito }]}>Servidor conectado</Text>
-            <Text style={estilos.nota}>Respondió en {consulta.data?.milisegundos} ms.</Text>
-            {typeof consulta.data?.datos === 'object' && consulta.data.datos !== null
-              ? Object.entries(consulta.data.datos).map(([clave, valor]) => (
-                  <Text key={clave} style={estilos.texto}>
-                    {clave}: {describirValor(valor)}
-                  </Text>
-                ))
-              : null}
-            <Boton
-              titulo="Volver a probar"
-              variante="secundario"
-              onPress={() => void consulta.refetch()}
+      <ContenidoBajoCabecera style={estilos.cuerpo}>
+        <ScrollView
+          contentContainerStyle={[estilos.contenido, { paddingBottom: bottom + espaciado.xl }]}
+        >
+          {consulta.isFetching ? (
+            <PantallaConectando />
+          ) : consulta.isError ? (
+            <Superficie style={estilos.tarjeta}>
+              <Texto variante="cuerpoFuerte" color={coloresEstado.peligro.texto}>
+                No pudimos conectar
+              </Texto>
+              <Texto variante="cuerpo">{mensajeDeError(consulta.error)}</Texto>
+              {consulta.error instanceof ErrorApi ? (
+                <Texto variante="secundario" color={colores.textoSecundario} cifras>
+                  Detalle: {consulta.error.status}
+                  {consulta.error.codigo ? ` · ${consulta.error.codigo}` : ''}
+                </Texto>
+              ) : null}
+              <Boton titulo="Reintentar" ancho="completo" onPress={() => void consulta.refetch()} />
+            </Superficie>
+          ) : (
+            <Superficie relleno="ninguno">
+              <View style={estilos.encabezadoTarjeta}>
+                <Texto variante="cuerpoFuerte" color={coloresEstado.exito.texto}>
+                  Servidor conectado
+                </Texto>
+                <Texto variante="secundario" color={colores.textoSecundario} cifras>
+                  Respondió en {consulta.data?.milisegundos} ms.
+                </Texto>
+              </View>
+              {typeof consulta.data?.datos === 'object' && consulta.data.datos !== null
+                ? Object.entries(consulta.data.datos).map(([clave, valor]) => (
+                    <FilaLista key={clave} titulo={clave} valor={describirValor(valor)} separador />
+                  ))
+                : null}
+              <View style={estilos.accionTarjeta}>
+                <Boton
+                  titulo="Volver a probar"
+                  variante="secundario"
+                  ancho="completo"
+                  onPress={() => void consulta.refetch()}
+                />
+              </View>
+            </Superficie>
+          )}
+
+          <Texto variante="tituloSeccion" style={estilos.tituloSeccion}>
+            En este teléfono
+          </Texto>
+          <Superficie relleno="ninguno">
+            <FilaLista
+              titulo="Hoy en Bogotá"
+              subtitulo={hoy}
+              valor={formatearFechaLarga(hoy)}
+              icono="calendario"
             />
-          </View>
-        )}
-
-        <View style={estilos.tarjeta}>
-          <Text style={estilos.estado}>En este teléfono</Text>
-          <Text style={estilos.texto}>
-            Hoy en Bogotá: {formatearFechaLarga(hoy)} ({hoy})
-          </Text>
-          <Text style={estilos.texto}>Dinero de ejemplo: {centavosAPesosTexto(125_000_000)}</Text>
-        </View>
-      </ScrollView>
-    </Pantalla>
+            <FilaLista
+              titulo="Dinero de ejemplo"
+              subtitulo="125.000.000 centavos"
+              valor={centavosAPesosTexto(125_000_000)}
+              icono="pagos"
+              separador
+            />
+          </Superficie>
+        </ScrollView>
+      </ContenidoBajoCabecera>
+    </View>
   );
 }
 
 const estilos = StyleSheet.create({
-  contenido: { gap: espaciado.md },
-  servidor: { fontSize: tipografia.pequeno, color: colores.textoSecundario },
-  tarjeta: {
-    backgroundColor: colores.superficie,
-    borderRadius: radios.lg,
-    borderWidth: 1,
-    borderColor: colores.borde,
-    padding: espaciado.md,
-    gap: espaciado.sm,
-  },
-  estado: { fontSize: tipografia.subtitulo, fontWeight: '600', color: colores.texto },
-  texto: { fontSize: tipografia.normal, color: colores.texto },
-  nota: { fontSize: tipografia.pequeno, color: colores.textoSecundario },
+  pantalla: { flex: 1, backgroundColor: colores.fondo },
+  cuerpo: { flex: 1, paddingTop: 0, paddingHorizontal: 0 },
+  contenido: { gap: espaciado.md, paddingHorizontal: espaciado.md, paddingTop: espaciado.lg },
+  tarjeta: { gap: espaciado.sm },
+  encabezadoTarjeta: { gap: 2, padding: espaciado.md },
+  accionTarjeta: { padding: espaciado.md },
+  tituloSeccion: { marginTop: espaciado.xs, paddingHorizontal: 4 },
 });

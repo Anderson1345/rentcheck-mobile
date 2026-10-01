@@ -1,4 +1,4 @@
-import { centavosAPesosTexto, pesosTextoACentavos } from '../dinero';
+import { centavosAPesosAbreviado, centavosAPesosTexto, pesosTextoACentavos } from '../dinero';
 
 describe('centavosAPesosTexto', () => {
   it('formatea pesos enteros con puntos de miles', () => {
@@ -89,5 +89,25 @@ describe('pesosTextoACentavos', () => {
     for (const centavos of [0, 100, 99_900, 125_000_000, 123_456_789_000]) {
       expect(pesosTextoACentavos(centavosAPesosTexto(centavos))).toBe(centavos);
     }
+  });
+});
+
+describe('centavosAPesosAbreviado', () => {
+  it('desde un millón de pesos usa millones con hasta dos decimales', () => {
+    expect(centavosAPesosAbreviado(1_365_000_000)).toBe('$ 13,65 M');
+    expect(centavosAPesosAbreviado(1_800_000_000)).toBe('$ 18 M');
+    expect(centavosAPesosAbreviado(1_850_000_000)).toBe('$ 18,5 M');
+    expect(centavosAPesosAbreviado(100_000_000)).toBe('$ 1 M');
+    expect(centavosAPesosAbreviado(123_456_789_000)).toBe('$ 1.234,57 M');
+  });
+
+  it('por debajo de un millón usa el formato completo', () => {
+    expect(centavosAPesosAbreviado(85_000_000)).toBe('$ 850.000');
+    expect(centavosAPesosAbreviado(0)).toBe('$ 0');
+  });
+
+  it('negativos y valores que no son enteros', () => {
+    expect(centavosAPesosAbreviado(-1_365_000_000)).toBe('-$ 13,65 M');
+    expect(() => centavosAPesosAbreviado(1.5)).toThrow();
   });
 });

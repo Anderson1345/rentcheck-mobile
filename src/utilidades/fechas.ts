@@ -23,30 +23,83 @@ const MESES = [
 
 /**
  * Una fecha de negocio puede llegar como:
- * - texto "AAAA-MM-DD" (o ISO completo de un campo @db.Date, p. ej. "2026-10-01T00:00:00.000Z"):
+ * - texto "AAAA-MM-DD", o medianoche UTC exacta ("2026-10-01T00:00:00.000Z", un campo @db.Date):
  *   es un día calendario y se toma tal cual, sin correrlo por zonas horarias;
- * - Date: un instante (p. ej. "ahora"), que se convierte al día de Bogotá.
+ * - texto ISO con cualquier otra hora o desfase ("2026-10-02T03:00:00Z"): es un instante y se
+ *   convierte al día de Bogotá;
+ * - Date: un instante (p. ej. "ahora"), que también se convierte al día de Bogotá.
  */
 export type FechaNegocio = string | Date;
 
-const FORMATO_FECHA = /^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/;
+const FORMATO_FECHA = /^(\d{4})-(\d{2})-(\d{2})$/;
+const FORMATO_ISO_CON_HORA =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?(Z|[+-]\d{2}:?\d{2})$/;
+
+function diaDeInstante(instante: number): string {
+  return new Date(instante + DESFASE_BOGOTA_MS).toISOString().slice(0, 10);
+}
+
+/** Valida que el día exista en el calendario y lo devuelve como "AAAA-MM-DD". */
+function diaCalendario(anio: string, mes: string, dia: string, original: string): string {
+  const comprobada = new Date(Date.UTC(Number(anio), Number(mes) - 1, Number(dia)));
+  if (comprobada.toISOString().slice(0, 10) !== `${anio}-${mes}-${dia}`) {
+    throw new RangeError(`Fecha inválida: "${original}".`);
+  }
+  return `${anio}-${mes}-${dia}`;
+}
+
+/** Desfase de la zona en minutos ("Z" → 0, "-05:00" → -300). */
+function minutosDeDesfase(zona: string): number {
+  if (zona === 'Z') return 0;
+  const signo = zona.startsWith('-') ? -1 : 1;
+  const digitos = zona.slice(1).replace(':', '');
+  return signo * (Number(digitos.slice(0, 2)) * 60 + Number(digitos.slice(2, 4)));
+}
 
 /** Normaliza a "AAAA-MM-DD" o lanza RangeError si la fecha no existe. */
 function aDiaNegocio(fecha: FechaNegocio): string {
   if (fecha instanceof Date) {
     const instante = fecha.getTime();
     if (Number.isNaN(instante)) throw new RangeError('Fecha inválida.');
-    return new Date(instante + DESFASE_BOGOTA_MS).toISOString().slice(0, 10);
+    return diaDeInstante(instante);
   }
 
-  const partes = FORMATO_FECHA.exec(fecha);
-  if (!partes) throw new RangeError(`Fecha inválida: "${fecha}".`);
-  const [, anio, mes, dia] = partes;
-  const comprobada = new Date(Date.UTC(Number(anio), Number(mes) - 1, Number(dia)));
-  if (comprobada.toISOString().slice(0, 10) !== `${anio}-${mes}-${dia}`) {
+  const soloFecha = FORMATO_FECHA.exec(fecha);
+  if (soloFecha) {
+    const [, anio, mes, dia] = soloFecha;
+    return diaCalendario(anio, mes, dia, fecha);
+  }
+
+  const conHora = FORMATO_ISO_CON_HORA.exec(fecha);
+  if (!conHora) throw new RangeError(`Fecha inválida: "${fecha}".`);
+  const [, anio, mes, dia, hora, minuto, segundo = '0', fraccion = '0', zona] = conHora;
+  diaCalendario(anio, mes, dia, fecha);
+  if (Number(hora) > 23 || Number(minuto) > 59 || Number(segundo) > 59) {
     throw new RangeError(`Fecha inválida: "${fecha}".`);
   }
-  return `${anio}-${mes}-${dia}`;
+  const desfase = minutosDeDesfase(zona);
+  const milisegundos = Number(fraccion.slice(0, 3).padEnd(3, '0'));
+
+  const esMedianocheUtc =
+    desfase === 0 &&
+    Number(hora) === 0 &&
+    Number(minuto) === 0 &&
+    Number(segundo) === 0 &&
+    milisegundos === 0;
+  if (esMedianocheUtc) return `${anio}-${mes}-${dia}`;
+
+  const instante =
+    Date.UTC(
+      Number(anio),
+      Number(mes) - 1,
+      Number(dia),
+      Number(hora),
+      Number(minuto),
+      Number(segundo),
+      milisegundos,
+    ) -
+    desfase * 60_000;
+  return diaDeInstante(instante);
 }
 
 /** La fecha de hoy en Bogotá como "AAAA-MM-DD". */

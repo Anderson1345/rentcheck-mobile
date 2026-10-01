@@ -1,17 +1,8 @@
 import { Stack } from 'expo-router';
 
-import { colores } from '@/tema';
+import { OPCIONES_STACK } from '@/componentes/navegacion/opcionesStack';
 
-// E2 agrega aquí la guardia por rol.
+// E2 agrega aquí la guardia por rol y la barra inferior (NavInferior).
 export default function LayoutArrendador() {
-  return (
-    <Stack
-      screenOptions={{
-        headerTintColor: colores.primario,
-        headerStyle: { backgroundColor: colores.fondo },
-        headerShadowVisible: false,
-        contentStyle: { backgroundColor: colores.fondo },
-      }}
-    />
-  );
+  return <Stack screenOptions={OPCIONES_STACK} />;
 }
