@@ -123,6 +123,8 @@ export default function IncrementoContrato() {
               fase={accion.fase}
               error={accion.error}
               onVerificar={() => void accion.verificar()}
+              recargable={accion.recargable}
+              onRecargar={() => void accion.recargar()}
             />
             {accion.fase === 'incierto' ? null : (
               <Boton

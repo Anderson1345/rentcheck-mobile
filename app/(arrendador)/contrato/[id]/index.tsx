@@ -7,6 +7,7 @@ import {
   type ContratoDetalle,
   type DocumentoContrato,
   listarDocumentos,
+  type ResumenTerminacionContrato,
   type RolContrato,
 } from '@/api/contratos';
 import { detalleTecnico, mensajeDeError } from '@/api/errores';
@@ -14,6 +15,11 @@ import { Aviso } from '@/componentes/Aviso';
 import { Boton } from '@/componentes/Boton';
 import { ChipEstado } from '@/componentes/ChipEstado';
 import { AccionesContrato } from '@/componentes/contratos/AccionesContrato';
+import {
+  BotonRegenerar,
+  SeccionCorreccion,
+  SeccionTerminacion,
+} from '@/componentes/contratos/TerminacionYCorreccion';
 import { CodigoAcceso } from '@/componentes/contratos/CodigoAcceso';
 import { DetalleTecnico } from '@/componentes/DetalleTecnico';
 import { EsqueletoCarga } from '@/componentes/EsqueletoCarga';
@@ -84,6 +90,8 @@ export default function DetalleContrato() {
       <Incrementos contrato={contrato} />
       <Avisos contrato={contrato} />
       <AccionesContrato contrato={contrato} />
+      <SeccionTerminacion contrato={contrato} />
+      <SeccionCorreccion contrato={contrato} />
       <Documentos contratoId={contrato.id} />
       <Acceso contrato={contrato} />
       <Boton
@@ -156,7 +164,15 @@ function Incrementos({ contrato: c }: { contrato: ContratoDetalle }) {
   );
 }
 
-/** Solo lectura: las acciones (dar aviso, terminar…) llegan en E5-B y E5-C. */
+/** Texto informativo de la terminación anticipada (solicitada o confirmada). */
+function textoTerminacion(t: ResumenTerminacionContrato): string {
+  const confirmada = t.estado === 'CONFIRMADA';
+  const quien = confirmada ? t.confirmada_por : t.solicitada_por;
+  const cuando = confirmada ? t.confirmada_en : null;
+  return `Terminación anticipada ${confirmada ? 'confirmada' : 'solicitada'}${quien ? ` por ${ROL[quien]}` : ''}${cuando ? ` el ${formatearFechaCorta(cuando)}` : ''}${t.fecha_efectiva ? `. Fecha efectiva: ${formatearFechaCorta(t.fecha_efectiva)}` : ''}.${t.motivo ? ` Motivo: ${t.motivo}` : ''}`;
+}
+
+/** Información de solo lectura; las acciones están en la sección Acciones. */
 function Avisos({ contrato: c }: { contrato: ContratoDetalle }) {
   const aviso = c.aviso_no_renovacion;
   const termina = c.terminacion_anticipada;
@@ -169,10 +185,7 @@ function Avisos({ contrato: c }: { contrato: ContratoDetalle }) {
         />
       ) : null}
       {termina && termina.estado !== 'NINGUNA' ? (
-        <Aviso
-          tono="informacion"
-          mensaje={`Terminación anticipada ${termina.estado === 'CONFIRMADA' ? 'confirmada' : 'solicitada'}${termina.solicitada_por ? ` por ${ROL[termina.solicitada_por]}` : ''}${termina.fecha_efectiva ? `. Fecha efectiva: ${formatearFechaCorta(termina.fecha_efectiva)}` : ''}.${termina.motivo ? ` Motivo: ${termina.motivo}` : ''}`}
-        />
+        <Aviso tono="informacion" mensaje={textoTerminacion(termina)} />
       ) : null}
     </>
   );
@@ -275,6 +288,11 @@ function Documentos({ contratoId }: { contratoId: string }) {
           </Superficie>
         );
       })}
+      <BotonRegenerar
+        contratoId={contratoId}
+        titulo="¿Falta un documento? Generar"
+        conConfirmacion
+      />
     </View>
   );
 }

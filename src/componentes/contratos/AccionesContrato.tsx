@@ -41,10 +41,15 @@ export function MensajeAccion({
   fase,
   error,
   onVerificar,
+  recargable = false,
+  onRecargar,
 }: {
   fase: FaseAccion;
   error: string | null;
   onVerificar: () => void;
+  /** 409 por estado desactualizado: invita a recargar el contrato. */
+  recargable?: boolean;
+  onRecargar?: () => void;
 }) {
   return (
     <>
@@ -52,6 +57,19 @@ export function MensajeAccion({
       {error ? <Aviso mensaje={error} /> : null}
       {fase === 'incierto' ? (
         <Boton titulo="Verificar" variante="secundario" ancho="completo" onPress={onVerificar} />
+      ) : null}
+      {recargable && onRecargar ? (
+        <>
+          <Texto variante="secundario" color={colores.textoSecundario}>
+            Puede que el contrato haya cambiado: recárgalo para ver su estado actual.
+          </Texto>
+          <Boton
+            titulo="Recargar contrato"
+            variante="secundario"
+            ancho="completo"
+            onPress={onRecargar}
+          />
+        </>
       ) : null}
     </>
   );
@@ -201,6 +219,8 @@ export function AccionesContrato({ contrato }: { contrato: ContratoDetalle }) {
             fase={cancelarAviso.fase}
             error={cancelarAviso.error}
             onVerificar={() => void cancelarAviso.verificar()}
+            recargable={cancelarAviso.recargable}
+            onRecargar={() => void cancelarAviso.recargar()}
           />
         </>
       ) : null}
@@ -230,6 +250,8 @@ export function AccionesContrato({ contrato }: { contrato: ContratoDetalle }) {
             fase={cancelarProgramado.fase}
             error={cancelarProgramado.error}
             onVerificar={() => void cancelarProgramado.verificar()}
+            recargable={cancelarProgramado.recargable}
+            onRecargar={() => void cancelarProgramado.recargar()}
           />
         </>
       ) : null}

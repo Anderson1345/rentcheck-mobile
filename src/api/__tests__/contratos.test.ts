@@ -279,3 +279,93 @@ describe('mensajeDeErrorAccion', () => {
     expect(mensajeDeErrorAccion(new ErrorTimeout())).toContain('tardó');
   });
 });
+
+describe('contratos: terminación, correcciones y documentos (E5-C)', () => {
+  const real = () => jest.requireActual('../contratos');
+
+  it('terminación: solicitar con motivo y fecha; confirmar y cancelar sin cuerpo', async () => {
+    await real().solicitarTerminacion('c1', ' Venta ', '2026-12-31');
+    expect(mockPost).toHaveBeenLastCalledWith('/contratos/c1/solicitar-terminacion-anticipada', {
+      motivo: 'Venta',
+      fecha_efectiva: '2026-12-31',
+    });
+    await real().confirmarTerminacion('c1');
+    expect(mockPost).toHaveBeenLastCalledWith('/contratos/c1/confirmar-terminacion-anticipada');
+    await real().cancelarTerminacion('c1');
+    expect(mockPost).toHaveBeenLastCalledWith('/contratos/c1/cancelar-terminacion-anticipada');
+  });
+
+  it('correcciones: PATCH con el cuerpo recibido; regenerar documentos: POST sin cuerpo', async () => {
+    const mockPatch = jest.fn().mockResolvedValue({});
+    const cliente = jest.requireMock('../cliente');
+    cliente.api.patch = mockPatch;
+    await real().corregirContrato('c1', { dia_pago: 10 });
+    expect(mockPatch).toHaveBeenLastCalledWith('/contratos/c1', { dia_pago: 10 });
+    await real().corregirInquilino('c1', { nombre: 'X' });
+    expect(mockPatch).toHaveBeenLastCalledWith('/contratos/c1/inquilino', { nombre: 'X' });
+    await real().regenerarDocumentos('c1');
+    expect(mockPost).toHaveBeenLastCalledWith('/contratos/c1/documentos/regenerar');
+    expect(JSON.stringify([...mockPatch.mock.calls, ...mockPost.mock.calls])).not.toMatch(
+      /idempoten/i,
+    );
+  });
+});
+
+describe('mensajeDeErrorAccion (E5-C)', () => {
+  const { mensajeDeErrorAccion } = jest.requireActual('../errores');
+  const api = (status: number, codigo: string, mensaje = 'texto técnico', detalles?: unknown) =>
+    new ErrorApi({ status, codigo, mensaje, detalles });
+
+  it.each([
+    [
+      api(400, 'FECHA_EFECTIVA_INVALIDA', 'x', { desde: '2026-10-01', hasta: '2027-08-31' }),
+      'La fecha efectiva debe estar entre 01/10/2026 y 31/08/2027.',
+    ],
+    [api(409, 'TERMINACION_YA_SOLICITADA'), 'Ya hay una solicitud de terminación pendiente.'],
+    [api(409, 'TERMINACION_NO_SOLICITADA'), 'No hay una solicitud de terminación pendiente.'],
+    [api(409, 'TERMINACION_YA_CONFIRMADA'), 'La terminación ya fue confirmada.'],
+    [
+      api(403, 'NO_PUEDE_CONFIRMAR_SU_PROPIA_SOLICITUD'),
+      'La otra parte es quien debe confirmar la solicitud.',
+    ],
+    [
+      api(403, 'NO_PUEDE_CANCELAR_SOLICITUD_AJENA'),
+      'Solo quien hizo la solicitud puede cancelarla.',
+    ],
+    [
+      api(409, 'CONTRATO_NO_EDITABLE', 'El contrato no se puede corregir: ya tiene pagos.'),
+      'El contrato no se puede corregir: ya tiene pagos.',
+    ],
+    [
+      api(409, 'CONTRATO_YA_VINCULADO'),
+      'El inquilino ya vinculó este contrato, por lo que ya no se puede corregir.',
+    ],
+    [api(400, 'SIN_CAMPOS'), 'No enviaste ningún dato para cambiar.'],
+    [api(400, 'INQUILINO_DATOS_INVALIDOS'), 'Los datos del inquilino no son válidos.'],
+    [
+      api(500, 'DOCUMENTO_NO_GENERADO'),
+      'No se pudo generar uno de los documentos. Los ya generados se conservaron; inténtalo de nuevo.',
+    ],
+    [
+      api(409, 'TRASLAPE_DE_CONTRATOS', 'x', {
+        fecha_inicio: '2026-10-01T00:00:00.000Z',
+        fecha_fin: '2027-09-30T00:00:00.000Z',
+      }),
+      'Choca con el contrato del 01/10/2026 al 30/09/2027.',
+    ],
+    [
+      api(400, 'SOLICITUD_INVALIDA', 'La cédula debe tener entre 5 y 20 caracteres alfanuméricos.'),
+      'La cédula debe tener entre 5 y 20 caracteres alfanuméricos.',
+    ],
+  ])('%#', (error, mensaje) => {
+    expect(mensajeDeErrorAccion(error)).toBe(mensaje);
+  });
+
+  it('un 409 por estado desactualizado se reconoce (invita a recargar)', () => {
+    const { esConflictoDeEstado } = jest.requireActual('../errores');
+    expect(esConflictoDeEstado(api(409, 'CONTRATO_NO_ACTIVO'))).toBe(true);
+    expect(esConflictoDeEstado(api(409, 'TERMINACION_YA_SOLICITADA'))).toBe(true);
+    expect(esConflictoDeEstado(api(400, 'VALIDACION'))).toBe(false);
+    expect(esConflictoDeEstado(new ErrorSinConexion())).toBe(false);
+  });
+});

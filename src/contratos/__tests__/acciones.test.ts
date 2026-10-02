@@ -185,3 +185,32 @@ describe('huboCambio: verificación tras "sin respuesta"', () => {
     expect(huboCambio('cancelarProgramado', programado, con({ estado: 'CANCELADO' }))).toBe(true);
   });
 });
+
+describe('huboCambio: terminación anticipada (E5-C)', () => {
+  const t = (estado: 'NINGUNA' | 'SOLICITADA' | 'CONFIRMADA') =>
+    con({
+      terminacion_anticipada: {
+        estado,
+        solicitada_por: null,
+        solicitada_en: null,
+        motivo: null,
+        fecha_efectiva: null,
+      },
+    });
+
+  it('solicitar: de NINGUNA a SOLICITADA (o ya CONFIRMADA)', () => {
+    expect(huboCambio('solicitarTerminacion', t('NINGUNA'), t('NINGUNA'))).toBe(false);
+    expect(huboCambio('solicitarTerminacion', t('NINGUNA'), t('SOLICITADA'))).toBe(true);
+    expect(huboCambio('solicitarTerminacion', base, t('SOLICITADA'))).toBe(true);
+  });
+
+  it('confirmar: pasa a CONFIRMADA (o el contrato terminó)', () => {
+    expect(huboCambio('confirmarTerminacion', t('SOLICITADA'), t('SOLICITADA'))).toBe(false);
+    expect(huboCambio('confirmarTerminacion', t('SOLICITADA'), t('CONFIRMADA'))).toBe(true);
+  });
+
+  it('cancelar solicitud: de SOLICITADA a NINGUNA', () => {
+    expect(huboCambio('cancelarTerminacion', t('SOLICITADA'), t('SOLICITADA'))).toBe(false);
+    expect(huboCambio('cancelarTerminacion', t('SOLICITADA'), t('NINGUNA'))).toBe(true);
+  });
+});

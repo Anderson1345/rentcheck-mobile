@@ -329,7 +329,52 @@ export function mensajeDeErrorAccion(error: unknown): string {
       default:
         break;
     }
+    switch (error.codigo) {
+      case 'FECHA_EFECTIVA_INVALIDA': {
+        const desde = fechaDeDetalle(detalles, 'desde');
+        const hasta = fechaDeDetalle(detalles, 'hasta');
+        if (desde && hasta) return `La fecha efectiva debe estar entre ${desde} y ${hasta}.`;
+        break;
+      }
+      case 'CONTRATO_NO_EDITABLE':
+        // El servidor dice el motivo (está en español).
+        if (error.mensaje.trim() !== '') return error.mensaje;
+        break;
+      case 'DOCUMENTO_NO_GENERADO':
+        return 'No se pudo generar uno de los documentos. Los ya generados se conservaron; inténtalo de nuevo.';
+      case 'TRASLAPE_DE_CONTRATOS':
+      case 'CONFLICTO':
+      case 'SOLICITUD_INVALIDA':
+        return mensajeDeErrorContrato(error);
+      default:
+        break;
+    }
     if (error.status === 404) return 'Contrato no encontrado.';
   }
   return mensajeDeError(error);
+}
+
+const CODIGOS_DE_ESTADO = new Set([
+  'CONTRATO_NO_ACTIVO',
+  'CONTRATO_NO_PROGRAMADO',
+  'CONTRATO_NO_EDITABLE',
+  'CONTRATO_YA_VINCULADO',
+  'TERMINACION_YA_SOLICITADA',
+  'TERMINACION_NO_SOLICITADA',
+  'TERMINACION_YA_CONFIRMADA',
+  'AVISO_YA_DADO',
+  'AVISO_NO_DADO',
+  'AVISO_FUERA_DE_PLAZO',
+  'INCREMENTO_YA_APLICADO',
+  'PRORROGA_YA_APLICADA',
+]);
+
+/** 409 por estado desactualizado (alguien cambió el contrato): conviene recargar el detalle. */
+export function esConflictoDeEstado(error: unknown): boolean {
+  return (
+    error instanceof ErrorApi &&
+    error.status === 409 &&
+    error.codigo !== null &&
+    CODIGOS_DE_ESTADO.has(error.codigo)
+  );
 }

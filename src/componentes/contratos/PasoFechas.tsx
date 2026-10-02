@@ -34,7 +34,7 @@ function fechaParaSelector(texto: string, respaldo: string): Date {
   return new Date(anio, mes - 1, dia, 12, 0, 0);
 }
 
-function SelectorFecha({
+export function SelectorFecha({
   etiqueta,
   valor,
   hoy,
