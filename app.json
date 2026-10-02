@@ -33,8 +33,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "RentCheck usa tus fotos solo para elegir la foto de portada de tu inmueble.",
-          "cameraPermission": "RentCheck usa la cámara para tomar la foto de portada de tu inmueble.",
+          "photosPermission": "RentCheck usa tus fotos solo para adjuntar comprobantes de pago, fotos de inmuebles y documentos que tú elijas.",
+          "cameraPermission": "RentCheck usa la cámara para tomar fotos de comprobantes de pago, inmuebles y documentos.",
           "microphonePermission": false
         }
       ],

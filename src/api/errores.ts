@@ -1,7 +1,12 @@
 import { formatearPorcentaje } from '../contratos/acciones';
 import { formatearFechaCorta } from '../utilidades/fechas';
 import { ErrorApi, ErrorArchivo, ErrorSinConexion, ErrorTimeout } from './cliente';
-import { MENSAJE_FOTO_GRANDE } from './mensajesArchivo';
+import {
+  MENSAJE_ARCHIVO_GRANDE,
+  MENSAJE_ARCHIVO_ILEGIBLE,
+  MENSAJE_COMPROBANTE_NO_VALIDO,
+  MENSAJE_FOTO_GRANDE,
+} from './mensajesArchivo';
 
 export const MENSAJE_GENERICO = 'Ocurrió un error inesperado. Inténtalo de nuevo.';
 export const MENSAJE_SIN_CONEXION =
@@ -379,4 +384,34 @@ export function esConflictoDeEstado(error: unknown): boolean {
     error.codigo !== null &&
     CODIGOS_DE_ESTADO.has(error.codigo)
   );
+}
+
+const MENSAJE_PAGO_SIN_RESPUESTA =
+  'No sabemos si el pago se envió. Puedes volver a enviarlo: no se duplicará.';
+
+/**
+ * Reportar un pago con comprobante. Por código, en español: los de período, fecha y contrato salen
+ * del diccionario; 415 y 413 hablan de "archivo" (foto o PDF), no de "foto". Sin respuesta o tiempo
+ * agotado NO se afirma que falló: el envío lleva Idempotency-Key y reenviarlo no duplica.
+ */
+export function mensajeDeErrorPago(error: unknown): string {
+  if (error instanceof ErrorArchivo) {
+    return error.motivo === 'grande' ? MENSAJE_ARCHIVO_GRANDE : MENSAJE_ARCHIVO_ILEGIBLE;
+  }
+  if (error instanceof ErrorSinConexion || error instanceof ErrorTimeout) {
+    return MENSAJE_PAGO_SIN_RESPUESTA;
+  }
+  if (error instanceof ErrorApi) {
+    if (error.status === 415) return MENSAJE_COMPROBANTE_NO_VALIDO;
+    if (error.status === 413 || error.codigo === 'CARGA_DEMASIADO_GRANDE') {
+      return MENSAJE_ARCHIVO_GRANDE;
+    }
+    if (error.codigo === 'SOLICITUD_EN_PROCESO') {
+      return 'Tu pago se está procesando. Espera unos segundos y revisa Mis pagos.';
+    }
+    if (error.codigo === 'IDEMPOTENCY_KEY_REUTILIZADA') {
+      return 'Los datos del pago cambiaron mientras se enviaba. Revísalos y vuelve a enviar.';
+    }
+  }
+  return mensajeDeError(error);
 }

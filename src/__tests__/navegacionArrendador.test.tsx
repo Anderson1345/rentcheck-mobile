@@ -449,13 +449,19 @@ describe('barra inferior del inquilino (layouts reales)', () => {
     expect(mockNavegar).toHaveBeenLastCalledWith('mas');
   });
 
-  it.each([
-    ['pagos', 'Pagos', 'Próximamente (E7)'],
-    ['solicitudes', 'Solicitudes', 'Próximamente (E8)'],
-  ])('%s: pantalla "Próximamente" y pestaña activa', async (ruta, pestana, texto) => {
-    const m = await montar(INQUILINO(), ['(inquilino)', '(pestanas)', ruta]);
-    expect(m.textos()).toContain(texto);
-    expect(m.pestana(pestana).props).toMatchObject({ accessibilityState: { selected: true } });
+  it('solicitudes: pantalla "Próximamente" y pestaña activa', async () => {
+    const m = await montar(INQUILINO(), ['(inquilino)', '(pestanas)', 'solicitudes']);
+    expect(m.textos()).toContain('Próximamente (E8)');
+    expect(m.pestana('Solicitudes').props).toMatchObject({
+      accessibilityState: { selected: true },
+    });
+  });
+
+  it('pagos: pantalla real del inquilino (ya no "Próximamente") y pestaña activa', async () => {
+    const m = await montar(INQUILINO(), ['(inquilino)', '(pestanas)', 'pagos']);
+    expect(m.textos()).not.toContain('Próximamente (E7)');
+    expect(m.textos()).toContain('Aún no tienes contratos');
+    expect(m.pestana('Pagos').props).toMatchObject({ accessibilityState: { selected: true } });
   });
 
   it('Más: solo "Cerrar sesión"; al cerrar se desmonta todo el grupo (inquilino)', async () => {
