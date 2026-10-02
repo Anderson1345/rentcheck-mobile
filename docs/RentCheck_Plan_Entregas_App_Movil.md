@@ -1,6 +1,6 @@
 # RentCheck — Plan de entregas de la app móvil (E1 a E12)
 
-**Versión 1.9 — 02/10/2026.** Documento de guía para las entregas de la Fase 1 (repositorio `rentcheck-mobile`).
+**Versión 1.10 — 02/10/2026.** Documento de guía para las entregas de la Fase 1 (repositorio `rentcheck-mobile`).
 
 ## 0. Para qué sirve y qué lugar ocupa
 
@@ -119,7 +119,13 @@ Cada ficha: objetivo · pantallas · reglas clave · referencias · prueba manua
 - **Referencias**: Contexto F5, §5.10, §7.3; Plan B-xx de pagos (mora, períodos). **Depende de B0.6-A1** (cerrada) para el motivo y el mensaje del rechazo (B-59): `PATCH /pagos/:id/rechazar` acepta `{ motivo, mensaje }` opcionales en el servidor, pero la app los pide siempre (lista fija; el mensaje es obligatorio con "otro", hasta 200 caracteres). Los pagos rechazados antes de A1 no tienen motivo (mostrar sin él).
 - **Prueba manual**: reportar pago con foto; aprobarlo desde la otra cuenta; rechazar otro y ver el estado.
 
-### E8 — Mantenimiento
+### E8 — Mantenimiento (se hace en dos entregas: E8-A y E8-B, después de B0.6-A4)
+
+- **Diagnóstico (02/10/2026)**: un solo adjunto opcional por solicitud (JPEG, PNG o MP4, hasta 20 MB, en la misma petición multipart, campo `adjunto`); estados PENDIENTE → EN_PROCESO → RESUELTO (o PENDIENTE → RESUELTO), solo los cambia el arrendador y sin comentario ni historial; crear exige contrato ACTIVO (409 `CONTRATO_NO_ACTIVO`); sin compresión de video posible en Expo Go (se muestra el tamaño, se bloquea por encima de 20 MB y se recomiendan clips cortos). Reproducción con `expo-video` (sdk-57, incluido en Expo Go).
+- **Depende de B0.6-A4** (B-66: `unidad.id` en los contratos del inquilino; B-67: esquemas de respuesta; B-68: `adjunto_tipo`).
+- **E8-A (inquilino)**: pestaña Solicitudes (lista del contrato seleccionado, detalle con adjunto) y crear solicitud (descripción, urgencia BAJO/MEDIO/ALTO, adjunto opcional foto o video) con `Idempotency-Key` por borrador. Requiere generalizar `subirArchivo` (límite y plazo por llamada, progreso, cancelación, envío sin archivo) y el borrador idempotente de pagos. Paquete: `expo-video`.
+- **E8-B (arrendador)**: lista con segmentos por estado y contador, filtros de urgencia y unidad, detalle con adjunto y cambio de estado con confirmación. Punto de entrada: fila "Mantenimiento" en la pestaña Más (decisión del líder técnico; la sexta pestaña o esperar a E9 quedan descartadas por ahora).
+- Lo siguiente es la ficha original de E8.
 
 - **Inquilino**: crear solicitud (foto o video; solo con contrato Activo) y consultar. **Arrendador**: lista, filtros, cambio de estado.
 - **Reglas**: video MP4 validado por el servidor; tamaño máximo según la API (mostrarlo antes de subir).
@@ -159,4 +165,4 @@ Cada ficha: objetivo · pantallas · reglas clave · referencias · prueba manua
 
 ## 5. Orden y dependencias
 
-E1 → D1 → E2 → E3 → E4 → E5 → E6 → B0.6-A1 → E7-A → B0.6-A3 → E7-B → E8 → B0.6-A2 → B0.6-B → E9 → E10 → E11 → E12. Mismo orden que el documento de instrucciones §8; no se cambia sin pedirlo.
+E1 → D1 → E2 → E3 → E4 → E5 → E6 → B0.6-A1 → E7-A → B0.6-A3 → E7-B → B0.6-A4 → E8-A → E8-B → B0.6-A2 → B0.6-B → E9 → E10 → E11 → E12. Mismo orden que el documento de instrucciones §8; no se cambia sin pedirlo.
