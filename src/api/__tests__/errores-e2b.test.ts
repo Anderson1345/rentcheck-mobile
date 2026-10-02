@@ -66,9 +66,12 @@ describe('mensajeDeErrorActivacion', () => {
 });
 
 describe('mensajeDeErrorVinculacion', () => {
-  it('404: el código no es válido para esta cuenta', () => {
-    expect(mensajeDeErrorVinculacion(api(404, 'NO_ENCONTRADO'))).toMatch(
-      /código no es válido para tu cuenta/i,
+  it('404: el mismo texto genérico del servidor que la activación (no inventa causas)', () => {
+    expect(mensajeDeErrorVinculacion(api(404, 'NO_ENCONTRADO'))).toBe(
+      'Código de acceso no válido.',
+    );
+    expect(mensajeDeErrorVinculacion(api(404, 'NO_ENCONTRADO'))).toBe(
+      mensajeDeErrorActivacion(api(404, 'NO_ENCONTRADO')),
     );
   });
 

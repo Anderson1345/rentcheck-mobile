@@ -17,6 +17,7 @@ import MiPanel from '../../app/(inquilino)/(pestanas)/mi-panel';
 import PagosInquilino from '../../app/(inquilino)/(pestanas)/pagos';
 import SolicitudesInquilino from '../../app/(inquilino)/(pestanas)/solicitudes';
 import AgregarContrato from '../../app/(inquilino)/agregar-contrato';
+import MisContratos from '../../app/(inquilino)/mis-contratos';
 import Bienvenida from '../../app/(auth)/index';
 import Activar from '../../app/(auth)/activar';
 import ActivarConEnlace from '../../app/(auth)/activar/[codigo]';
@@ -167,6 +168,15 @@ describe.each([
     () => (
       <Proveedor>
         <MasInquilino />
+      </Proveedor>
+    ),
+    true,
+  ],
+  [
+    'Mis contratos del inquilino (cargando)',
+    () => (
+      <Proveedor>
+        <MisContratos />
       </Proveedor>
     ),
     true,

@@ -309,11 +309,11 @@ describe('vinculación tras iniciar sesión (Mi panel del inquilino)', () => {
     expect(textosDe(raiz).join(' ')).toMatch(/Agregando tu contrato/);
   });
 
-  it('404: mensaje claro de que el código no es válido para esta cuenta; el código ya no queda', async () => {
+  it('404: el mensaje genérico de código no válido; el código ya no queda', async () => {
     guardarCodigoPendiente('RC-AB3D-9KPX');
     mockVincular.mockRejectedValueOnce(error(404, 'NO_ENCONTRADO'));
     const { raiz } = await renderizarPantalla(<ContratosInquilino />, sesionInquilino);
-    expect(textosDe(raiz).join(' ')).toMatch(/código no es válido para tu cuenta/i);
+    expect(textosDe(raiz).join(' ')).toContain('Código de acceso no válido.');
     expect(hayCodigoPendiente()).toBe(false);
   });
 

@@ -33,7 +33,12 @@ export default function MisContratos() {
     return (
       <PantallaPila>
         {lista.isPending ? (
-          <EsqueletoCarga filas={3} />
+          <>
+            <Texto variante="cuerpo" color={colores.textoSecundario}>
+              Cargando tus contratos…
+            </Texto>
+            <EsqueletoCarga filas={3} />
+          </>
         ) : (
           <ErrorConReintento error={lista.error} onReintentar={() => void lista.refetch()} />
         )}

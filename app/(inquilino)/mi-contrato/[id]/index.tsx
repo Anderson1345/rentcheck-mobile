@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { type ContratoInquilinoDetalle, listarDocumentosInquilino } from '@/api/inquilino';
 import { ChipEstado } from '@/componentes/ChipEstado';
+import { AccionesInquilino } from '@/componentes/inquilino/AccionesInquilino';
 import { AvisosContrato, SeccionDocumentos } from '@/componentes/contratos/LecturaContrato';
 import { EsqueletoCarga } from '@/componentes/EsqueletoCarga';
 import { FilaLista } from '@/componentes/FilaLista';
@@ -22,8 +23,9 @@ import { espaciado } from '@/tema';
 import { centavosAPesosTexto } from '@/utilidades/dinero';
 import { formatearFechaCorta, formatearFechaLarga } from '@/utilidades/fechas';
 
-// Mi contrato: solo lectura. La terminación y el aviso se muestran como información (E6-B agrega
-// las acciones). pdf_contrato_url es obsoleto y fotos_devolucion no se usa en esta entrega.
+// Mi contrato. La terminación y el aviso se muestran como información y, con el contrato ACTIVO,
+// la sección Acciones ofrece lo que el servidor permite. pdf_contrato_url es obsoleto y
+// fotos_devolucion no se usa.
 export default function MiContrato() {
   const router = useRouter();
   const { id, seccion } = useLocalSearchParams<{ id: string; seccion?: string }>();
@@ -83,6 +85,7 @@ export default function MiContrato() {
         aviso={contrato.aviso_no_renovacion}
         terminacion={contrato.terminacion_anticipada}
       />
+      <AccionesInquilino contrato={contrato} />
       <FotosEntrega fotos={contrato.fotos_entrega} />
       {primero ? null : documentos}
     </PantallaPila>

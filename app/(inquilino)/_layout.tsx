@@ -18,6 +18,12 @@ export default function LayoutInquilino() {
           name="mi-contrato/[id]/estado-cuenta"
           options={{ title: 'Estado de cuenta' }}
         />
+        <Stack.Screen
+          name="mi-contrato/[id]/terminacion"
+          options={{ title: 'Terminación anticipada' }}
+        />
+        <Stack.Screen name="mi-contrato/[id]/aviso" options={{ title: 'Aviso de no renovación' }} />
+        <Stack.Screen name="mi-perfil" options={{ title: 'Mi perfil' }} />
       </Stack>
     </ContratoSeleccionadoProvider>
   );

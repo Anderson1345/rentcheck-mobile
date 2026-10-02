@@ -107,8 +107,6 @@ export const MENSAJES_ERROR: Record<string, string> = {
 
 export const MENSAJE_SESION_VENCIDA = 'Tu sesión venció. Inicia sesión de nuevo.';
 const MENSAJE_CODIGO_NO_VALIDO = 'Código de acceso no válido.';
-const MENSAJE_CODIGO_NO_VALIDO_CUENTA =
-  'Este código no es válido para tu cuenta. Revisa que sea el que te dio tu arrendador.';
 const MENSAJE_REGISTRO_NO_COMPLETADO =
   'No pudimos completar el registro con esos datos. Si ya tienes una cuenta, inicia sesión.';
 
@@ -139,9 +137,13 @@ export function mensajeDeErrorActivacion(error: unknown): string {
   return mensajeDeErrorRegistro(error);
 }
 
-/** Vincular un contrato con sesión abierta: el 404 es "este código no es válido para tu cuenta". */
+/**
+ * Vincular un contrato con sesión abierta: el 404 es el mismo texto genérico que en la activación
+ * (el servidor responde igual para un código inexistente, ajeno, vencido o cancelado: no se
+ * inventan causas).
+ */
 export function mensajeDeErrorVinculacion(error: unknown): string {
-  if (error instanceof ErrorApi && error.status === 404) return MENSAJE_CODIGO_NO_VALIDO_CUENTA;
+  if (error instanceof ErrorApi && error.status === 404) return MENSAJE_CODIGO_NO_VALIDO;
   return mensajeDeError(error);
 }
 

@@ -10,11 +10,14 @@ import {
   type RespuestaCorreccion,
   regenerarDocumentos,
 } from '../../api/contratos';
-import { puedeCorregir, puedeSolicitarTerminacion } from '../../contratos/acciones';
+import {
+  puedeCorregir,
+  puedeSolicitarTerminacion,
+  textoConfirmarTerminacion,
+} from '../../contratos/acciones';
 import { useAccionContrato } from '../../contratos/useAccionContrato';
 import { useDocumentos } from '../../consultas/contratos';
 import { colores, espaciado } from '../../tema';
-import { formatearFechaLarga } from '../../utilidades/fechas';
 import { Aviso } from '../Aviso';
 import { Boton } from '../Boton';
 import { Texto } from '../Texto';
@@ -90,7 +93,7 @@ export function SeccionTerminacion({ contrato }: { contrato: ContratoDetalle }) 
             onPress={() =>
               confirmarAccion(
                 'Confirmar terminación anticipada',
-                `Esta acción es irreversible: si la fecha efectiva es hoy, el contrato termina de inmediato; si es futura, sigue activo hasta esa fecha.${t.fecha_efectiva ? ` Fecha efectiva: ${formatearFechaLarga(t.fecha_efectiva)}.` : ''}`,
+                textoConfirmarTerminacion(t.fecha_efectiva),
                 'Confirmar terminación',
                 () => void confirmar.iniciar(() => confirmarTerminacion(contrato.id)),
                 true,
