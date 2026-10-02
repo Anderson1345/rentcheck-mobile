@@ -1,6 +1,6 @@
 # RentCheck — Plan de entregas de la app móvil (E1 a E12)
 
-**Versión 1.7 — 01/10/2026.** Documento de guía para las entregas de la Fase 1 (repositorio `rentcheck-mobile`).
+**Versión 1.8 — 02/10/2026.** Documento de guía para las entregas de la Fase 1 (repositorio `rentcheck-mobile`).
 
 ## 0. Para qué sirve y qué lugar ocupa
 
@@ -110,7 +110,7 @@ Cada ficha: objetivo · pantallas · reglas clave · referencias · prueba manua
 ### E7 — Pagos (se hace en dos entregas: E7-A y E7-B)
 
 - **E7-A (inquilino)**: pestaña Pagos (datos de recaudo solo con contrato ACTIVO, períodos con "Reportar pago", historial con el motivo del rechazo) y formulario de reporte con comprobante por cámara, galería o PDF, fotos reducidas a 1600 px y JPEG 0,75, y `Idempotency-Key` (una clave por borrador: misma clave si no cambia el contenido; clave nueva al cambiar período, monto, fecha o archivo). El monto se avisa contra el saldo del período (menor: quedará parcial; mayor: no cubre otros períodos), sin bloquear. Cerrada. Paquetes: `expo-document-picker` y `expo-image-manipulator`. Ver el comprobante ya subido queda para E7-B (falta B-63).
-- **E7-B (arrendador)**: cola de validación con monto esperado vs. reportado, ver el comprobante, aprobar y rechazar con motivo y confirmación. **Depende de B0.6-A3** (B-61: monto esperado y fecha límite en cada pago; B-63: tipo del comprobante). Aquí se generaliza `useAccionContrato` para aprobar y rechazar.
+- **E7-B (arrendador)**: cola de validación con monto esperado vs. reportado, ver el comprobante, aprobar y rechazar con motivo y confirmación. **B0.6-A3 cerrada** (B-61: `periodo_cuenta` con canon, fecha límite, aprobado y estado del período en cada pago; B-63: `comprobante_tipo`). Al empezar, regenerar `docs/api/openapi.json` y `npm run api:tipos` y sustituir los tipos de pagos escritos a mano por los generados. Aquí se generaliza `useAccionContrato` para aprobar y rechazar.
 - Lo siguiente es la ficha original de E7.
 
 - **Inquilino**: lista de períodos (por vencer, vencidos, en revisión), datos de recaudo, reportar pago (período sugerido, monto, fecha, comprobante por cámara, galería o PDF).
