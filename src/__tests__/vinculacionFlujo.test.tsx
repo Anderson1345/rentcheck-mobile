@@ -48,6 +48,11 @@ jest.mock('../api/auth', () => ({
   iniciarSesionInquilino: (...a: unknown[]) => mockLoginInquilino(...a),
   vincularContrato: (...a: unknown[]) => mockVincular(...a),
 }));
+// Mi panel pide la lista de contratos: aquí, vacía.
+jest.mock('../api/inquilino', () => ({
+  ...jest.requireActual('../api/inquilino'),
+  listarContratosInquilino: async () => [],
+}));
 jest.mock('expo-router', () => {
   function Stack({ children }: { children: ReactElement }) {
     return children;
@@ -68,6 +73,7 @@ jest.mock('expo-router', () => {
     Stack,
     useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: mockAtras }),
     useLocalSearchParams: () => mockParams,
+    useFocusEffect: () => undefined,
   };
 });
 
@@ -119,7 +125,12 @@ async function montar() {
   };
   mockPantallas = {
     '(auth)': m.react.createElement(require('../../app/(auth)/login-inquilino').default),
-    '(inquilino)': m.react.createElement(require('../../app/(inquilino)/contratos').default),
+    // La entrada del inquilino: Mi panel dentro del proveedor del contrato seleccionado.
+    '(inquilino)': m.react.createElement(
+      require('../inquilino/ContratoSeleccionado').ContratoSeleccionadoProvider,
+      null,
+      m.react.createElement(require('../../app/(inquilino)/(pestanas)/mi-panel').default),
+    ),
   };
 
   /* eslint-enable @typescript-eslint/no-require-imports */

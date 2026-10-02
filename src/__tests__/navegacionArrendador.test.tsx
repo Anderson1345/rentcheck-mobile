@@ -70,6 +70,10 @@ jest.mock('../api/contratos', () => ({
     codigo_acceso: { codigo: 'RC-AB3D-9KPX', expira_en: '2026-10-31T15:00:00.000Z' },
   }),
 }));
+jest.mock('../api/inquilino', () => ({
+  ...jest.requireActual('../api/inquilino'),
+  listarContratosInquilino: async () => [],
+}));
 jest.mock('../api/perfil', () => ({
   ...jest.requireActual('../api/perfil'),
   obtenerPerfil: (...a: unknown[]) => mockPerfil(...a),
@@ -210,7 +214,12 @@ async function montar(guardado: string | null, ruta: string[]): Promise<Montaje>
     '(arrendador)/inmueble/[id]/unidad/[unidadId]':
       require('../../app/(arrendador)/inmueble/[id]/unidad/[unidadId]').default,
     '(inquilino)': require('../../app/(inquilino)/_layout').default,
-    '(inquilino)/contratos': require('../../app/(inquilino)/contratos').default,
+    '(inquilino)/(pestanas)': require('../../app/(inquilino)/(pestanas)/_layout').default,
+    '(inquilino)/(pestanas)/mi-panel': require('../../app/(inquilino)/(pestanas)/mi-panel').default,
+    '(inquilino)/(pestanas)/pagos': require('../../app/(inquilino)/(pestanas)/pagos').default,
+    '(inquilino)/(pestanas)/solicitudes': require('../../app/(inquilino)/(pestanas)/solicitudes')
+      .default,
+    '(inquilino)/(pestanas)/mas': require('../../app/(inquilino)/(pestanas)/mas').default,
   };
   /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -410,16 +419,62 @@ describe('guardias reales: quién entra a las rutas del arrendador', () => {
     expect(mockListar).not.toHaveBeenCalled();
   });
 
-  it('el inquilino sí ve lo suyo y no recibe la barra del arrendador', async () => {
-    const m = await montar(INQUILINO(), ['(inquilino)', 'contratos']);
-    expect(m.etiquetasTabs()).toEqual([]);
-    expect(m.textos().join('|')).toContain('Hola, Camila Ruiz');
+  it('el inquilino sí ve lo suyo, con su barra y no la del arrendador', async () => {
+    const m = await montar(INQUILINO(), ['(inquilino)', '(pestanas)', 'mi-panel']);
+    expect(m.etiquetasTabs()).toEqual(['Mi panel', 'Pagos', 'Solicitudes', 'Más']);
+    expect(m.etiquetasTabs()).not.toContain('Inmuebles');
   });
 
   it('el arrendador no entra a las rutas del inquilino', async () => {
-    const m = await montar(ARRENDADOR(), ['(inquilino)', 'contratos']);
+    const m = await montar(ARRENDADOR(), ['(inquilino)', '(pestanas)', 'mi-panel']);
     expect(m.etiquetasTabs()).toEqual([]);
-    expect(m.textos().join('|')).not.toContain('Hola, Camila Ruiz');
+    expect(m.textos()).not.toContain('Aún no tienes contratos');
+  });
+});
+
+describe('barra inferior del inquilino (layouts reales)', () => {
+  it('4 pestañas con "Mi panel" activa; las rutas son las claves de PESTANAS_INQUILINO', async () => {
+    const m = await montar(INQUILINO(), ['(inquilino)', '(pestanas)', 'mi-panel']);
+    const { PESTANAS_INQUILINO } = jest.requireActual<
+      typeof import('../componentes/navegacion/configuracion')
+    >('../componentes/navegacion/configuracion');
+
+    expect(m.etiquetasTabs()).toEqual(['Mi panel', 'Pagos', 'Solicitudes', 'Más']);
+    expect(m.pestana('Mi panel').props).toMatchObject({ accessibilityState: { selected: true } });
+    expect(mockNombresTabs).toEqual(PESTANAS_INQUILINO.map((p) => p.clave));
+
+    await m.rt.act(async () => m.pestana('Pagos').props.onPress());
+    expect(mockNavegar).toHaveBeenCalledWith('pagos');
+    await m.rt.act(async () => m.pestana('Más').props.onPress());
+    expect(mockNavegar).toHaveBeenLastCalledWith('mas');
+  });
+
+  it.each([
+    ['pagos', 'Pagos', 'Próximamente (E7)'],
+    ['solicitudes', 'Solicitudes', 'Próximamente (E8)'],
+  ])('%s: pantalla "Próximamente" y pestaña activa', async (ruta, pestana, texto) => {
+    const m = await montar(INQUILINO(), ['(inquilino)', '(pestanas)', ruta]);
+    expect(m.textos()).toContain(texto);
+    expect(m.pestana(pestana).props).toMatchObject({ accessibilityState: { selected: true } });
+  });
+
+  it('Más: solo "Cerrar sesión"; al cerrar se desmonta todo el grupo (inquilino)', async () => {
+    const m = await montar(INQUILINO(), ['(inquilino)', '(pestanas)', 'mas']);
+    expect(m.etiquetasTabs()).toHaveLength(4);
+    const errores = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const cerrar = m.raiz.root.find(
+      (n) =>
+        n.props.accessibilityRole === 'button' &&
+        n.findAll((h) => h.props.children === 'Cerrar sesión').length > 0,
+    );
+    await m.rt.act(async () => cerrar.props.onPress());
+    await m.rt.act(async () => {
+      await new Promise<void>((r) => setTimeout(r, 10));
+    });
+    expect(m.etiquetasTabs()).toEqual([]);
+    expect(mockLlavero.size).toBe(0);
+    expect(errores).not.toHaveBeenCalled();
+    errores.mockRestore();
   });
 });
 

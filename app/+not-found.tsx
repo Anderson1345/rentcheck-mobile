@@ -18,9 +18,7 @@ export default function NoEncontrada() {
 
   function irAlInicio() {
     // Cada rol tiene su propio inicio: la bienvenida solo existe sin sesión.
-    router.replace(
-      estado === 'arrendador' ? '/panel' : estado === 'inquilino' ? '/contratos' : '/',
-    );
+    router.replace(estado === 'arrendador' ? '/panel' : estado === 'inquilino' ? '/mi-panel' : '/');
   }
 
   return (
