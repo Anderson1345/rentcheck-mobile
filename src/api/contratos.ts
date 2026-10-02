@@ -36,12 +36,14 @@ export interface IncrementoIpc {
   porcentaje_ipc_aplicado: string | number;
 }
 
-/** Resumen de solo lectura (resumenAvisoNoRenovacion del backend). */
+/** Resumen del aviso (resumenAvisoNoRenovacion del backend). Los dos booleanos mandan sobre cualquier cálculo. */
 export interface ResumenAviso {
   estado: 'NINGUNO' | 'DADO';
   dado_por: RolContrato | null;
   dado_en: string | null;
   motivo: string | null;
+  puede_dar?: boolean;
+  puede_cancelar?: boolean;
 }
 
 /** Resumen de solo lectura (resumenTerminacion del backend). */
@@ -122,3 +124,78 @@ export const regenerarCodigo = (id: string) =>
   api.post<{ codigo: string; expira_en: string }>(
     `/contratos/${encodeURIComponent(id)}/regenerar-codigo`,
   );
+
+// ---- Estado de cuenta (camelCase: así lo responde el backend) y acciones (E5-B) ----
+
+export type EstadoPeriodoApi = 'PAGADO' | 'EN_REVISION' | 'PENDIENTE' | 'VENCIDO' | 'PARCIAL';
+
+export interface PeriodoCuenta {
+  /** Primer día del mes que cubre (medianoche UTC = día calendario). */
+  periodo: string;
+  fechaLimite: string;
+  canonVigenteCentavos: number;
+  estado: EstadoPeriodoApi;
+  montoAprobadoCentavos: number;
+}
+
+export interface EstadoCuenta {
+  estadoPago: 'al_dia' | 'en_mora' | 'pendiente';
+  periodos: PeriodoCuenta[];
+}
+
+export const obtenerEstadoCuenta = (id: string) =>
+  api.get<EstadoCuenta>(`/contratos/${encodeURIComponent(id)}/estado-cuenta`);
+
+/** Fila IncrementoIPC que devuelve el servidor al aplicar el incremento. */
+export interface IncrementoAplicado {
+  id: string;
+  fecha_aplicacion: string;
+  canon_anterior_centavos: number;
+  canon_nuevo_centavos: number;
+  porcentaje_ipc_aplicado: string | number;
+}
+
+/** Fila Prorroga que devuelve el servidor al prorrogar. */
+export interface ProrrogaAplicada {
+  id: string;
+  fecha_aplicacion: string;
+  fecha_fin_anterior: string;
+  fecha_fin_nueva: string;
+  meses: number;
+  tipo: 'MANUAL' | 'AUTOMATICA';
+}
+
+/**
+ * Sin porcentaje, el servidor usa el IPC del año anterior. Genera el otrosí (PDF) antes de responder:
+ * mismo tiempo de espera largo que crear un contrato. Sin Idempotency-Key. La respuesta NO tiene la
+ * forma de ContratoDetalle: después hay que volver a pedir el detalle.
+ */
+export const aplicarIncremento = (id: string, porcentaje?: number) =>
+  api.post<{ incremento_ipc: IncrementoAplicado }>(
+    `/contratos/${encodeURIComponent(id)}/aplicar-incremento`,
+    porcentaje === undefined ? undefined : { porcentaje },
+    { tiempo: TIMEOUT_CREAR_CONTRATO_MS },
+  );
+
+/** Sin meses, el término inicial del contrato. También genera un otrosí. */
+export const prorrogar = (id: string, meses?: number) =>
+  api.post<{ prorroga: ProrrogaAplicada }>(
+    `/contratos/${encodeURIComponent(id)}/prorrogar`,
+    meses === undefined ? undefined : { meses },
+    { tiempo: TIMEOUT_CREAR_CONTRATO_MS },
+  );
+
+export const darAvisoNoRenovacion = (id: string, motivo?: string) => {
+  const texto = motivo?.trim();
+  return api.post<unknown>(
+    `/contratos/${encodeURIComponent(id)}/aviso-no-renovacion`,
+    texto ? { motivo: texto } : undefined,
+  );
+};
+
+export const cancelarAvisoNoRenovacion = (id: string) =>
+  api.post<unknown>(`/contratos/${encodeURIComponent(id)}/cancelar-aviso-no-renovacion`);
+
+/** No borra nada: el contrato queda CANCELADO. */
+export const cancelarProgramado = (id: string) =>
+  api.post<unknown>(`/contratos/${encodeURIComponent(id)}/cancelar-programado`);

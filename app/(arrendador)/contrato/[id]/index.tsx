@@ -13,6 +13,7 @@ import { detalleTecnico, mensajeDeError } from '@/api/errores';
 import { Aviso } from '@/componentes/Aviso';
 import { Boton } from '@/componentes/Boton';
 import { ChipEstado } from '@/componentes/ChipEstado';
+import { AccionesContrato } from '@/componentes/contratos/AccionesContrato';
 import { CodigoAcceso } from '@/componentes/contratos/CodigoAcceso';
 import { DetalleTecnico } from '@/componentes/DetalleTecnico';
 import { EsqueletoCarga } from '@/componentes/EsqueletoCarga';
@@ -41,7 +42,7 @@ export default function DetalleContrato() {
 
   function volver() {
     if (router.canGoBack()) router.back();
-    else router.replace('/contratos');
+    else router.replace('/contratos-arrendador');
   }
 
   if (contrato === undefined) {
@@ -82,6 +83,7 @@ export default function DetalleContrato() {
       <Datos contrato={contrato} />
       <Incrementos contrato={contrato} />
       <Avisos contrato={contrato} />
+      <AccionesContrato contrato={contrato} />
       <Documentos contratoId={contrato.id} />
       <Acceso contrato={contrato} />
       <Boton

@@ -5,6 +5,7 @@ import {
   crearContrato,
   listarContratos,
   listarDocumentos,
+  obtenerEstadoCuenta,
   listarInquilinos,
   obtenerContrato,
   regenerarCodigo,
@@ -18,6 +19,7 @@ export const STALE_TIME_CONTRATOS_MS = 2 * 60_000;
 export const STALE_TIME_DOCUMENTOS_MS = 60_000;
 
 export const clavesContratos = {
+  estadoCuenta: (id: string) => ['contratos', 'estado-cuenta', id] as const,
   documentos: (id: string) => ['contratos', 'documentos', id] as const,
   todos: ['contratos'] as const,
   detalle: (id: string) => ['contratos', 'detalle', id] as const,
@@ -91,5 +93,13 @@ export function useRegenerarCodigo(id: string) {
       // Solo la lista: el detalle ya tiene el código nuevo (no hace falta volver a pedirlo).
       void cliente.invalidateQueries({ queryKey: clavesContratos.todos, exact: true });
     },
+  });
+}
+
+export function useEstadoCuenta(id: string) {
+  return useQuery({
+    queryKey: clavesContratos.estadoCuenta(id),
+    queryFn: () => obtenerEstadoCuenta(id),
+    staleTime: STALE_TIME_CONTRATOS_MS,
   });
 }
