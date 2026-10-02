@@ -4,10 +4,11 @@
 import { act } from 'react-test-renderer';
 
 import NoEncontrada from '../../app/+not-found';
-import ContratosInquilino from '../../app/(inquilino)/contratos';
+import MiPanel from '../../app/(inquilino)/(pestanas)/mi-panel';
 import LoginArrendador from '../../app/(auth)/login-arrendador';
 import LoginInquilino from '../../app/(auth)/login-inquilino';
 import { ErrorApi, ErrorSinConexion } from '../api/cliente';
+import { ContratoSeleccionadoProvider } from '../inquilino/ContratoSeleccionado';
 import { crearToken } from '../pruebas/crearToken';
 import {
   botonDe,
@@ -32,6 +33,12 @@ let mockParams: Record<string, string> = {};
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, replace: mockReplace, back: jest.fn() }),
   useLocalSearchParams: () => mockParams,
+  useFocusEffect: () => undefined,
+}));
+// Mi panel pide la lista de contratos: aquí, vacía.
+jest.mock('../api/inquilino', () => ({
+  ...jest.requireActual('../api/inquilino'),
+  listarContratosInquilino: async () => [],
 }));
 jest.mock(
   'react-native-safe-area-context',
@@ -276,7 +283,14 @@ describe('login del inquilino: activación y código pendiente', () => {
   });
 });
 
-describe('vinculación tras iniciar sesión (pantalla provisional del inquilino)', () => {
+// La entrada del inquilino es Mi panel; la vinculación pendiente se muestra en ella.
+const ContratosInquilino = () => (
+  <ContratoSeleccionadoProvider>
+    <MiPanel />
+  </ContratoSeleccionadoProvider>
+);
+
+describe('vinculación tras iniciar sesión (Mi panel del inquilino)', () => {
   it('con código pendiente llama a vincular UNA vez y muestra la unidad y la dirección', async () => {
     guardarCodigoPendiente('RC-AB3D-9KPX');
     mockVincular.mockResolvedValueOnce(CONTRATO);
@@ -338,7 +352,7 @@ describe('+not-found: "Esta pantalla no está disponible"', () => {
   it('con sesión de inquilino (el caso del enlace de activación) lleva a su pantalla', async () => {
     const { raiz } = await renderizarPantalla(<NoEncontrada />, sesionInquilino);
     await pulsar(raiz, 'Ir al inicio');
-    expect(mockReplace).toHaveBeenCalledWith('/contratos');
+    expect(mockReplace).toHaveBeenCalledWith('/mi-panel');
   });
 
   it('con sesión de arrendador lleva a su panel', async () => {

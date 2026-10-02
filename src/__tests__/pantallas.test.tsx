@@ -12,7 +12,11 @@ import MasArrendador from '../../app/(arrendador)/(pestanas)/mas-arrendador';
 import PagosArrendador from '../../app/(arrendador)/(pestanas)/pagos-arrendador';
 import PanelArrendador from '../../app/(arrendador)/(pestanas)/panel';
 import NuevoInmueble from '../../app/(arrendador)/inmueble/nuevo';
-import ContratosInquilino from '../../app/(inquilino)/contratos';
+import MasInquilino from '../../app/(inquilino)/(pestanas)/mas';
+import MiPanel from '../../app/(inquilino)/(pestanas)/mi-panel';
+import PagosInquilino from '../../app/(inquilino)/(pestanas)/pagos';
+import SolicitudesInquilino from '../../app/(inquilino)/(pestanas)/solicitudes';
+import AgregarContrato from '../../app/(inquilino)/agregar-contrato';
 import Bienvenida from '../../app/(auth)/index';
 import Activar from '../../app/(auth)/activar';
 import ActivarConEnlace from '../../app/(auth)/activar/[codigo]';
@@ -25,6 +29,7 @@ import VerificaCorreo from '../../app/(auth)/verifica-correo';
 import Diagnostico from '../../app/(auth)/diagnostico';
 import Galeria from '../../app/(auth)/galeria';
 import { MAPAS_ESTADO, URGENCIAS } from '../componentes/estados';
+import { ContratoSeleccionadoProvider } from '../inquilino/ContratoSeleccionado';
 import { crearToken } from '../pruebas/crearToken';
 import { crearControladorSesion } from '../sesion/controlador';
 import { SesionProvider } from '../sesion/SesionProvider';
@@ -124,6 +129,10 @@ function textos(raiz: ReactTestRenderer): string[] {
     .map(String);
 }
 
+const Proveedor = ({ children }: { children: ReactElement }) => (
+  <ContratoSeleccionadoProvider>{children}</ContratoSeleccionadoProvider>
+);
+
 describe.each([
   ['Bienvenida', () => <Bienvenida />],
   ['Diagnóstico', () => <Diagnostico />],
@@ -142,7 +151,35 @@ describe.each([
   ['Pagos del arrendador (próximamente)', () => <PagosArrendador />, true],
   ['Más del arrendador', () => <MasArrendador />, true],
   ['Nuevo inmueble', () => <NuevoInmueble />, true],
-  ['Contratos provisional del inquilino', () => <ContratosInquilino />, true],
+  [
+    'Mi panel del inquilino',
+    () => (
+      <Proveedor>
+        <MiPanel />
+      </Proveedor>
+    ),
+    true,
+  ],
+  ['Pagos del inquilino (próximamente)', () => <PagosInquilino />, true],
+  ['Solicitudes del inquilino (próximamente)', () => <SolicitudesInquilino />, true],
+  [
+    'Más del inquilino',
+    () => (
+      <Proveedor>
+        <MasInquilino />
+      </Proveedor>
+    ),
+    true,
+  ],
+  [
+    'Agregar contrato con código',
+    () => (
+      <Proveedor>
+        <AgregarContrato />
+      </Proveedor>
+    ),
+    true,
+  ],
 ])('%s', (_nombre, pantalla, conArrendador = false) => {
   it('renderiza; todo texto usa Manrope y respeta el tamaño mínimo', async () => {
     const raiz = await renderizar(pantalla(), conArrendador);

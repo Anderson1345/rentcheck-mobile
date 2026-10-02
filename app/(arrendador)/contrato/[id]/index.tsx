@@ -3,14 +3,8 @@ import { useRef, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import { ErrorApi } from '@/api/cliente';
-import {
-  type ContratoDetalle,
-  type DocumentoContrato,
-  listarDocumentos,
-  type ResumenTerminacionContrato,
-  type RolContrato,
-} from '@/api/contratos';
-import { detalleTecnico, mensajeDeError } from '@/api/errores';
+import { type ContratoDetalle, listarDocumentos } from '@/api/contratos';
+import { mensajeDeError } from '@/api/errores';
 import { Aviso } from '@/componentes/Aviso';
 import { Boton } from '@/componentes/Boton';
 import { ChipEstado } from '@/componentes/ChipEstado';
@@ -21,7 +15,7 @@ import {
   SeccionTerminacion,
 } from '@/componentes/contratos/TerminacionYCorreccion';
 import { CodigoAcceso } from '@/componentes/contratos/CodigoAcceso';
-import { DetalleTecnico } from '@/componentes/DetalleTecnico';
+import { AvisosContrato, SeccionDocumentos } from '@/componentes/contratos/LecturaContrato';
 import { EsqueletoCarga } from '@/componentes/EsqueletoCarga';
 import { EstadoMensaje } from '@/componentes/EstadoMensaje';
 import { FilaLista } from '@/componentes/FilaLista';
@@ -30,14 +24,10 @@ import { Superficie } from '@/componentes/Superficie';
 import { Texto } from '@/componentes/Texto';
 import { useContrato, useDocumentos, useRegenerarCodigo } from '@/consultas/contratos';
 import { useRefrescarAlEnfocar } from '@/consultas/enfoque';
-import { ETIQUETA_DOCUMENTO, nombreArchivoDocumento } from '@/contratos/lectura';
 import { ETIQUETA_PLANTILLA, esPlantillaVivienda } from '@/contratos/plantilla';
 import { colores, espaciado } from '@/tema';
 import { centavosAPesosTexto } from '@/utilidades/dinero';
-import { descargarYCompartir } from '@/utilidades/documentos';
 import { formatearFechaCorta, formatearFechaLarga } from '@/utilidades/fechas';
-
-const ROL: Record<RolContrato, string> = { ARRENDADOR: 'el arrendador', INQUILINO: 'el inquilino' };
 
 export default function DetalleContrato() {
   const router = useRouter();
@@ -88,7 +78,10 @@ export default function DetalleContrato() {
     <PantallaPila>
       <Datos contrato={contrato} />
       <Incrementos contrato={contrato} />
-      <Avisos contrato={contrato} />
+      <AvisosContrato
+        aviso={contrato.aviso_no_renovacion}
+        terminacion={contrato.terminacion_anticipada}
+      />
       <AccionesContrato contrato={contrato} />
       <SeccionTerminacion contrato={contrato} />
       <SeccionCorreccion contrato={contrato} />
@@ -164,136 +157,21 @@ function Incrementos({ contrato: c }: { contrato: ContratoDetalle }) {
   );
 }
 
-/** Texto informativo de la terminación anticipada (solicitada o confirmada). */
-function textoTerminacion(t: ResumenTerminacionContrato): string {
-  const confirmada = t.estado === 'CONFIRMADA';
-  const quien = confirmada ? t.confirmada_por : t.solicitada_por;
-  const cuando = confirmada ? t.confirmada_en : null;
-  return `Terminación anticipada ${confirmada ? 'confirmada' : 'solicitada'}${quien ? ` por ${ROL[quien]}` : ''}${cuando ? ` el ${formatearFechaCorta(cuando)}` : ''}${t.fecha_efectiva ? `. Fecha efectiva: ${formatearFechaCorta(t.fecha_efectiva)}` : ''}.${t.motivo ? ` Motivo: ${t.motivo}` : ''}`;
-}
-
-/** Información de solo lectura; las acciones están en la sección Acciones. */
-function Avisos({ contrato: c }: { contrato: ContratoDetalle }) {
-  const aviso = c.aviso_no_renovacion;
-  const termina = c.terminacion_anticipada;
-  return (
-    <>
-      {aviso && aviso.estado === 'DADO' ? (
-        <Aviso
-          tono="informacion"
-          mensaje={`Aviso de no renovación dado por ${aviso.dado_por ? ROL[aviso.dado_por] : 'una de las partes'}${aviso.dado_en ? ` el ${formatearFechaCorta(aviso.dado_en)}` : ''}.${aviso.motivo ? ` Motivo: ${aviso.motivo}` : ''}`}
-        />
-      ) : null}
-      {termina && termina.estado !== 'NINGUNA' ? (
-        <Aviso tono="informacion" mensaje={textoTerminacion(termina)} />
-      ) : null}
-    </>
-  );
-}
-
-type EstadoDoc = 'descargando' | 'noDisponible' | 'error';
-
 function Documentos({ contratoId }: { contratoId: string }) {
   const documentos = useDocumentos(contratoId);
-  const [estados, setEstados] = useState<Record<string, EstadoDoc | undefined>>({});
-  const [fallos, setFallos] = useState<Record<string, string | null>>({});
-  // Un documento que se está descargando no se vuelve a pedir.
-  const enVuelo = useRef(new Set<string>());
-
-  const poner = (docId: string, estado: EstadoDoc | undefined) =>
-    setEstados((actual) => ({ ...actual, [docId]: estado }));
-
-  /** La URL firmada caduca: se pide la lista fresca justo antes de descargar. No se guarda ni se registra. */
-  async function verYCompartir(doc: DocumentoContrato) {
-    if (enVuelo.current.has(doc.id)) return;
-    enVuelo.current.add(doc.id);
-    poner(doc.id, 'descargando');
-    setFallos((f) => ({ ...f, [doc.id]: null }));
-    try {
-      const fresca = (await listarDocumentos(contratoId)).find((d) => d.id === doc.id);
-      if (!fresca?.url_firmada) {
-        poner(doc.id, 'noDisponible');
-        return;
-      }
-      await descargarYCompartir(
-        fresca.url_firmada,
-        nombreArchivoDocumento(contratoId, doc.version),
-      );
-      poner(doc.id, undefined);
-    } catch (falla) {
-      poner(doc.id, 'error');
-      setFallos((f) => ({
-        ...f,
-        [doc.id]: detalleTecnico(falla),
-      }));
-    } finally {
-      enVuelo.current.delete(doc.id);
-    }
-  }
-
   return (
-    <View style={estilos.grupo}>
-      <Texto variante="tituloSeccion" accessibilityRole="header">
-        Documentos
-      </Texto>
-      {documentos.isPending ? <EsqueletoCarga filas={1} /> : null}
-      {documentos.isError && documentos.data === undefined ? (
-        <>
-          <Aviso mensaje={mensajeDeError(documentos.error)} />
-          <Boton
-            titulo="Reintentar"
-            variante="secundario"
-            ancho="completo"
-            onPress={() => void documentos.refetch()}
-          />
-        </>
-      ) : null}
-      {documentos.data?.length === 0 ? (
-        <Texto variante="cuerpo" color={colores.textoSecundario}>
-          Aún no hay documentos.
-        </Texto>
-      ) : null}
-      {(documentos.data ?? []).map((doc) => {
-        const estado = estados[doc.id];
-        const noDisponible = doc.url_firmada === null || estado === 'noDisponible';
-        return (
-          <Superficie key={doc.id} style={estilos.tarjeta}>
-            <FilaLista
-              icono="documento"
-              titulo={ETIQUETA_DOCUMENTO[doc.tipo]}
-              subtitulo={`Versión ${doc.version} · ${formatearFechaCorta(doc.generado_en)}`}
-            />
-            {noDisponible ? (
-              <Texto variante="cuerpo" color={colores.textoSecundario}>
-                Archivo no disponible
-              </Texto>
-            ) : (
-              <>
-                {estado === 'error' ? (
-                  <>
-                    <Aviso mensaje="No pudimos descargar el documento. Inténtalo de nuevo." />
-                    <DetalleTecnico detalle={fallos[doc.id] ?? null} />
-                  </>
-                ) : null}
-                <Boton
-                  titulo={estado === 'error' ? 'Reintentar' : 'Ver y compartir'}
-                  tituloCargando="Descargando…"
-                  cargando={estado === 'descargando'}
-                  variante="secundario"
-                  ancho="completo"
-                  onPress={() => void verYCompartir(doc)}
-                />
-              </>
-            )}
-          </Superficie>
-        );
-      })}
-      <BotonRegenerar
-        contratoId={contratoId}
-        titulo="¿Falta un documento? Generar"
-        conConfirmacion
-      />
-    </View>
+    <SeccionDocumentos
+      contratoId={contratoId}
+      consulta={documentos}
+      pedirLista={listarDocumentos}
+      pie={
+        <BotonRegenerar
+          contratoId={contratoId}
+          titulo="¿Falta un documento? Generar"
+          conConfirmacion
+        />
+      }
+    />
   );
 }
 
