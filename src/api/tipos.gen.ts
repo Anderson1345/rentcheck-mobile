@@ -848,7 +848,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Rechazar un pago pendiente del arrendador */
+        /**
+         * Rechazar un pago pendiente del arrendador
+         * @description El cuerpo es OPCIONAL: sin cuerpo el pago queda RECHAZADO sin motivo. Con `motivo` (MONTO_NO_COINCIDE, PAGO_NO_VISIBLE, COMPROBANTE_ILEGIBLE u OTRO) y `mensaje` (1 a 200 caracteres tras recortar espacios) el inquilino los ve en su pago rechazado. `motivo = OTRO` exige mensaje (400 MENSAJE_REQUERIDO) y un mensaje exige motivo (400 MOTIVO_REQUERIDO). Se escriben en la misma escritura condicionada a PENDIENTE: si dos rechazos coinciden, gana uno y el otro recibe 409.
+         */
         patch: operations["PagoController_rechazar"];
         trace?: never;
     };
@@ -1624,6 +1627,20 @@ export interface components {
              *     contrato, y no anterior a su fecha de inicio.
              */
             fecha_efectiva: string;
+        };
+        /**
+         * @description Motivo de una lista fija. Opcional.
+         * @enum {string}
+         */
+        MotivoRechazoPago: "MONTO_NO_COINCIDE" | "PAGO_NO_VISIBLE" | "COMPROBANTE_ILEGIBLE" | "OTRO";
+        RechazarPagoDto: {
+            /** @description Motivo de una lista fija. Opcional. */
+            motivo?: components["schemas"]["MotivoRechazoPago"];
+            /**
+             * @description Mensaje opcional para el inquilino, de 1 a 200 caracteres tras recortar espacios. Un mensaje en
+             *     blanco cuenta como no enviado.
+             */
+            mensaje?: string;
         };
         VincularContratoDto: {
             /**
@@ -3244,7 +3261,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Lista de pagos con el contrato, la unidad y el inquilino relacionados. */
+            /** @description Lista de pagos con el contrato, la unidad y el inquilino relacionados. Cada pago trae `motivo_rechazo` (enum o null) y `mensaje_rechazo` (texto o null); solo los pagos RECHAZADO traen valor. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3337,7 +3354,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Lista de pagos del inquilino con sus datos de contrato. */
+            /** @description Lista de pagos del inquilino con sus datos de contrato. Cada pago trae `motivo_rechazo` (enum o null) y `mensaje_rechazo` (texto o null); solo los pagos RECHAZADO traen valor. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3357,7 +3374,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Detalle del pago con los datos relacionados. */
+            /** @description Detalle del pago con los datos relacionados. Cada pago trae `motivo_rechazo` (enum o null) y `mensaje_rechazo` (texto o null); solo los pagos RECHAZADO traen valor. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3416,10 +3433,21 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RechazarPagoDto"];
+            };
+        };
         responses: {
-            /** @description Pago rechazado correctamente. */
+            /** @description Pago rechazado correctamente, con `motivo_rechazo` y `mensaje_rechazo` (null si no se indicaron). Solo los pagos RECHAZADO traen valor en esos campos. */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description VALIDACION (motivo fuera de la lista o mensaje de más de 200 caracteres), MOTIVO_REQUERIDO (mensaje sin motivo) o MENSAJE_REQUERIDO (motivo OTRO sin mensaje). */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
