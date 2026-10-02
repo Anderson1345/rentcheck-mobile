@@ -26,6 +26,7 @@ export const clavesInquilino = {
   panel: (id: string) => ['inquilino', 'contrato', id, 'panel'] as const,
   detalle: (id: string) => ['inquilino', 'contrato', id, 'detalle'] as const,
   estadoCuenta: (id: string) => ['inquilino', 'contrato', id, 'estado-cuenta'] as const,
+  pagos: (id: string) => ['inquilino', 'contrato', id, 'pagos'] as const,
 };
 
 export function useContratosInquilino() {
@@ -36,11 +37,12 @@ export function useContratosInquilino() {
   });
 }
 
-export function usePanelInquilino(id: string) {
+export function usePanelInquilino(id: string, habilitada = true) {
   return useQuery({
     queryKey: clavesInquilino.panel(id),
     queryFn: () => obtenerPanelInquilino(id),
     staleTime: STALE_TIME_CONTRATOS_MS,
+    enabled: habilitada,
   });
 }
 
@@ -54,11 +56,12 @@ export function useContratoInquilino(id: string, habilitada = true) {
   });
 }
 
-export function useEstadoCuentaInquilino(id: string) {
+export function useEstadoCuentaInquilino(id: string, habilitada = true) {
   return useQuery({
     queryKey: clavesInquilino.estadoCuenta(id),
     queryFn: () => obtenerEstadoCuentaInquilino(id),
     staleTime: STALE_TIME_CONTRATOS_MS,
+    enabled: habilitada,
   });
 }
 

@@ -180,6 +180,11 @@ export interface OpcionesPeticion {
   tiempo?: number;
 }
 
+/** Opciones de una subida: cabeceras extra (p. ej. Idempotency-Key). Authorization y Accept no se pisan. */
+export interface OpcionesSubida {
+  encabezados?: Record<string, string>;
+}
+
 export interface ClienteApi {
   solicitar<T = unknown>(
     metodo: Metodo,
@@ -193,6 +198,7 @@ export interface ClienteApi {
     campo: string,
     archivo: ArchivoSubida,
     extras?: Record<string, string>,
+    opciones?: OpcionesSubida,
   ): Promise<T>;
   get<T = unknown>(ruta: string): Promise<T>;
   post<T = unknown>(ruta: string, cuerpo?: unknown, opciones?: OpcionesPeticion): Promise<T>;
@@ -327,6 +333,7 @@ export function crearClienteApi(opciones: OpcionesCliente = {}): ClienteApi {
     campo: string,
     archivo: ArchivoSubida,
     extras?: Record<string, string>,
+    opciones?: OpcionesSubida,
   ): Promise<T> {
     const info = await infoImpl(archivo.uri).catch(() => null);
     if (info !== null) {
@@ -335,9 +342,14 @@ export function crearClienteApi(opciones: OpcionesCliente = {}): ClienteApi {
     }
 
     const token = await obtenerToken();
-    const encabezados: Record<string, string> = { Accept: 'application/json' };
+    const encabezados: Record<string, string> = {
+      ...opciones?.encabezados,
+      Accept: 'application/json',
+    };
     if (token) encabezados.Authorization = `Bearer ${token}`;
+    else delete encabezados.Authorization;
     // Sin Content-Type: el cargador lo calcula con el boundary.
+    delete encabezados['Content-Type'];
     const opcionesSubida: FileSystem.FileSystemUploadOptions = {
       httpMethod: 'POST',
       uploadType: FileSystem.FileSystemUploadType.MULTIPART,

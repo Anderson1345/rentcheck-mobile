@@ -39,12 +39,17 @@ export function SelectorFecha({
   valor,
   hoy,
   error,
+  minimo,
+  maximo,
   onCambio,
 }: {
   etiqueta: string;
   valor: string;
   hoy: string;
   error?: string;
+  /** Fecha mínima y máxima que admite el selector (AAAA-MM-DD). Sin ellas no hay tope. */
+  minimo?: string;
+  maximo?: string;
   onCambio: (fecha: string) => void;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -71,7 +76,13 @@ export function SelectorFecha({
         </Texto>
       ) : null}
       {abierto ? (
-        <DateTimePicker value={fechaParaSelector(valor, hoy)} mode="date" onChange={alElegir} />
+        <DateTimePicker
+          value={fechaParaSelector(valor, hoy)}
+          mode="date"
+          onChange={alElegir}
+          minimumDate={minimo ? fechaParaSelector(minimo, hoy) : undefined}
+          maximumDate={maximo ? fechaParaSelector(maximo, hoy) : undefined}
+        />
       ) : null}
     </View>
   );

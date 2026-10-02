@@ -66,6 +66,18 @@ describe('subirArchivo con el cargador nativo', () => {
     expect(subir.mock.calls[0][2].headers['Content-Type']).toBeUndefined();
   });
 
+  it('acepta cabeceras extra (Idempotency-Key) sin perder Authorization ni Accept, y no pueden pisar la autorización', async () => {
+    const subir = jest.fn().mockResolvedValue(resultado(201, '{}'));
+    await crear(subir).subirArchivo('/pagos', 'comprobante', archivo, undefined, {
+      encabezados: { 'Idempotency-Key': 'k'.repeat(32), Authorization: 'Bearer falso' },
+    });
+    expect(subir.mock.calls[0][2].headers).toEqual({
+      Authorization: 'Bearer abc123',
+      Accept: 'application/json',
+      'Idempotency-Key': 'k'.repeat(32),
+    });
+  });
+
   it('el tipo de subida es MULTIPART (el predeterminado, BINARY_CONTENT, no enviaría el campo)', async () => {
     const subir = jest.fn().mockResolvedValue(resultado(200, '{}'));
     await crear(subir).subirArchivo('/foto', 'foto', archivo);

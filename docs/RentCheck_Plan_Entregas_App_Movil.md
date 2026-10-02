@@ -1,6 +1,6 @@
 # RentCheck — Plan de entregas de la app móvil (E1 a E12)
 
-**Versión 1.5 — 01/10/2026.** Documento de guía para las entregas de la Fase 1 (repositorio `rentcheck-mobile`).
+**Versión 1.7 — 01/10/2026.** Documento de guía para las entregas de la Fase 1 (repositorio `rentcheck-mobile`).
 
 ## 0. Para qué sirve y qué lugar ocupa
 
@@ -107,12 +107,16 @@ Cada ficha: objetivo · pantallas · reglas clave · referencias · prueba manua
 - **Referencias**: Contexto §10, §7.5, F4, F8; `PATCH /inquilino/perfil`.
 - **Prueba manual**: inquilino con dos contratos cambia de uno a otro y ve datos distintos; intenta abrir un contrato ajeno (404).
 
-### E7 — Pagos
+### E7 — Pagos (se hace en dos entregas: E7-A y E7-B)
+
+- **E7-A (inquilino)**: pestaña Pagos (datos de recaudo solo con contrato ACTIVO, períodos con "Reportar pago", historial con el motivo del rechazo) y formulario de reporte con comprobante por cámara, galería o PDF, fotos reducidas a 1600 px y JPEG 0,75, y `Idempotency-Key` (una clave por borrador: misma clave si no cambia el contenido; clave nueva al cambiar período, monto, fecha o archivo). El monto se avisa contra el saldo del período (menor: quedará parcial; mayor: no cubre otros períodos), sin bloquear. Cerrada. Paquetes: `expo-document-picker` y `expo-image-manipulator`. Ver el comprobante ya subido queda para E7-B (falta B-63).
+- **E7-B (arrendador)**: cola de validación con monto esperado vs. reportado, ver el comprobante, aprobar y rechazar con motivo y confirmación. **Depende de B0.6-A3** (B-61: monto esperado y fecha límite en cada pago; B-63: tipo del comprobante). Aquí se generaliza `useAccionContrato` para aprobar y rechazar.
+- Lo siguiente es la ficha original de E7.
 
 - **Inquilino**: lista de períodos (por vencer, vencidos, en revisión), datos de recaudo, reportar pago (período sugerido, monto, fecha, comprobante por cámara, galería o PDF).
 - **Arrendador**: cola de validación con monto esperado vs. reportado, aprobar o rechazar (con motivo) con confirmación.
 - **Reglas**: dinero en centavos; el comprobante nunca se borra (valor legal); "anular aprobación" llega con B0.6 (B-45) y se agrega entonces.
-- **Referencias**: Contexto F5, §5.10, §7.3; Plan B-xx de pagos (mora, períodos). **Depende de B0.6-A** para el motivo y el mensaje del rechazo (B-59); hasta entonces el rechazo no los guarda.
+- **Referencias**: Contexto F5, §5.10, §7.3; Plan B-xx de pagos (mora, períodos). **Depende de B0.6-A1** (cerrada) para el motivo y el mensaje del rechazo (B-59): `PATCH /pagos/:id/rechazar` acepta `{ motivo, mensaje }` opcionales en el servidor, pero la app los pide siempre (lista fija; el mensaje es obligatorio con "otro", hasta 200 caracteres). Los pagos rechazados antes de A1 no tienen motivo (mostrar sin él).
 - **Prueba manual**: reportar pago con foto; aprobarlo desde la otra cuenta; rechazar otro y ver el estado.
 
 ### E8 — Mantenimiento
@@ -124,7 +128,7 @@ Cada ficha: objetivo · pantallas · reglas clave · referencias · prueba manua
 ### E9 — Alertas y panel
 
 - **Pantallas**: bandeja de alertas de ambos roles con enlace al recurso; Panel del arrendador (ingresos, recaudo esperado vs. real, ocupación, pendientes, tendencia).
-- **Depende de B0.6-A** (endpoint del Panel del arrendador, B-58) y de **B0.6-B** (alertas del inquilino, B-18). Las alertas del arrendador ya existen.
+- **Depende de B0.6-A2** (endpoint del Panel del arrendador, B-58) y de **B0.6-B** (alertas del inquilino, B-18). Las alertas del arrendador ya existen.
 - **Referencias**: Contexto §11, §9.
 
 ### E10 — Notificaciones push
@@ -155,4 +159,4 @@ Cada ficha: objetivo · pantallas · reglas clave · referencias · prueba manua
 
 ## 5. Orden y dependencias
 
-E1 → D1 → E2 → E3 → E4 → E5 → E6 → B0.6-A → E7 → E8 → B0.6-B → E9 → E10 → E11 → E12. Mismo orden que el documento de instrucciones §8; no se cambia sin pedirlo.
+E1 → D1 → E2 → E3 → E4 → E5 → E6 → B0.6-A1 → E7-A → B0.6-A3 → E7-B → E8 → B0.6-A2 → B0.6-B → E9 → E10 → E11 → E12. Mismo orden que el documento de instrucciones §8; no se cambia sin pedirlo.

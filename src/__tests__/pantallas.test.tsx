@@ -15,6 +15,7 @@ import NuevoInmueble from '../../app/(arrendador)/inmueble/nuevo';
 import MasInquilino from '../../app/(inquilino)/(pestanas)/mas';
 import MiPanel from '../../app/(inquilino)/(pestanas)/mi-panel';
 import PagosInquilino from '../../app/(inquilino)/(pestanas)/pagos';
+import ReportarPago from '../../app/(inquilino)/reportar-pago';
 import SolicitudesInquilino from '../../app/(inquilino)/(pestanas)/solicitudes';
 import AgregarContrato from '../../app/(inquilino)/agregar-contrato';
 import MisContratos from '../../app/(inquilino)/mis-contratos';
@@ -161,7 +162,24 @@ describe.each([
     ),
     true,
   ],
-  ['Pagos del inquilino (próximamente)', () => <PagosInquilino />, true],
+  [
+    'Pagos del inquilino',
+    () => (
+      <Proveedor>
+        <PagosInquilino />
+      </Proveedor>
+    ),
+    true,
+  ],
+  [
+    'Reportar pago del inquilino',
+    () => (
+      <Proveedor>
+        <ReportarPago />
+      </Proveedor>
+    ),
+    true,
+  ],
   ['Solicitudes del inquilino (próximamente)', () => <SolicitudesInquilino />, true],
   [
     'Más del inquilino',

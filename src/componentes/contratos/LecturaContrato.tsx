@@ -181,7 +181,16 @@ export function AvisosContrato({
 
 const ESTADO_PAGO = { al_dia: 'AL_DIA', en_mora: 'EN_MORA', pendiente: 'PENDIENTE' } as const;
 
-function FilaPeriodo({ p, separador }: { p: PeriodoCuenta; separador: boolean }) {
+/** Fila de un período. `accion` va debajo del estado (p. ej. "Reportar pago" del inquilino). */
+export function FilaPeriodo({
+  p,
+  separador,
+  accion,
+}: {
+  p: PeriodoCuenta;
+  separador: boolean;
+  accion?: ReactNode;
+}) {
   return (
     <FilaLista
       titulo={mesDePeriodo(p.periodo)}
@@ -198,6 +207,7 @@ function FilaPeriodo({ p, separador }: { p: PeriodoCuenta; separador: boolean })
               {`Aprobado ${centavosAPesosTexto(p.montoAprobadoCentavos)} de ${centavosAPesosTexto(p.canonVigenteCentavos)}`}
             </Texto>
           ) : null}
+          {accion}
         </View>
       }
     />

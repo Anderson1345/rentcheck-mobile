@@ -309,10 +309,11 @@ beforeEach(() => {
 
 // ---------------------------------------------------------------------------------------------
 
-describe('pestañas Pagos y Solicitudes: próximamente', () => {
-  it('Pagos llega en E7 y Solicitudes en E8', async () => {
+describe('pestañas Pagos y Solicitudes', () => {
+  it('Pagos ya es real (E7-A: períodos e historial) y Solicitudes llega en E8', async () => {
     const pagos = await montar(<PagosInquilino />);
-    expect(todo(pagos.raiz)).toContain('Próximamente (E7)');
+    expect(todo(pagos.raiz)).not.toContain('Próximamente');
+    expect(todo(pagos.raiz)).toContain('Pagos');
     const solicitudes = await montar(<SolicitudesInquilino />);
     expect(todo(solicitudes.raiz)).toContain('Próximamente (E8)');
   });
