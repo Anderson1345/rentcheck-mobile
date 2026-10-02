@@ -1,3 +1,4 @@
+import { formatearPorcentaje } from '../contratos/acciones';
 import { formatearFechaCorta } from '../utilidades/fechas';
 import { ErrorApi, ErrorArchivo, ErrorSinConexion, ErrorTimeout } from './cliente';
 import { MENSAJE_FOTO_GRANDE } from './mensajesArchivo';
@@ -272,4 +273,63 @@ export function pasoDeErrorContrato(error: unknown): PasoDeError | null {
     default:
       return null;
   }
+}
+
+function fechaDeDetalle(detalles: Record<string, unknown>, campo: string): string | null {
+  const valor = detalles[campo];
+  if (typeof valor !== 'string') return null;
+  try {
+    return formatearFechaCorta(valor);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Acciones sobre un contrato (incremento, prórroga, aviso, cancelar programado): el mensaje del
+ * diccionario, con las fechas, el año o el tope que manda el servidor en `detalles`. Nunca muestra
+ * el texto técnico del servidor.
+ */
+export function mensajeDeErrorAccion(error: unknown): string {
+  if (error instanceof ErrorApi) {
+    const detalles = textoDeDetalles(error);
+    switch (error.codigo) {
+      case 'INCREMENTO_ANTES_DE_12_MESES': {
+        const desde = fechaDeDetalle(detalles, 'puede_aplicarse_desde');
+        if (desde) return `Podrás aplicar el incremento desde el ${desde}.`;
+        break;
+      }
+      case 'IPC_NO_CONFIGURADO': {
+        const anio = detalles.anio;
+        if (typeof anio === 'number' || typeof anio === 'string') {
+          return `El IPC de ${anio} aún no está cargado.`;
+        }
+        break;
+      }
+      case 'PORCENTAJE_SUPERIOR_AL_IPC': {
+        const tope = formatearPorcentaje(detalles.ipc_referencia_porcentaje as string | number);
+        if (tope) return `El máximo permitido es ${tope} %.`;
+        break;
+      }
+      case 'PRORROGA_FUERA_DE_VENTANA': {
+        const desde = fechaDeDetalle(detalles, 'puede_prorrogarse_desde');
+        const hasta = fechaDeDetalle(detalles, 'puede_prorrogarse_hasta');
+        if (desde && hasta) {
+          return `La prórroga solo se puede hacer entre el ${desde} y el ${hasta}.`;
+        }
+        break;
+      }
+      case 'AVISO_FUERA_DE_PLAZO': {
+        const fin = fechaDeDetalle(detalles, 'fecha_fin');
+        if (fin) {
+          return `El aviso de no renovación ya no se puede dar ni cancelar: el contrato termina el ${fin}.`;
+        }
+        break;
+      }
+      default:
+        break;
+    }
+    if (error.status === 404) return 'Contrato no encontrado.';
+  }
+  return mensajeDeError(error);
 }

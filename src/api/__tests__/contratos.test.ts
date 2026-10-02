@@ -174,3 +174,108 @@ describe('contratos: documentos y código (E5-A)', () => {
     expect(mockPost).toHaveBeenLastCalledWith('/contratos/c1/regenerar-codigo');
   });
 });
+
+describe('contratos: acciones y estado de cuenta (E5-B)', () => {
+  const real = () => jest.requireActual('../contratos');
+
+  it('incremento: cuerpo opcional y tiempo largo (genera el otrosí)', async () => {
+    await real().aplicarIncremento('c1');
+    expect(mockPost).toHaveBeenLastCalledWith('/contratos/c1/aplicar-incremento', undefined, {
+      tiempo: 60_000,
+    });
+    await real().aplicarIncremento('c1', 5.5);
+    expect(mockPost).toHaveBeenLastCalledWith(
+      '/contratos/c1/aplicar-incremento',
+      { porcentaje: 5.5 },
+      {
+        tiempo: 60_000,
+      },
+    );
+  });
+
+  it('prórroga: meses opcionales y tiempo largo', async () => {
+    await real().prorrogar('c1');
+    expect(mockPost).toHaveBeenLastCalledWith('/contratos/c1/prorrogar', undefined, {
+      tiempo: 60_000,
+    });
+    await real().prorrogar('c1', 12);
+    expect(mockPost).toHaveBeenLastCalledWith(
+      '/contratos/c1/prorrogar',
+      { meses: 12 },
+      {
+        tiempo: 60_000,
+      },
+    );
+  });
+
+  it('aviso, cancelar aviso, cancelar programado y estado de cuenta; sin Idempotency-Key', async () => {
+    await real().darAvisoNoRenovacion('c1', 'Me mudo');
+    expect(mockPost).toHaveBeenLastCalledWith('/contratos/c1/aviso-no-renovacion', {
+      motivo: 'Me mudo',
+    });
+    await real().darAvisoNoRenovacion('c1', '  ');
+    expect(mockPost).toHaveBeenLastCalledWith('/contratos/c1/aviso-no-renovacion', undefined);
+    await real().cancelarAvisoNoRenovacion('c1');
+    expect(mockPost).toHaveBeenLastCalledWith('/contratos/c1/cancelar-aviso-no-renovacion');
+    await real().cancelarProgramado('c1');
+    expect(mockPost).toHaveBeenLastCalledWith('/contratos/c1/cancelar-programado');
+    await real().obtenerEstadoCuenta('c1');
+    expect(mockGet).toHaveBeenLastCalledWith('/contratos/c1/estado-cuenta');
+    expect(JSON.stringify(mockPost.mock.calls)).not.toMatch(/idempoten/i);
+  });
+});
+
+describe('mensajeDeErrorAccion', () => {
+  const { mensajeDeErrorAccion } = jest.requireActual('../errores');
+  const api = (status: number, codigo: string | null, detalles?: unknown) =>
+    new ErrorApi({ status, codigo, mensaje: 'texto técnico', detalles });
+
+  it.each([
+    [
+      api(409, 'INCREMENTO_ANTES_DE_12_MESES', { puede_aplicarse_desde: '2027-10-01' }),
+      'Podrás aplicar el incremento desde el 01/10/2027.',
+    ],
+    [api(409, 'IPC_NO_CONFIGURADO', { anio: 2025 }), 'El IPC de 2025 aún no está cargado.'],
+    [
+      api(400, 'PORCENTAJE_SUPERIOR_AL_IPC', { ipc_referencia_porcentaje: 5.5 }),
+      'El máximo permitido es 5,5 %.',
+    ],
+    [
+      api(409, 'PRORROGA_FUERA_DE_VENTANA', {
+        puede_prorrogarse_desde: '2026-10-01',
+        puede_prorrogarse_hasta: '2026-12-30',
+      }),
+      'La prórroga solo se puede hacer entre el 01/10/2026 y el 30/12/2026.',
+    ],
+    [
+      api(409, 'AVISO_FUERA_DE_PLAZO', { fecha_fin: '2026-12-31' }),
+      'El aviso de no renovación ya no se puede dar ni cancelar: el contrato termina el 31/12/2026.',
+    ],
+    [api(409, 'INCREMENTO_YA_APLICADO'), 'El incremento ya se aplicó.'],
+    [api(409, 'PRORROGA_YA_APLICADA'), 'La prórroga ya se aplicó.'],
+    [api(409, 'AVISO_YA_DADO'), 'Ya hay un aviso de no renovación para este contrato.'],
+    [api(409, 'AVISO_NO_DADO'), 'No hay un aviso de no renovación para cancelar.'],
+    [
+      api(403, 'NO_PUEDE_CANCELAR_AVISO_AJENO'),
+      'Solo quien dio el aviso de no renovación puede cancelarlo.',
+    ],
+    [api(409, 'CONTRATO_NO_PROGRAMADO'), 'El contrato no está programado.'],
+    [api(409, 'CONTRATO_NO_ACTIVO'), 'El contrato no está activo.'],
+    [api(404, 'NO_ENCONTRADO'), 'Contrato no encontrado.'],
+  ])('%#', (error, mensaje) => {
+    expect(mensajeDeErrorAccion(error)).toBe(mensaje);
+  });
+
+  it('sin detalles usa el mensaje del diccionario y nunca el texto técnico', () => {
+    expect(mensajeDeErrorAccion(api(409, 'INCREMENTO_ANTES_DE_12_MESES'))).not.toContain('técnico');
+    expect(mensajeDeErrorAccion(api(409, 'IPC_NO_CONFIGURADO', {}))).not.toContain('undefined');
+    expect(mensajeDeErrorAccion(api(400, 'PORCENTAJE_SUPERIOR_AL_IPC', {}))).not.toContain(
+      'undefined',
+    );
+  });
+
+  it('sin conexión o tiempo: los mensajes generales', () => {
+    expect(mensajeDeErrorAccion(new ErrorSinConexion())).toContain('conexión');
+    expect(mensajeDeErrorAccion(new ErrorTimeout())).toContain('tardó');
+  });
+});

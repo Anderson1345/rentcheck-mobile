@@ -334,7 +334,7 @@ describe('Detalle del contrato', () => {
     expect(textosDe(raiz).join('|')).not.toContain('Incrementos de IPC');
   });
 
-  it('aviso de no renovación y terminación anticipada: solo información, sin botones de acción', async () => {
+  it('aviso de no renovación y terminación anticipada: solo información, sin botones de aviso ni de terminación', async () => {
     datos.detalle = {
       ...DETALLE,
       aviso_no_renovacion: {
@@ -357,13 +357,13 @@ describe('Detalle del contrato', () => {
     expect(todo).toContain('Me mudo');
     expect(todo).toContain('Terminación anticipada solicitada por el arrendador');
     expect(todo).toContain('31/01/2027');
+    // Sin los booleanos puede_dar / puede_cancelar del servidor no hay botones de aviso; la
+    // terminación anticipada llega en E5-C.
     for (const accion of [
       'Cancelar aviso',
-      'Dar aviso',
+      'Dar aviso de no renovación',
       'Confirmar terminación',
       'Solicitar terminación',
-      'Aplicar incremento',
-      'Prorrogar',
     ]) {
       expect(hayBoton(raiz, accion)).toBe(false);
     }
