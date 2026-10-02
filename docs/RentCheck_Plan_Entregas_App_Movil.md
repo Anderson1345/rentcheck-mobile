@@ -1,6 +1,6 @@
 # RentCheck — Plan de entregas de la app móvil (E1 a E12)
 
-**Versión 1.11 — 02/10/2026.** Documento de guía para las entregas de la Fase 1 (repositorio `rentcheck-mobile`).
+**Versión 1.12 — 02/10/2026.** Documento de guía para las entregas de la Fase 1 (repositorio `rentcheck-mobile`).
 
 ## 0. Para qué sirve y qué lugar ocupa
 
@@ -124,7 +124,7 @@ Cada ficha: objetivo · pantallas · reglas clave · referencias · prueba manua
 - **Diagnóstico (02/10/2026)**: un solo adjunto opcional por solicitud (JPEG, PNG o MP4, hasta 20 MB, en la misma petición multipart, campo `adjunto`); estados PENDIENTE → EN_PROCESO → RESUELTO (o PENDIENTE → RESUELTO), solo los cambia el arrendador y sin comentario ni historial; crear exige contrato ACTIVO (409 `CONTRATO_NO_ACTIVO`); sin compresión de video posible en Expo Go (se muestra el tamaño, se bloquea por encima de 20 MB y se recomiendan clips cortos). Reproducción con `expo-video` (sdk-57, incluido en Expo Go).
 - **Depende de B0.6-A4** (B-66: `unidad.id` en los contratos del inquilino; B-67: esquemas de respuesta; B-68: `adjunto_tipo`).
 - **E8-A (inquilino) — CERRADA el 02/10/2026** (commit `10e82cd`; el estado vive en el documento de instrucciones). Quedó: chip "Resuelto" (no "Resuelta"), sin icono de video (diseño), `TRANSICION_INVALIDA` ya registrado como conflicto de estado, `subirArchivo` y el borrador idempotente genéricos, `unidad.id` en los tipos del portal. Alcance original: pestaña Solicitudes (lista del contrato seleccionado, detalle con adjunto) y crear solicitud (descripción, urgencia BAJO/MEDIO/ALTO, adjunto opcional foto o video) con `Idempotency-Key` por borrador. Requiere generalizar `subirArchivo` (límite y plazo por llamada, progreso, cancelación, envío sin archivo) y el borrador idempotente de pagos. Paquete: `expo-video`.
-- **E8-B (arrendador)**: lista con segmentos por estado y contador, filtros de urgencia y unidad, detalle con adjunto y cambio de estado con confirmación. Punto de entrada: fila "Mantenimiento" en la pestaña Más (decisión del líder técnico; la sexta pestaña o esperar a E9 quedan descartadas por ahora).
+- **E8-B (arrendador) — CERRADA el 02/10/2026** (commit `f197d49`; **E8 completa**). Ruta del detalle `mantenimiento/[id]`; contadores calculados en la app desde una lista sin filtro de estado; teléfono del inquilino solo texto. Alcance original: lista con segmentos por estado y contador, filtros de urgencia y unidad, detalle con adjunto y cambio de estado con confirmación. Punto de entrada: fila "Mantenimiento" en la pestaña Más (decisión del líder técnico; la sexta pestaña o esperar a E9 quedan descartadas por ahora).
 - Lo siguiente es la ficha original de E8.
 
 - **Inquilino**: crear solicitud (foto o video; solo con contrato Activo) y consultar. **Arrendador**: lista, filtros, cambio de estado.
