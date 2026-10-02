@@ -27,6 +27,8 @@ export interface FuenteDetalle<D extends object = ContratoDetalle> {
    * que no es un contrato aporta la suya.
    */
   huboCambio?: (accion: AccionContrato, antes: D, despues: D) => boolean;
+  /** Texto de un error de la acción; por defecto el de contratos (mensajeDeErrorAccion). */
+  mensajeError?: (error: unknown) => string;
   claves: {
     /** Prefijo que cuelga todo el contrato (detalle, lista, documentos, estado de cuenta). */
     todos: readonly unknown[];
@@ -130,7 +132,7 @@ export function useAccionContrato<R = unknown, T = unknown, D extends object = C
         }
       } else {
         setFase('inactivo');
-        setError(mensajeDeErrorAccion(falla));
+        setError((fuente.mensajeError ?? mensajeDeErrorAccion)(falla));
         // Alguien cambió el contrato: se refresca el detalle y se invita a recargar.
         if (esConflictoDeEstado(falla)) {
           setRecargable(true);

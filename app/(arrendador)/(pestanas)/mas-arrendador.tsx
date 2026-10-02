@@ -20,10 +20,18 @@ export default function MasArrendador() {
       <ContenidoBajoCabecera style={estilos.cuerpo}>
         <Superficie relleno="ninguno">
           <FilaLista
+            icono="mantenimiento"
+            titulo="Mantenimiento"
+            subtitulo="Solicitudes de tus inquilinos"
+            conChevron
+            onPress={() => router.push('/mantenimiento')}
+          />
+          <FilaLista
             icono="perfil"
             titulo="Mi perfil"
             subtitulo="Nombre, teléfono y cédula"
             conChevron
+            separador
             onPress={() => router.push('/perfil')}
           />
         </Superficie>

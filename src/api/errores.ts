@@ -458,3 +458,19 @@ export function mensajeDeErrorSolicitud(error: unknown): string {
   }
   return mensajeDeError(error);
 }
+
+/**
+ * Cambiar el estado de una solicitud de mantenimiento (arrendador). TRANSICION_INVALIDA (409) y 404
+ * hablan de la solicitud, no del contrato; lo demás sale del texto de las acciones de siempre.
+ */
+export function mensajeDeErrorEstadoSolicitud(error: unknown): string {
+  if (error instanceof ErrorApi) {
+    if (error.codigo === 'TRANSICION_INVALIDA') {
+      return 'La solicitud ya cambió de estado. Te mostramos el estado actual.';
+    }
+    if (error.status === 404) {
+      return 'No encontramos esa solicitud. Puede que ya no exista o que no tengas acceso.';
+    }
+  }
+  return mensajeDeErrorAccion(error);
+}
