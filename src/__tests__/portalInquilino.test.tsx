@@ -784,10 +784,11 @@ describe('Mi contrato', () => {
     expect(todo(raiz)).not.toContain('obsoleto');
   });
 
-  it('terminación y aviso: solo información, sin botones de acción (E6-B)', async () => {
+  it('terminación y aviso se ven como información; con el contrato finalizado no hay botones', async () => {
     montarContrato('c1', {
       detalle: {
         ...DETALLE,
+        estado: 'VENCIDO',
         terminacion_anticipada: {
           estado: 'SOLICITADA',
           solicitada_por: 'ARRENDADOR',
@@ -904,10 +905,10 @@ describe('Más y cierre de sesión', () => {
     return <Text>sonda</Text>;
   }
 
-  it('solo ofrece "Cerrar sesión" (el perfil llega en E6-B)', async () => {
+  it('ofrece "Mi perfil" y "Cerrar sesión"', async () => {
     const { raiz } = await montar(<MasInquilino />);
     expect(hayBoton(raiz, 'Cerrar sesión')).toBe(true);
-    expect(todo(raiz)).not.toContain('Mi perfil');
+    expect(hayBoton(raiz, 'Mi perfil')).toBe(true);
   });
 
   it('cerrar sesión limpia el contrato seleccionado', async () => {

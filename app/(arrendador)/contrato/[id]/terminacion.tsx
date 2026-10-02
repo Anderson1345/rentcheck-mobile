@@ -13,14 +13,12 @@ import {
 } from '@/componentes/contratos/AccionesContrato';
 import { SelectorFecha } from '@/componentes/contratos/PasoFechas';
 import { Texto } from '@/componentes/Texto';
+import { ADVERTENCIA_TERMINACION, textoResumenSolicitud } from '@/contratos/acciones';
 import { useAccionContrato } from '@/contratos/useAccionContrato';
 import { colores, espaciado } from '@/tema';
-import { formatearFechaLarga, hoyBogota } from '@/utilidades/fechas';
+import { hoyBogota } from '@/utilidades/fechas';
 
 const MAXIMO_MOTIVO = 1000;
-// Advertencia obligatoria de la interfaz (Contexto §13, Ley 820 art. 21): texto exacto.
-const ADVERTENCIA =
-  'Esto es una terminación por mutuo acuerdo. No reemplaza el aviso escrito ni las causales de una terminación unilateral (Ley 820, arts. 22 a 24).';
 
 export default function TerminacionAnticipada() {
   const router = useRouter();
@@ -57,7 +55,7 @@ export default function TerminacionAnticipada() {
           setErrorMotivo(null);
           confirmarAccion(
             'Solicitar terminación anticipada',
-            `Fecha efectiva: ${formatearFechaLarga(fecha)}. Motivo: ${texto}. La otra parte debe confirmarla.`,
+            textoResumenSolicitud(fecha, texto),
             'Solicitar',
             () => void accion.iniciar(() => solicitarTerminacion(id, texto, fecha)),
           );
@@ -68,7 +66,7 @@ export default function TerminacionAnticipada() {
             <Texto variante="titulo" accessibilityRole="header">
               Solicitar terminación anticipada
             </Texto>
-            <Aviso tono="advertencia" mensaje={ADVERTENCIA} />
+            <Aviso tono="advertencia" mensaje={ADVERTENCIA_TERMINACION} />
             <CampoTexto
               etiqueta="Motivo"
               valor={motivo}

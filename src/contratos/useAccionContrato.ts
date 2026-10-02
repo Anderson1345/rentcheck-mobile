@@ -5,7 +5,7 @@ import { ErrorSinConexion, ErrorTimeout } from '../api/cliente';
 import { type ContratoDetalle, obtenerContrato } from '../api/contratos';
 import { esConflictoDeEstado, mensajeDeErrorAccion } from '../api/errores';
 import { clavesContratos } from '../consultas/contratos';
-import { type AccionContrato, huboCambio } from './acciones';
+import { type AccionContrato, type DetalleAccionable, huboCambio } from './acciones';
 
 export type FaseAccion = 'inactivo' | 'enviando' | 'verificando' | 'exito' | 'incierto';
 
@@ -14,6 +14,24 @@ export interface Verificador<T> {
   leer: () => Promise<T>;
   cambio: (leido: T) => boolean;
 }
+
+/**
+ * De dónde se lee el detalle del contrato y qué claves de consulta se invalidan. Por defecto, el del
+ * arrendador; el portal del inquilino pasa el suyo (su detalle y sus claves).
+ */
+export interface FuenteDetalle<D extends DetalleAccionable = ContratoDetalle> {
+  obtener: (id: string) => Promise<D>;
+  claves: {
+    /** Prefijo que cuelga todo el contrato (detalle, lista, documentos, estado de cuenta). */
+    todos: readonly unknown[];
+    detalle: (id: string) => readonly unknown[];
+  };
+}
+
+export const FUENTE_ARRENDADOR: FuenteDetalle = {
+  obtener: (id) => obtenerContrato(id),
+  claves: clavesContratos,
+};
 
 export const MENSAJE_NO_SE_APLICO = 'No se aplicó. Puedes intentarlo de nuevo.';
 export const MENSAJE_VERIFICANDO = 'No sabemos si se aplicó. Verificando…';
@@ -25,25 +43,30 @@ const MENSAJE_INCIERTO =
  * éxito vuelve a pedir detalle, lista, documentos y estado de cuenta, y "sin respuesta" NO da el
  * éxito por hecho ni reintenta sola: recarga el detalle y compara con lo que había antes.
  */
-export function useAccionContrato<R = unknown, T = unknown>(
+export function useAccionContrato<
+  R = unknown,
+  T = unknown,
+  D extends DetalleAccionable = ContratoDetalle,
+>(
   contratoId: string,
   accion: AccionContrato,
+  fuente: FuenteDetalle<D> = FUENTE_ARRENDADOR as unknown as FuenteDetalle<D>,
 ) {
   const cliente = useQueryClient();
   const [fase, setFase] = useState<FaseAccion>('inactivo');
   const [error, setError] = useState<string | null>(null);
   const [resultado, setResultado] = useState<R | null>(null);
-  const [despues, setDespues] = useState<ContratoDetalle | null>(null);
+  const [despues, setDespues] = useState<D | null>(null);
   const [leido, setLeido] = useState<T | null>(null);
   const [recargable, setRecargable] = useState(false);
   const verificador = useRef<Verificador<T> | null>(null);
-  const antes = useRef<ContratoDetalle | null>(null);
-  const [previo, setPrevio] = useState<ContratoDetalle | null>(null);
+  const antes = useRef<D | null>(null);
+  const [previo, setPrevio] = useState<D | null>(null);
   const enCurso = useRef(false);
 
   /** Detalle, lista, documentos y estado de cuenta: todo cuelga de la clave "contratos". */
   async function refrescar() {
-    await cliente.invalidateQueries({ queryKey: clavesContratos.todos });
+    await cliente.invalidateQueries({ queryKey: fuente.claves.todos });
   }
 
   /** Compara el detalle real con el de antes; true si la acción se aplicó (y ya refrescó todo). */
@@ -58,10 +81,10 @@ export function useAccionContrato<R = unknown, T = unknown>(
         }
         return false;
       }
-      const actual = await obtenerContrato(contratoId);
+      const actual = await fuente.obtener(contratoId);
       const previo = antes.current;
       if (previo && huboCambio(accion, previo, actual)) {
-        cliente.setQueryData(clavesContratos.detalle(contratoId), actual);
+        cliente.setQueryData(fuente.claves.detalle(contratoId), actual);
         setDespues(actual);
         await refrescar();
         return true;
@@ -77,8 +100,7 @@ export function useAccionContrato<R = unknown, T = unknown>(
     enCurso.current = true;
     verificador.current = comprobacion ?? null;
     setRecargable(false);
-    antes.current =
-      cliente.getQueryData<ContratoDetalle>(clavesContratos.detalle(contratoId)) ?? null;
+    antes.current = cliente.getQueryData<D>(fuente.claves.detalle(contratoId)) ?? null;
     setPrevio(antes.current);
     setFase('enviando');
     setError(null);
@@ -86,9 +108,7 @@ export function useAccionContrato<R = unknown, T = unknown>(
       const respuesta = await ejecutar();
       setResultado(respuesta);
       await refrescar();
-      setDespues(
-        cliente.getQueryData<ContratoDetalle>(clavesContratos.detalle(contratoId)) ?? null,
-      );
+      setDespues(cliente.getQueryData<D>(fuente.claves.detalle(contratoId)) ?? null);
       setFase('exito');
     } catch (falla) {
       if (falla instanceof ErrorTimeout || falla instanceof ErrorSinConexion) {

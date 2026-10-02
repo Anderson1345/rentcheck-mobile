@@ -216,7 +216,7 @@ describe('"ya tengo cuenta": del login a la vinculación, con el layout real', (
     await t.esperar();
     const visibles = t.textos().join(' | ');
     expect(mockVincular).toHaveBeenCalledTimes(1);
-    expect(visibles).toMatch(/código no es válido para tu cuenta/i);
+    expect(visibles).toContain('Código de acceso no válido.');
     expect(visibles).not.toContain('Agregando tu contrato…');
   });
 

@@ -49,3 +49,29 @@ export function camposCambiadosPerfil(
   if (cedula !== '' && cedula !== normalizarCedula(original.cedula)) cambios.cedula = cedula;
   return cambios;
 }
+
+/** Perfil del inquilino: solo nombre y teléfono (la cédula y el correo no se editan aquí). */
+export function esquemaPerfilInquilino() {
+  return z.object({
+    nombre: z.string().trim().min(1, 'Escribe tu nombre.'),
+    telefono: z.string().trim().min(1, 'Escribe tu teléfono.'),
+  });
+}
+
+export interface ValoresPerfilInquilino {
+  nombre: string;
+  telefono: string;
+}
+
+/** Solo lo que cambió, recortado. Sin cambios devuelve un objeto vacío (no se llama al servidor). */
+export function camposCambiadosPerfilInquilino(
+  original: ValoresPerfilInquilino,
+  nuevos: ValoresPerfilInquilino,
+): Partial<ValoresPerfilInquilino> {
+  const cambios: Partial<ValoresPerfilInquilino> = {};
+  const nombre = nuevos.nombre.trim();
+  const telefono = nuevos.telefono.trim();
+  if (nombre !== original.nombre.trim()) cambios.nombre = nombre;
+  if (telefono !== original.telefono.trim()) cambios.telefono = telefono;
+  return cambios;
+}

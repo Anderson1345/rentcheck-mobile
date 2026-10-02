@@ -1,6 +1,6 @@
 # RentCheck — Plan de entregas de la app móvil (E1 a E12)
 
-**Versión 1.4 — 01/10/2026.** Documento de guía para las entregas de la Fase 1 (repositorio `rentcheck-mobile`).
+**Versión 1.5 — 01/10/2026.** Documento de guía para las entregas de la Fase 1 (repositorio `rentcheck-mobile`).
 
 ## 0. Para qué sirve y qué lugar ocupa
 
@@ -100,7 +100,7 @@ Cada ficha: objetivo · pantallas · reglas clave · referencias · prueba manua
 ### E6 — Portal del inquilino (se hace en dos entregas: E6-A y E6-B)
 
 - **E6-A (lectura)**: barra inferior del inquilino (Mi panel, Pagos, Solicitudes, Más; Pagos y Solicitudes "próximamente"), selector de contrato en memoria, agregar contrato con código (`POST /inquilino/contratos/vincular`), Mi panel (variantes ACTIVO, PROGRAMADO y finalizado; datos de recaudo solo con ACTIVO), Mi contrato (condiciones, incrementos, fotos de entrega, documentos, terminación y aviso solo como información) y estado de cuenta. Cerrada. Las rutas llevan nombres propios (`mi-contrato/[id]`, `mis-contratos`, `agregar-contrato`) porque dos grupos no pueden compartir URL.
-- **E6-B (acciones y perfil)**: terminación anticipada (solicitar con motivo y fecha efectiva, confirmar la del arrendador, cancelar la propia) y aviso de no renovación (dar y cancelar) desde el inquilino, con los booleanos `puede_*` del servidor; perfil (nombre y teléfono; cédula y correo solo lectura; foto de cédula); y dos correcciones de E6-A (prueba de render de "Mis contratos" y mensaje único de código no válido).
+- **E6-B (acciones y perfil)**: terminación anticipada (solicitar con motivo y fecha efectiva, confirmar la del arrendador, cancelar la propia) y aviso de no renovación (dar y cancelar) desde el inquilino, con los booleanos `puede_*` del servidor; perfil (nombre y teléfono; cédula y correo solo lectura; foto de cédula); y dos correcciones de E6-A (prueba de render de "Mis contratos" y mensaje único de código no válido). Cerrada. El servidor responde 403 (no 409) si se intenta confirmar la propia solicitud o cancelar la ajena; la app no ofrece esos botones.
 - Lo siguiente es la ficha original de E6.
 
 - **Pantallas**: selector de contrato + "agregar contrato con código", Mi Panel, Mi Contrato, Mis Documentos, solicitud de terminación y no renovación, editar perfil (nombre y teléfono; el resto no es editable, mostrar `CAMPO_NO_EDITABLE` con claridad).

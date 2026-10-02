@@ -4,6 +4,7 @@
 // alias obsoletos /inquilino/mi-* no se usan. Vincular con código vive en auth.ts.
 
 import { api } from './cliente';
+import type { ArchivoFoto } from './inmuebles';
 import type {
   DocumentoContrato,
   EstadoContratoApi,
@@ -108,3 +109,53 @@ export const obtenerEstadoCuentaInquilino = (id: string) =>
 
 export const listarDocumentosInquilino = (id: string) =>
   api.get<DocumentoContrato[]>(ruta(id, '/documentos'));
+
+// ---- Acciones de contrato (E6-B). Las respuestas NO sirven para pintar: se vuelve a pedir el detalle. ----
+
+/** El motivo es obligatorio (≤1000); la fecha efectiva va "AAAA-MM-DD". Sin Idempotency-Key (B-60). */
+export const solicitarTerminacionInquilino = (id: string, motivo: string, fechaEfectiva: string) =>
+  api.post<unknown>(ruta(id, '/solicitar-terminacion-anticipada'), {
+    motivo: motivo.trim(),
+    fecha_efectiva: fechaEfectiva,
+  });
+
+/** IRREVERSIBLE; solo la contraparte de quien solicitó. */
+export const confirmarTerminacionInquilino = (id: string) =>
+  api.post<unknown>(ruta(id, '/confirmar-terminacion-anticipada'));
+
+export const cancelarTerminacionInquilino = (id: string) =>
+  api.post<unknown>(ruta(id, '/cancelar-terminacion-anticipada'));
+
+/** Motivo opcional (≤1000): en blanco no se envía. */
+export const darAvisoInquilino = (id: string, motivo?: string) => {
+  const texto = motivo?.trim();
+  return api.post<unknown>(ruta(id, '/aviso-no-renovacion'), texto ? { motivo: texto } : undefined);
+};
+
+export const cancelarAvisoInquilino = (id: string) =>
+  api.post<unknown>(ruta(id, '/cancelar-aviso-no-renovacion'));
+
+// ---- Perfil del inquilino ----
+
+/**
+ * GET/PATCH /inquilino/perfil. La cédula y el correo son solo lectura. `foto_cedula_url` es una URL
+ * firmada de un DOCUMENTO SENSIBLE: nunca se guarda ni se registra.
+ */
+export interface PerfilInquilino {
+  id: string;
+  nombre: string;
+  cedula: string | null;
+  telefono: string;
+  correo: string | null;
+  foto_cedula_url: string | null;
+}
+
+export const obtenerPerfilInquilino = () => api.get<PerfilInquilino>('/inquilino/perfil');
+
+/** Solo nombre y/o teléfono. No modifica contratos ni las copias que escribió el arrendador. */
+export const actualizarPerfilInquilino = (cambios: { nombre?: string; telefono?: string }) =>
+  api.patch<PerfilInquilino>('/inquilino/perfil', cambios);
+
+/** Campo multipart "foto" (JPEG o PNG); responde el perfil con la foto firmada. */
+export const subirFotoCedulaInquilino = (foto: ArchivoFoto) =>
+  api.subirArchivo<PerfilInquilino>('/inquilino/perfil/foto-cedula', 'foto', foto);

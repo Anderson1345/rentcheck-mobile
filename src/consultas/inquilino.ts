@@ -1,13 +1,19 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect } from 'react';
 
 import { ErrorApi } from '../api/cliente';
+import type { ArchivoFoto } from '../api/inmuebles';
 import {
+  actualizarPerfilInquilino,
+  type ContratoInquilinoDetalle,
   listarContratosInquilino,
   obtenerContratoInquilino,
   obtenerEstadoCuentaInquilino,
   obtenerPanelInquilino,
+  obtenerPerfilInquilino,
+  subirFotoCedulaInquilino,
 } from '../api/inquilino';
+import type { FuenteDetalle } from '../contratos/useAccionContrato';
 import { STALE_TIME_CONTRATOS_MS } from './contratos';
 
 /**
@@ -84,4 +90,50 @@ export function useRefrescarContratosInquilino() {
     () => cliente.invalidateQueries({ queryKey: clavesInquilino.contratos, exact: true }),
     [cliente],
   );
+}
+
+/**
+ * Detalle de Mi contrato para las acciones: lo lee y lo invalida con las claves del portal (detalle,
+ * panel, lista, estado de cuenta), nunca con las del arrendador.
+ */
+export const FUENTE_INQUILINO: FuenteDetalle<ContratoInquilinoDetalle> = {
+  obtener: (id) => obtenerContratoInquilino(id),
+  claves: { todos: clavesInquilino.todos, detalle: clavesInquilino.detalle },
+};
+
+/** El detalle del portal con el aislamiento por 404 (refresca la lista de contratos). */
+export function useDetalleInquilino(id: string) {
+  const consulta = useContratoInquilino(id);
+  useRefrescarSiNoEncontrado(consulta.error);
+  return consulta;
+}
+
+// ---- Perfil. Clave fuera de "inquilino": las acciones de contrato no vuelven a pedir la foto. ----
+
+/** La URL firmada de la cédula dura 1 hora y solo vive en la caché en memoria de la consulta. */
+export const clavePerfilInquilino = ['perfil-inquilino'] as const;
+
+export function usePerfilInquilino() {
+  return useQuery({
+    queryKey: clavePerfilInquilino,
+    queryFn: obtenerPerfilInquilino,
+    staleTime: STALE_TIME_CONTRATOS_MS,
+  });
+}
+
+export function useActualizarPerfilInquilino() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: (cambios: { nombre?: string; telefono?: string }) =>
+      actualizarPerfilInquilino(cambios),
+    onSuccess: () => cliente.invalidateQueries({ queryKey: clavePerfilInquilino }),
+  });
+}
+
+export function useSubirFotoCedulaInquilino() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: (foto: ArchivoFoto) => subirFotoCedulaInquilino(foto),
+    onSuccess: () => cliente.invalidateQueries({ queryKey: clavePerfilInquilino }),
+  });
 }

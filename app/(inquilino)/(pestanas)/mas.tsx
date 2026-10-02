@@ -1,13 +1,17 @@
+import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { Boton } from '@/componentes/Boton';
 import { CabeceraTinta, ContenidoBajoCabecera, TituloCabecera } from '@/componentes/CabeceraTinta';
+import { FilaLista } from '@/componentes/FilaLista';
+import { Superficie } from '@/componentes/Superficie';
 import { useContratoSeleccionado } from '@/inquilino/ContratoSeleccionado';
 import { useSesion } from '@/sesion/SesionProvider';
 import { colores, espaciado } from '@/tema';
 
-// "Más" del inquilino: por ahora solo cerrar sesión (el perfil llega en E6-B).
+// "Más" del inquilino: Mi perfil y cerrar sesión.
 export default function MasInquilino() {
+  const router = useRouter();
   const { cerrarSesion } = useSesion();
   const { limpiar } = useContratoSeleccionado();
 
@@ -17,6 +21,15 @@ export default function MasInquilino() {
         <TituloCabecera titulo="Más" />
       </CabeceraTinta>
       <ContenidoBajoCabecera style={estilos.cuerpo}>
+        <Superficie relleno="ninguno">
+          <FilaLista
+            icono="perfil"
+            titulo="Mi perfil"
+            subtitulo="Nombre, teléfono y foto de tu cédula"
+            conChevron
+            onPress={() => router.push('/mi-perfil')}
+          />
+        </Superficie>
         <Boton
           titulo="Cerrar sesión"
           variante="secundario"

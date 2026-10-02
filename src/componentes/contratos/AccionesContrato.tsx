@@ -1,3 +1,4 @@
+import type { UseQueryResult } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { type ReactNode, useEffect } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
@@ -7,6 +8,7 @@ import {
   cancelarProgramado as cancelarProgramadoApi,
   type ContratoDetalle,
 } from '../../api/contratos';
+import { ErrorApi } from '../../api/cliente';
 import { mensajeDeError } from '../../api/errores';
 import { useContrato } from '../../consultas/contratos';
 import { accionesDisponibles } from '../../contratos/acciones';
@@ -108,15 +110,26 @@ export function OpcionesRadio<T extends string>({
   );
 }
 
-/** Carga el contrato para las pantallas de formulario: cargando, error con Reintentar o contenido. */
-export function CargaContrato({
+/**
+ * Carga el contrato para las pantallas de formulario: cargando, error con Reintentar o contenido.
+ * Por defecto lee el detalle del arrendador; el portal del inquilino pasa su propia consulta
+ * (`usar`, siempre la misma función: es un hook) y qué mostrar ante un 404 (`noEncontrado`).
+ */
+export function CargaContrato<D = ContratoDetalle>({
   id,
   children,
+  usar = useContrato as unknown as (id: string) => UseQueryResult<D>,
+  noEncontrado,
 }: {
   id: string;
-  children: (contrato: ContratoDetalle) => ReactNode;
+  children: (contrato: D) => ReactNode;
+  usar?: (id: string) => UseQueryResult<D>;
+  noEncontrado?: () => ReactNode;
 }) {
-  const { data, isPending, error, refetch } = useContrato(id);
+  const { data, isPending, error, refetch } = usar(id);
+  if (noEncontrado && error instanceof ErrorApi && error.status === 404) {
+    return <PantallaPila>{noEncontrado()}</PantallaPila>;
+  }
   if (data === undefined) {
     return (
       <PantallaPila>
