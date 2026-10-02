@@ -16,11 +16,17 @@ export interface Verificador<T> {
 }
 
 /**
- * De dónde se lee el detalle del contrato y qué claves de consulta se invalidan. Por defecto, el del
- * arrendador; el portal del inquilino pasa el suyo (su detalle y sus claves).
+ * De dónde se lee el detalle del recurso y qué claves de consulta se invalidan. Por defecto, el del
+ * contrato del arrendador; el portal del inquilino pasa el suyo y los pagos del arrendador (E7-B) el
+ * suyo, con su propia comparación (`huboCambio`). Es lo que hace neutro al hook.
  */
-export interface FuenteDetalle<D extends DetalleAccionable = ContratoDetalle> {
+export interface FuenteDetalle<D extends object = ContratoDetalle> {
   obtener: (id: string) => Promise<D>;
+  /**
+   * ¿La acción ya se aplicó? Por defecto compara contratos (`huboCambio` de acciones.ts); un recurso
+   * que no es un contrato aporta la suya.
+   */
+  huboCambio?: (accion: AccionContrato, antes: D, despues: D) => boolean;
   claves: {
     /** Prefijo que cuelga todo el contrato (detalle, lista, documentos, estado de cuenta). */
     todos: readonly unknown[];
@@ -43,11 +49,7 @@ const MENSAJE_INCIERTO =
  * éxito vuelve a pedir detalle, lista, documentos y estado de cuenta, y "sin respuesta" NO da el
  * éxito por hecho ni reintenta sola: recarga el detalle y compara con lo que había antes.
  */
-export function useAccionContrato<
-  R = unknown,
-  T = unknown,
-  D extends DetalleAccionable = ContratoDetalle,
->(
+export function useAccionContrato<R = unknown, T = unknown, D extends object = ContratoDetalle>(
   contratoId: string,
   accion: AccionContrato,
   fuente: FuenteDetalle<D> = FUENTE_ARRENDADOR as unknown as FuenteDetalle<D>,
@@ -83,7 +85,11 @@ export function useAccionContrato<
       }
       const actual = await fuente.obtener(contratoId);
       const previo = antes.current;
-      if (previo && huboCambio(accion, previo, actual)) {
+      const comparar =
+        fuente.huboCambio ??
+        ((a: AccionContrato, x: D, y: D) =>
+          huboCambio(a, x as DetalleAccionable, y as DetalleAccionable));
+      if (previo && comparar(accion, previo, actual)) {
         cliente.setQueryData(fuente.claves.detalle(contratoId), actual);
         setDespues(actual);
         await refrescar();

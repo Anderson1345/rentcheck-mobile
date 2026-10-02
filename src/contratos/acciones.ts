@@ -46,7 +46,10 @@ export type AccionContrato =
   | 'solicitarTerminacion'
   | 'confirmarTerminacion'
   | 'cancelarTerminacion'
-  | 'regenerarDocumentos';
+  | 'regenerarDocumentos'
+  // Pagos del arrendador (E7-B): la verificación la aporta la fuente (FuenteDetalle.huboCambio).
+  | 'aprobarPago'
+  | 'rechazarPago';
 
 export interface AccionesDisponibles {
   incremento: boolean;
@@ -183,6 +186,10 @@ export function huboCambio(
       );
     case 'regenerarDocumentos':
       // Los documentos no cuelgan del detalle: se compara con la lista de documentos.
+      return false;
+    case 'aprobarPago':
+    case 'rechazarPago':
+      // Un pago no es un contrato: su fuente trae su propia comparación (consultas/pagos.ts).
       return false;
   }
 }

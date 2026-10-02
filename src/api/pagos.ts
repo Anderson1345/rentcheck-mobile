@@ -1,34 +1,26 @@
-// Excepción documentada: faltan esquemas de respuesta en OpenAPI (B-57). Las respuestas de los pagos se
-// escriben a mano según rentcheck-backend (pago.service.ts, INCLUDE_PAGO), SOLO con los campos que usa
-// la app del inquilino; el bloque `contrato` que también llega se ignora. Los CUERPOS sí están en
-// tipos.gen.ts (PagoController_crear, RechazarPagoDto).
+// Tipos de las respuestas de pagos: los GENERADOS desde el OpenAPI de producción (B0.6-A3 los describió:
+// PagoRespuestaDto, PagoCreadoDto, PeriodoCuentaDto, enum MotivoRechazoPago). Aquí solo se les da un
+// nombre corto; ya no se escriben a mano (B-57, parte de pagos).
 
 import { api, type ArchivoSubida } from './cliente';
-import type { EstadoPago } from '../componentes/estados';
 import type { components } from './tipos.gen';
 
 export type MotivoRechazoPago = components['schemas']['MotivoRechazoPago'];
+/** Un pago con su contrato, unidad, inmueble e inquilino: GET /pagos, /pagos/mios, /pagos/:id y aprobar/rechazar. */
+export type PagoRespuesta = components['schemas']['PagoRespuestaDto'];
+/** El pago sin el bloque `contrato`: respuesta 201 de POST /pagos. */
+export type PagoCreado = components['schemas']['PagoCreadoDto'];
+/** El período que cubre el pago, tal como lo calcula el servidor (null si el cálculo no lo genera). */
+export type PeriodoCuentaPago = components['schemas']['PeriodoCuentaDto'];
+export type CuerpoRechazo = components['schemas']['RechazarPagoDto'];
+export type EstadoPagoApi = PagoRespuesta['estado'];
+/** Estados que se piden a GET /pagos?estado= (los mismos del pago). */
+export type FiltroPagos = EstadoPagoApi;
 
-/** Un pago de GET /pagos/mios. `periodo` y `fecha_reportada` llegan como medianoche UTC (día calendario). */
-export interface PagoInquilino {
-  id: string;
-  contrato_id: string;
-  monto_centavos: number;
-  fecha_reportada: string;
-  /** Primer día del mes que cubre. */
-  periodo: string;
-  estado: EstadoPago;
-  /** Solo los pagos RECHAZADO traen valor; los rechazos anteriores a B0.6-A1 quedan en null. */
-  motivo_rechazo: MotivoRechazoPago | null;
-  mensaje_rechazo: string | null;
-  /** URL firmada del comprobante (caduca): en esta entrega no se usa ni se guarda. */
-  comprobante_url: string | null;
-  creado_en: string;
-  actualizado_en: string;
-}
+// ---- Inquilino (E7-A) ----
 
 export const listarMisPagos = (contratoId: string) =>
-  api.get<PagoInquilino[]>(`/pagos/mios?contratoId=${encodeURIComponent(contratoId)}`);
+  api.get<PagoRespuesta[]>(`/pagos/mios?contratoId=${encodeURIComponent(contratoId)}`);
 
 export interface DatosReporte {
   contratoId: string;
@@ -44,7 +36,7 @@ export interface DatosReporte {
 
 /** POST /pagos multipart. Responde 201 con el pago (sin el bloque `contrato`). */
 export const reportarPago = (datos: DatosReporte) =>
-  api.subirArchivo<PagoInquilino>(
+  api.subirArchivo<PagoCreado>(
     '/pagos',
     'comprobante',
     datos.comprobante,
@@ -56,3 +48,24 @@ export const reportarPago = (datos: DatosReporte) =>
     },
     { encabezados: { 'Idempotency-Key': datos.claveIdempotencia } },
   );
+
+// ---- Arrendador (E7-B) ----
+
+/** Sus pagos, del más reciente al más antiguo (orden del servidor). Sin filtro, todos los estados. */
+export const listarPagos = (estado?: FiltroPagos) =>
+  api.get<PagoRespuesta[]>(estado ? `/pagos?estado=${estado}` : '/pagos');
+
+/** 404 si el pago es de otro arrendador. */
+export const obtenerPago = (id: string) =>
+  api.get<PagoRespuesta>(`/pagos/${encodeURIComponent(id)}`);
+
+/** Sin cuerpo. 409 PAGO_YA_PROCESADO si el pago ya no está PENDIENTE. */
+export const aprobarPago = (id: string) =>
+  api.patch<PagoRespuesta>(`/pagos/${encodeURIComponent(id)}/aprobar`);
+
+/**
+ * El servidor admite rechazar sin cuerpo; la APP siempre manda el motivo (y el mensaje solo si lo
+ * hay). `OTRO` exige mensaje (400 MENSAJE_REQUERIDO).
+ */
+export const rechazarPago = (id: string, cuerpo: CuerpoRechazo) =>
+  api.patch<PagoRespuesta>(`/pagos/${encodeURIComponent(id)}/rechazar`, cuerpo);

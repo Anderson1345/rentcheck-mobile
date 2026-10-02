@@ -13,6 +13,7 @@ Expo (SDK estable actual) + TypeScript estricto + Expo Router + TanStack Query +
 - Imágenes: comprimir con expo-image-manipulator (ancho máximo 1600, JPEG 0.75) antes de subir.
 - Pantallas de un rol solo dentro de su grupo de rutas: (arrendador) o (inquilino).
 - Textos de interfaz en español de Colombia.
+- Las pruebas no pueden depender de la fecha de hoy: usa un reloj simulado o calcula lo esperado de forma independiente; nunca una cadena de fecha fija contra un valor relativo a hoy.
 
 ## Verificación antes de reportar
 npx tsc --noEmit && npm run lint && npx expo-doctor

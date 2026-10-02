@@ -3,10 +3,11 @@
 // (estado del período, motivo del rechazo) lo manda el servidor.
 
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import type { ContratoInquilinoResumen } from '../../api/inquilino';
-import type { PagoInquilino } from '../../api/pagos';
+import type { PagoRespuesta } from '../../api/pagos';
 import {
   useContratoInquilino,
   useEstadoCuentaInquilino,
@@ -20,6 +21,7 @@ import { centavosAPesosTexto } from '../../utilidades/dinero';
 import { formatearFechaCorta } from '../../utilidades/fechas';
 import { Boton } from '../Boton';
 import { ChipEstado } from '../ChipEstado';
+import { ComprobantePago, type ComprobanteFresco } from './ComprobantePago';
 import { FilaPeriodo } from '../contratos/LecturaContrato';
 import { EsqueletoCarga } from '../EsqueletoCarga';
 import { FilaLista } from '../FilaLista';
@@ -31,7 +33,19 @@ import {
 import { Superficie } from '../Superficie';
 import { Texto } from '../Texto';
 
-function FilaPago({ pago, separador }: { pago: PagoInquilino; separador: boolean }) {
+function FilaPago({
+  pago,
+  separador,
+  obtenerFresco,
+}: {
+  pago: PagoRespuesta;
+  separador: boolean;
+  /** Vuelve a pedir MIS pagos (la URL firmada del comprobante caduca) y entrega este pago. */
+  obtenerFresco: () => Promise<ComprobanteFresco | null | undefined>;
+}) {
+  // Si el pago traía comprobante, el bloque se queda aunque al refrescar ya no haya URL (dirá
+  // "Comprobante no disponible" en vez de desaparecer).
+  const [conComprobante] = useState(() => pago.comprobante_url !== null);
   const rechazo =
     pago.estado === 'RECHAZADO'
       ? textoMotivoRechazo(pago.motivo_rechazo, pago.mensaje_rechazo)
@@ -49,6 +63,14 @@ function FilaPago({ pago, separador }: { pago: PagoInquilino; separador: boolean
           <ChipEstado tipo="pago" estado={pago.estado} />
           {rechazo?.motivo ? <Texto variante="cuerpoFuerte">{rechazo.motivo}</Texto> : null}
           {rechazo?.mensaje ? <Texto variante="cuerpo">{rechazo.mensaje}</Texto> : null}
+          {conComprobante ? (
+            <ComprobantePago
+              pagoId={pago.id}
+              tipo={pago.comprobante_tipo}
+              url={pago.comprobante_url}
+              obtenerFresco={obtenerFresco}
+            />
+          ) : null}
         </View>
       }
     />
@@ -152,7 +174,12 @@ export function PagosContrato({ contrato }: { contrato: ContratoInquilinoResumen
         ) : (
           <Superficie relleno="ninguno">
             {pagos.data.map((p, indice) => (
-              <FilaPago key={p.id} pago={p} separador={indice > 0} />
+              <FilaPago
+                key={p.id}
+                pago={p}
+                separador={indice > 0}
+                obtenerFresco={async () => (await pagos.refetch()).data?.find((x) => x.id === p.id)}
+              />
             ))}
           </Superficie>
         )}
