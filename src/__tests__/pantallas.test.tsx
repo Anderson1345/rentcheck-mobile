@@ -180,7 +180,15 @@ describe.each([
     ),
     true,
   ],
-  ['Solicitudes del inquilino (próximamente)', () => <SolicitudesInquilino />, true],
+  [
+    'Solicitudes del inquilino',
+    () => (
+      <Proveedor>
+        <SolicitudesInquilino />
+      </Proveedor>
+    ),
+    true,
+  ],
   [
     'Más del inquilino',
     () => (

@@ -14,6 +14,8 @@ export const TIMEOUT_PRIMERA_PETICION_MS = 60_000;
 export const TIMEOUT_PETICION_MS = 20_000;
 /** Subir un archivo (foto) por una red móvil lenta puede tardar: 60 s, haya o no despertado el servidor. */
 export const TIMEOUT_SUBIDA_MS = 60_000;
+/** Un video (hasta 20 MB) por una red móvil lenta: 180 s. Solo lo pide quien sube un video. */
+export const TIMEOUT_SUBIDA_VIDEO_MS = 180_000;
 /** Render duerme el servicio tras 15 min sin tráfico; con más de 10 min sin respuesta se asume dormido. */
 export const INACTIVIDAD_SERVIDOR_DORMIDO_MS = 10 * 60_000;
 
@@ -91,13 +93,23 @@ export class ErrorSinConexion extends ErrorRentCheck {
   }
 }
 
-/** La foto elegida no se puede subir (no se lee o pesa más de 10 MB): se detecta antes de subirla. */
+/**
+ * El archivo elegido no se puede subir (no se lee o pasa del límite, 10 MB por defecto): se detecta
+ * antes de subirlo. `mensaje` permite un texto propio (p. ej. un adjunto de 20 MB que puede ser video).
+ */
 export class ErrorArchivo extends ErrorRentCheck {
   readonly motivo: 'ilegible' | 'grande';
 
-  constructor(motivo: 'ilegible' | 'grande') {
-    super(motivo === 'ilegible' ? MENSAJE_FOTO_ILEGIBLE : MENSAJE_FOTO_GRANDE);
+  constructor(motivo: 'ilegible' | 'grande', mensaje?: string) {
+    super(mensaje ?? (motivo === 'ilegible' ? MENSAJE_FOTO_ILEGIBLE : MENSAJE_FOTO_GRANDE));
     this.motivo = motivo;
+  }
+}
+
+/** La persona canceló el envío. No es un error de red ni un tiempo agotado. */
+export class ErrorCancelado extends ErrorRentCheck {
+  constructor() {
+    super('Envío cancelado');
   }
 }
 
@@ -133,13 +145,19 @@ export type SubirImpl = (
   uri: string,
   opciones: FileSystem.FileSystemUploadOptions,
   registrarCancelacion?: (cancelar: () => Promise<void>) => void,
+  alProgreso?: (enviados: number, totales: number) => void,
 ) => Promise<RespuestaSubida>;
 
 export type InfoArchivoImpl = (uri: string) => Promise<{ exists: boolean; size?: number }>;
 
 /** Cargador nativo de Expo: lee el archivo por su URI y arma el multipart, sin pasar por fetch. */
-const subirNativo: SubirImpl = async (url, uri, opciones, registrarCancelacion) => {
-  const tarea = FileSystem.createUploadTask(url, uri, opciones);
+const subirNativo: SubirImpl = async (url, uri, opciones, registrarCancelacion, alProgreso) => {
+  // Sin progreso, el cargador se crea sin callback (como antes).
+  const tarea = alProgreso
+    ? FileSystem.createUploadTask(url, uri, opciones, (datos) =>
+        alProgreso(datos.totalBytesSent, datos.totalBytesExpectedToSend),
+      )
+    : FileSystem.createUploadTask(url, uri, opciones);
   registrarCancelacion?.(() => tarea.cancelAsync());
   const respuesta = await tarea.uploadAsync();
   if (!respuesta) throw new Error('Subida cancelada');
@@ -180,9 +198,23 @@ export interface OpcionesPeticion {
   tiempo?: number;
 }
 
-/** Opciones de una subida: cabeceras extra (p. ej. Idempotency-Key). Authorization y Accept no se pisan. */
+/**
+ * Opciones de una subida. Sin ninguna, el comportamiento es el de siempre: 10 MB y 60 s.
+ * Authorization y Accept no se pisan.
+ */
 export interface OpcionesSubida {
+  /** Cabeceras extra (p. ej. Idempotency-Key). */
   encabezados?: Record<string, string>;
+  /** Tamaño máximo local en bytes (por defecto 10 MB). El servidor tiene la última palabra. */
+  tamanoMaximo?: number;
+  /** Textos propios de los errores de archivo (por defecto, los de foto). */
+  mensajes?: { grande?: string; ilegible?: string };
+  /** Plazo de la subida en ms (por defecto 60 s; un video usa TIMEOUT_SUBIDA_VIDEO_MS). */
+  tiempo?: number;
+  /** Bytes enviados y totales, a medida que avanza la subida con archivo. */
+  alProgreso?: (enviados: number, totales: number) => void;
+  /** Para que la persona cancele el envío: aborta la subida y lanza ErrorCancelado. */
+  senal?: AbortSignal;
 }
 
 export interface ClienteApi {
@@ -192,11 +224,14 @@ export interface ClienteApi {
     cuerpo?: unknown,
     opciones?: OpcionesPeticion,
   ): Promise<T>;
-  /** POST multipart/form-data con un archivo en `campo` (más campos de texto opcionales). */
+  /**
+   * POST multipart/form-data con un archivo en `campo` (más campos de texto opcionales). Con
+   * `archivo` null envía solo los campos de texto (adjunto opcional).
+   */
   subirArchivo<T = unknown>(
     ruta: string,
     campo: string,
-    archivo: ArchivoSubida,
+    archivo: ArchivoSubida | null,
     extras?: Record<string, string>,
     opciones?: OpcionesSubida,
   ): Promise<T>;
@@ -266,21 +301,37 @@ export function crearClienteApi(opciones: OpcionesCliente = {}): ClienteApi {
     tipoContenido?: string;
     /** Tiempo de espera propio (subidas); por defecto el de una petición normal. */
     tiempo?: number;
+    /** Cabeceras extra; Authorization y Accept no se pisan y Content-Type lo calcula fetch. */
+    encabezados?: Record<string, string>;
+    /** Señal de la persona para cancelar el envío. */
+    senal?: AbortSignal;
   }
 
   async function ejecutar<T>(metodo: Metodo, ruta: string, envio: Contenido): Promise<T> {
     const url = `${urlBase()}${ruta}`;
+    if (envio.senal?.aborted) throw new ErrorCancelado();
     const controlador = new AbortController();
     let vencido = false;
+    let cancelado = false;
     const temporizador = setTimeout(() => {
       vencido = true;
       controlador.abort();
     }, envio.tiempo ?? tiempoDeEspera());
+    const alCancelar = () => {
+      cancelado = true;
+      controlador.abort();
+    };
+    envio.senal?.addEventListener('abort', alCancelar);
 
     try {
       const token = await obtenerToken();
-      const encabezados: Record<string, string> = { Accept: 'application/json' };
+      const encabezados: Record<string, string> = {
+        ...envio.encabezados,
+        Accept: 'application/json',
+      };
       if (token) encabezados.Authorization = `Bearer ${token}`;
+      else delete encabezados.Authorization;
+      delete encabezados['Content-Type'];
       if (envio.tipoContenido) encabezados['Content-Type'] = envio.tipoContenido;
 
       let status: number;
@@ -296,6 +347,7 @@ export function crearClienteApi(opciones: OpcionesCliente = {}): ClienteApi {
         status = respuesta.status;
         texto = await respuesta.text();
       } catch (causa) {
+        if (cancelado) throw new ErrorCancelado();
         throw vencido ? new ErrorTimeout(causa) : new ErrorSinConexion(causa);
       }
 
@@ -306,6 +358,7 @@ export function crearClienteApi(opciones: OpcionesCliente = {}): ClienteApi {
       return contenido as T;
     } finally {
       clearTimeout(temporizador);
+      envio.senal?.removeEventListener('abort', alCancelar);
     }
   }
 
@@ -331,14 +384,32 @@ export function crearClienteApi(opciones: OpcionesCliente = {}): ClienteApi {
   async function subirArchivo<T>(
     ruta: string,
     campo: string,
-    archivo: ArchivoSubida,
+    archivo: ArchivoSubida | null,
     extras?: Record<string, string>,
     opciones?: OpcionesSubida,
   ): Promise<T> {
+    if (archivo === null) {
+      // Adjunto opcional que no se eligió: solo los campos de texto, multipart y sin cargador nativo
+      // (no hay archivo local que leer).
+      const formulario = new FormData();
+      for (const [nombre, valor] of Object.entries(extras ?? {})) formulario.append(nombre, valor);
+      return ejecutar<T>('POST', ruta, {
+        cuerpo: formulario,
+        tiempo: opciones?.tiempo,
+        encabezados: opciones?.encabezados,
+        senal: opciones?.senal,
+      });
+    }
+    if (opciones?.senal?.aborted) throw new ErrorCancelado();
+
     const info = await infoImpl(archivo.uri).catch(() => null);
     if (info !== null) {
-      if (!info.exists || !info.size) throw new ErrorArchivo('ilegible');
-      if (info.size > TAMANO_MAXIMO_FOTO_BYTES) throw new ErrorArchivo('grande');
+      if (!info.exists || !info.size) {
+        throw new ErrorArchivo('ilegible', opciones?.mensajes?.ilegible);
+      }
+      if (info.size > (opciones?.tamanoMaximo ?? TAMANO_MAXIMO_FOTO_BYTES)) {
+        throw new ErrorArchivo('grande', opciones?.mensajes?.grande);
+      }
     }
 
     const token = await obtenerToken();
@@ -365,22 +436,38 @@ export function crearClienteApi(opciones: OpcionesCliente = {}): ClienteApi {
       temporizador = setTimeout(() => {
         void cancelar?.().catch(() => undefined);
         rechazar(new ErrorTimeout());
-      }, TIMEOUT_SUBIDA_MS);
+      }, opciones?.tiempo ?? TIMEOUT_SUBIDA_MS);
+    });
+    // La persona cancela: se aborta la tarea nativa y se informa, sin tratarlo como error de red.
+    let alCancelar: (() => void) | undefined;
+    const cancelacion = new Promise<never>((_resolver, rechazar) => {
+      alCancelar = () => {
+        void cancelar?.().catch(() => undefined);
+        rechazar(new ErrorCancelado());
+      };
+      opciones?.senal?.addEventListener('abort', alCancelar);
     });
 
+    const registrar = (c: () => Promise<void>) => {
+      cancelar = c;
+    };
+    const alProgreso = opciones?.alProgreso;
+    const url = `${urlBase()}${ruta}`;
     let respuesta: RespuestaSubida;
     try {
       respuesta = await Promise.race([
-        subirImpl(`${urlBase()}${ruta}`, archivo.uri, opcionesSubida, (c) => {
-          cancelar = c;
-        }),
+        alProgreso
+          ? subirImpl(url, archivo.uri, opcionesSubida, registrar, alProgreso)
+          : subirImpl(url, archivo.uri, opcionesSubida, registrar),
         vencimiento,
+        cancelacion,
       ]);
     } catch (causa) {
-      if (causa instanceof ErrorTimeout) throw causa;
+      if (causa instanceof ErrorTimeout || causa instanceof ErrorCancelado) throw causa;
       throw new ErrorSinConexion(causa);
     } finally {
       clearTimeout(temporizador);
+      if (alCancelar) opciones?.senal?.removeEventListener('abort', alCancelar);
     }
     ultimaRespuestaEn = ahora();
 

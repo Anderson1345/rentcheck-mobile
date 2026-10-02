@@ -24,7 +24,8 @@ export interface ContratoInquilinoResumen {
   estado: EstadoContratoApi;
   fecha_inicio: string;
   fecha_fin: string;
-  unidad: { nombre: string; tipo: string };
+  /** `id` llega desde B0.6-A4 (B-66): es el que pide crear una solicitud de mantenimiento. */
+  unidad: { id: string; nombre: string; tipo: string };
   inmueble: { direccion: string; ciudad: string };
   /** Solo se calcula con el contrato ACTIVO; null en los demás. */
   estado_pago: EstadoPagoPortal | null;
@@ -74,6 +75,8 @@ export type PanelContratoInquilino =
  */
 export interface ContratoInquilinoDetalle {
   contratoId: string;
+  /** Solo el id de la unidad (B0.6-A4, B-66). */
+  unidad: { id: string };
   estado: EstadoContratoApi;
   programado: boolean;
   canon_centavos: number;

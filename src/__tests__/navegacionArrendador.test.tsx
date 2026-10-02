@@ -455,9 +455,10 @@ describe('barra inferior del inquilino (layouts reales)', () => {
     expect(mockNavegar).toHaveBeenLastCalledWith('mas');
   });
 
-  it('solicitudes: pantalla "Próximamente" y pestaña activa', async () => {
+  it('solicitudes: pantalla real del inquilino (ya no "Próximamente") y pestaña activa', async () => {
     const m = await montar(INQUILINO(), ['(inquilino)', '(pestanas)', 'solicitudes']);
-    expect(m.textos()).toContain('Próximamente (E8)');
+    expect(m.textos()).not.toContain('Próximamente (E8)');
+    expect(m.textos()).toContain('Aún no tienes contratos');
     expect(m.pestana('Solicitudes').props).toMatchObject({
       accessibilityState: { selected: true },
     });

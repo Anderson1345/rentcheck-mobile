@@ -1,6 +1,6 @@
 import { formatearPorcentaje } from '../contratos/acciones';
 import { formatearFechaCorta } from '../utilidades/fechas';
-import { ErrorApi, ErrorArchivo, ErrorSinConexion, ErrorTimeout } from './cliente';
+import { ErrorApi, ErrorArchivo, ErrorCancelado, ErrorSinConexion, ErrorTimeout } from './cliente';
 import {
   MENSAJE_ARCHIVO_GRANDE,
   MENSAJE_ARCHIVO_ILEGIBLE,
@@ -377,6 +377,7 @@ const CODIGOS_DE_ESTADO = new Set([
   'INCREMENTO_YA_APLICADO',
   'PRORROGA_YA_APLICADA',
   'PAGO_YA_PROCESADO',
+  'TRANSICION_INVALIDA',
 ]);
 
 /** 409 por estado desactualizado (alguien cambió el contrato o el pago): conviene recargar el detalle. */
@@ -415,6 +416,45 @@ export function mensajeDeErrorPago(error: unknown): string {
     if (error.codigo === 'IDEMPOTENCY_KEY_REUTILIZADA') {
       return 'Los datos del pago cambiaron mientras se enviaba. Revísalos y vuelve a enviar.';
     }
+  }
+  return mensajeDeError(error);
+}
+
+const MENSAJE_SOLICITUD_SIN_RESPUESTA =
+  'No sabemos si tu solicitud llegó. Puedes volver a enviarla: no se duplicará.';
+const MENSAJE_SOLICITUD_ARCHIVO_GRANDE = 'El archivo es demasiado grande (máximo 20 MB).';
+const MENSAJE_SOLICITUD_ARCHIVO_NO_VALIDO =
+  'Ese archivo no es válido. Usa una foto JPG o PNG, o un video MP4.';
+
+/**
+ * Crear una solicitud de mantenimiento con adjunto opcional. Por código, en español: 413 y 415 hablan
+ * del adjunto (foto o video MP4, hasta 20 MB). Sin respuesta o tiempo agotado NO se afirma que falló:
+ * el envío lleva Idempotency-Key y reenviarlo no duplica. Cancelar no es un error de red.
+ */
+export function mensajeDeErrorSolicitud(error: unknown): string {
+  if (error instanceof ErrorCancelado) return 'Envío cancelado.';
+  if (error instanceof ErrorArchivo) return error.message;
+  if (error instanceof ErrorSinConexion || error instanceof ErrorTimeout) {
+    return MENSAJE_SOLICITUD_SIN_RESPUESTA;
+  }
+  if (error instanceof ErrorApi) {
+    if (error.status === 415) return MENSAJE_SOLICITUD_ARCHIVO_NO_VALIDO;
+    if (error.status === 413 || error.codigo === 'CARGA_DEMASIADO_GRANDE') {
+      return MENSAJE_SOLICITUD_ARCHIVO_GRANDE;
+    }
+    switch (error.codigo) {
+      case 'CONTRATO_NO_ACTIVO':
+        return 'Solo puedes crear solicitudes con un contrato activo.';
+      case 'SOLICITUD_EN_PROCESO':
+        return 'Tu solicitud ya se está enviando. Espera unos segundos y revisa la lista antes de volver a enviarla.';
+      case 'IDEMPOTENCY_KEY_REUTILIZADA':
+        return 'Los datos de la solicitud cambiaron mientras se enviaba. Revísalos y vuelve a enviar.';
+      case 'ARCHIVO_CONTENIDO_INVALIDO':
+        return MENSAJE_SOLICITUD_ARCHIVO_NO_VALIDO;
+      default:
+        break;
+    }
+    if (error.status === 404) return 'No encontramos esa unidad entre tus contratos.';
   }
   return mensajeDeError(error);
 }
