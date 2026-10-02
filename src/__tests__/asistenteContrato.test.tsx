@@ -1,13 +1,14 @@
 // Asistente de nuevo contrato (pantalla real, cliente de API simulado) y pantalla "Contrato creado".
-import { Alert, BackHandler, Share } from 'react-native';
+import { Alert, BackHandler, Share, Text } from 'react-native';
 import { act } from 'react-test-renderer';
 
 import Creado from '../../app/(arrendador)/contrato/[id]/creado';
 import Nuevo from '../../app/(arrendador)/contrato/nuevo';
 import { ErrorApi, ErrorSinConexion, ErrorTimeout } from '../api/cliente';
 import type { ContratoDetalle, ContratoResumen } from '../api/contratos';
-import { formatearFechaLarga, hoyBogota } from '../utilidades/fechas';
+import { formatearFechaLarga } from '../utilidades/fechas';
 import { inmuebleEjemplo, unidadEjemplo } from '../pruebas/datosInmuebles';
+import { fijarReloj, HOY_PRUEBAS, restaurarReloj } from '../pruebas/reloj';
 import {
   botonDe,
   campoDe,
@@ -82,7 +83,8 @@ jest.mock('../api/cliente', () => ({
   },
 }));
 
-const HOY = hoyBogota();
+// El reloj está fijo en cada prueba (ver beforeEach): HOY no depende del día en que se corra.
+const HOY = HOY_PRUEBAS;
 type Raiz = Awaited<ReturnType<typeof renderizarPantalla>>['raiz'];
 
 const PERFIL = {
@@ -177,6 +179,12 @@ const botonesEditar = (raiz: Raiz) => {
 };
 const porEtiqueta = (raiz: Raiz, etiqueta: string) =>
   raiz.root.find((n) => n.props.accessibilityLabel === etiqueta && !!n.props.onPress);
+/** Lo que muestra un selector de fecha (etiqueta y valor), sin mirar el resto de la pantalla. */
+const textoDeCampoFecha = (raiz: Raiz, etiqueta: string) =>
+  porEtiqueta(raiz, etiqueta)
+    .findAllByType(Text)
+    .map((n) => String(n.props.children))
+    .join('|');
 const elegirFecha = async (raiz: Raiz, etiqueta: string, fecha: Date) => {
   await act(async () => porEtiqueta(raiz, etiqueta).props.onPress());
   const selector = raiz.root.findAll((n) => n.props.testID === 'selector-fecha')[0];
@@ -215,6 +223,7 @@ async function llegarAlResumen(raiz: Raiz, unidad = 'Apto 302') {
 }
 
 beforeEach(() => {
+  fijarReloj();
   jest.restoreAllMocks();
   for (const m of [mockGet, mockPost, mockPush, mockReplace, mockDispatch, mockCopiar])
     m.mockReset();
@@ -238,6 +247,8 @@ beforeEach(() => {
   });
   mockPost.mockResolvedValue({ id: 'nuevo1' });
 });
+
+afterEach(restaurarReloj);
 
 describe('Asistente: cédula del arrendador (B-16)', () => {
   it('sin cédula no empieza el asistente: mensaje y botón a Mi perfil', async () => {
@@ -572,8 +583,53 @@ describe('Asistente: correcciones de E4-A', () => {
     await pulsar(raiz, 'Local 1');
     await pulsar(raiz, 'Apto 302');
     await irAFechas(raiz);
-    expect(textosDe(raiz)).toContain(formatearFechaLarga(HOY));
-    expect(textosDe(raiz)).not.toContain('1 de octubre de 2027');
+    // Solo el campo de inicio: la fecha de fin por defecto (hoy + 12 meses) puede coincidir con el
+    // día siguiente al fin del contrato ocupado ("1 de octubre de 2027") según el día en que se corra.
+    expect(textoDeCampoFecha(raiz, 'Fecha de inicio')).toBe(
+      `Fecha de inicio|${formatearFechaLarga(HOY)}`,
+    );
+    expect(textoDeCampoFecha(raiz, 'Fecha de inicio')).not.toContain('1 de octubre de 2027');
+  });
+
+  describe('fechas por defecto con el reloj fijo en fechas de borde', () => {
+    // Esperados escritos a mano: inicio = hoy en Bogotá; fin = inicio + 12 meses − 1 día.
+    it.each([
+      // 17:00 UTC = 12:00 en Bogotá (el mismo día calendario).
+      [
+        'hoy típico (el caso que falló el 02/10/2026)',
+        '2026-10-02T17:00:00Z',
+        '2 de octubre de 2026',
+        '1 de octubre de 2027',
+      ],
+      [
+        '31 de diciembre',
+        '2027-12-31T17:00:00Z',
+        '31 de diciembre de 2027',
+        '30 de diciembre de 2028',
+      ],
+      [
+        '29 de febrero (año bisiesto)',
+        '2028-02-29T17:00:00Z',
+        '29 de febrero de 2028',
+        '27 de febrero de 2029',
+      ],
+      // 03:00 UTC del 1 de marzo = 22:00 del 29 de febrero en Bogotá.
+      [
+        'noche en Bogotá, ya otro día en UTC',
+        '2028-03-01T03:00:00Z',
+        '29 de febrero de 2028',
+        '27 de febrero de 2029',
+      ],
+    ])('%s', async (_nombre, instante, inicio, fin) => {
+      datos.contratos = contratoEnLocal();
+      fijarReloj(instante);
+      const { raiz } = await montar({ inmuebleId: 'i1' });
+      await pulsar(raiz, 'Local 1');
+      await pulsar(raiz, 'Apto 302');
+      await irAFechas(raiz);
+      expect(textoDeCampoFecha(raiz, 'Fecha de inicio')).toBe(`Fecha de inicio|${inicio}`);
+      expect(textoDeCampoFecha(raiz, 'Fecha de fin')).toBe(`Fecha de fin|${fin}`);
+    });
   });
 
   it('1b. si el usuario cambió el inicio a mano, no se le pisa al elegir otra unidad', async () => {

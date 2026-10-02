@@ -12,7 +12,6 @@ import type {
   DocumentoContrato,
   ResumenTerminacionContrato,
 } from '../api/contratos';
-import { hoyBogota } from '../utilidades/fechas';
 import {
   botonDe,
   campoDe,
@@ -21,6 +20,7 @@ import {
   renderizarPantalla,
   textosDe,
 } from '../pruebas/pantallas';
+import { fijarReloj, HOY_PRUEBAS, restaurarReloj } from '../pruebas/reloj';
 
 jest.setTimeout(60_000);
 
@@ -84,7 +84,8 @@ jest.mock('../api/cliente', () => ({
 }));
 
 type Raiz = Awaited<ReturnType<typeof renderizarPantalla>>['raiz'];
-const HOY = hoyBogota();
+// El reloj está fijo en cada prueba (ver beforeEach): HOY no depende del día en que se corra.
+const HOY = HOY_PRUEBAS;
 
 const TERMINACION_NINGUNA: ResumenTerminacionContrato = {
   estado: 'NINGUNA',
@@ -168,7 +169,10 @@ const api = (status: number, codigo: string, mensaje = 'texto técnico', detalle
   new ErrorApi({ status, codigo, mensaje, detalles });
 const alertaFalsa = () => jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
 
+afterEach(restaurarReloj);
+
 beforeEach(() => {
+  fijarReloj();
   jest.restoreAllMocks();
   for (const m of [mockGet, mockPost, mockPatch, mockPush, mockBack, mockReplace]) m.mockReset();
   mockParams = { id: 'c1' };

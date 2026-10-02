@@ -7,6 +7,7 @@ import type { ComponentType, ReactElement } from 'react';
 import type { ReactTestInstance, ReactTestRenderer } from 'react-test-renderer';
 
 import { crearToken } from '../pruebas/crearToken';
+import { fijarReloj, restaurarReloj } from '../pruebas/reloj';
 
 const mockLlavero = new Map<string, string>();
 const mockNavegar = jest.fn();
@@ -269,7 +270,10 @@ async function montar(guardado: string | null, ruta: string[]): Promise<Montaje>
   };
 }
 
+afterEach(restaurarReloj);
+
 beforeEach(() => {
+  fijarReloj();
   jest.clearAllMocks();
   mockListar.mockReset().mockResolvedValue([]);
   mockObtener.mockReset().mockResolvedValue({
