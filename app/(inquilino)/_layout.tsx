@@ -25,6 +25,8 @@ export default function LayoutInquilino() {
         <Stack.Screen name="mi-contrato/[id]/aviso" options={{ title: 'Aviso de no renovación' }} />
         <Stack.Screen name="mi-perfil" options={{ title: 'Mi perfil' }} />
         <Stack.Screen name="reportar-pago" options={{ title: 'Reportar pago' }} />
+        <Stack.Screen name="nueva-solicitud" options={{ title: 'Nueva solicitud' }} />
+        <Stack.Screen name="solicitud/[id]" options={{ title: 'Solicitud' }} />
       </Stack>
     </ContratoSeleccionadoProvider>
   );

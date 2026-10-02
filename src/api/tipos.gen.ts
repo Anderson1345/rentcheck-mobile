@@ -942,7 +942,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Actualizar el estado de una solicitud de mantenimiento */
+        /**
+         * Actualizar el estado de una solicitud de mantenimiento
+         * @description Transiciones permitidas: PENDIENTE → EN_PROCESO, PENDIENTE → RESUELTO y EN_PROCESO → RESUELTO. Una solicitud RESUELTO no admite más cambios y EN_PROCESO no se puede repetir (409 TRANSICION_INVALIDA).
+         */
         patch: operations["SolicitudMantenimientoArrendadorController_actualizarEstado"];
         trace?: never;
     };
@@ -1785,6 +1788,112 @@ export interface components {
             comprobante_tipo: components["schemas"]["ComprobanteTipo"] | null;
             /** @description null solo si el cálculo del estado de cuenta no genera el período del pago. */
             periodo_cuenta: components["schemas"]["PeriodoCuentaDto"] | null;
+        };
+        /** @enum {string} */
+        UrgenciaMantenimiento: "BAJO" | "MEDIO" | "ALTO";
+        /** @enum {string} */
+        EstadoSolicitudMantenimiento: "PENDIENTE" | "EN_PROCESO" | "RESUELTO";
+        /**
+         * @description Tipo del adjunto, derivado de la extensión del archivo guardado. null si no hay adjunto o si no
+         *     se puede saber (una solicitud antigua con otra extensión o sin ella).
+         * @enum {string}
+         */
+        TipoAdjunto: "IMAGEN" | "VIDEO";
+        SolicitudCreadaDto: {
+            id: string;
+            arrendador_id: string;
+            unidad_id: string;
+            inquilino_id: string;
+            descripcion: string;
+            urgencia: components["schemas"]["UrgenciaMantenimiento"];
+            estado: components["schemas"]["EstadoSolicitudMantenimiento"];
+            /** Format: date-time */
+            creado_en: string;
+            /** Format: date-time */
+            actualizado_en: string;
+            /** @description URL firmada del adjunto (caduca), o null si no hay archivo o falló la firma. Nunca la ruta interna. */
+            adjunto_url: string | null;
+            /**
+             * @description Tipo del adjunto, derivado de la extensión del archivo guardado. null si no hay adjunto o si no
+             *     se puede saber (una solicitud antigua con otra extensión o sin ella).
+             */
+            adjunto_tipo: components["schemas"]["TipoAdjunto"] | null;
+        };
+        InmuebleDeSolicitudDto: {
+            id: string;
+            direccion: string;
+            ciudad: string;
+            estrato: number | null;
+            matricula_inmobiliaria: string;
+            /** Format: date-time */
+            creado_en: string;
+        };
+        UnidadDeSolicitudDto: {
+            id: string;
+            inmueble_id: string;
+            nombre: string;
+            tipo: components["schemas"]["TipoUnidad"];
+            /** @description Decimal: llega como texto. */
+            metros_cuadrados: string | null;
+            numero_habitaciones: number | null;
+            numero_banos: number | null;
+            canon_base_centavos: number;
+            ocupantes_maximos: number | null;
+            acepta_mascotas: boolean;
+            uso_permitido: components["schemas"]["UsoPermitido"];
+            /** @description URL firmada de la foto principal, o null (nunca la ruta interna). */
+            foto_principal_url: string | null;
+            /** Format: date-time */
+            creado_en: string;
+            inmueble: components["schemas"]["InmuebleDeSolicitudDto"];
+        };
+        InquilinoDeSolicitudDto: {
+            id: string;
+            nombre: string | null;
+            cedula: string | null;
+            telefono: string | null;
+        };
+        SolicitudArrendadorDto: {
+            id: string;
+            arrendador_id: string;
+            unidad_id: string;
+            inquilino_id: string;
+            descripcion: string;
+            urgencia: components["schemas"]["UrgenciaMantenimiento"];
+            estado: components["schemas"]["EstadoSolicitudMantenimiento"];
+            /** Format: date-time */
+            creado_en: string;
+            /** Format: date-time */
+            actualizado_en: string;
+            /** @description URL firmada del adjunto (caduca), o null si no hay archivo o falló la firma. Nunca la ruta interna. */
+            adjunto_url: string | null;
+            /**
+             * @description Tipo del adjunto, derivado de la extensión del archivo guardado. null si no hay adjunto o si no
+             *     se puede saber (una solicitud antigua con otra extensión o sin ella).
+             */
+            adjunto_tipo: components["schemas"]["TipoAdjunto"] | null;
+            unidad: components["schemas"]["UnidadDeSolicitudDto"];
+            inquilino: components["schemas"]["InquilinoDeSolicitudDto"];
+        };
+        SolicitudInquilinoDto: {
+            id: string;
+            arrendador_id: string;
+            unidad_id: string;
+            inquilino_id: string;
+            descripcion: string;
+            urgencia: components["schemas"]["UrgenciaMantenimiento"];
+            estado: components["schemas"]["EstadoSolicitudMantenimiento"];
+            /** Format: date-time */
+            creado_en: string;
+            /** Format: date-time */
+            actualizado_en: string;
+            /** @description URL firmada del adjunto (caduca), o null si no hay archivo o falló la firma. Nunca la ruta interna. */
+            adjunto_url: string | null;
+            /**
+             * @description Tipo del adjunto, derivado de la extensión del archivo guardado. null si no hay adjunto o si no
+             *     se puede saber (una solicitud antigua con otra extensión o sin ella).
+             */
+            adjunto_tipo: components["schemas"]["TipoAdjunto"] | null;
         };
         VincularContratoDto: {
             /**
@@ -3743,12 +3852,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Solicitudes del arrendador con unidad, inmueble e inquilino relacionados, ordenadas por urgencia y fecha. */
+            /** @description Solicitudes del arrendador con unidad, inmueble e inquilino relacionados, ordenadas por urgencia (ALTO primero) y fecha de creación (la más reciente primero). `adjunto_url` es una URL firmada (null si el archivo no está disponible) y `adjunto_tipo` dice si es IMAGEN, VIDEO o null. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SolicitudArrendadorDto"][];
+                };
             };
         };
     };
@@ -3776,21 +3887,23 @@ export interface operations {
                     urgencia: "BAJO" | "MEDIO" | "ALTO";
                     /**
                      * Format: binary
-                     * @description Foto o video de evidencia (opcional).
+                     * @description Foto o video de evidencia (opcional): un solo archivo, JPEG, PNG o MP4, hasta 20 MB. El contenido real debe coincidir con el tipo declarado.
                      */
                     adjunto?: string;
                 };
             };
         };
         responses: {
-            /** @description Solicitud de mantenimiento creada exitosamente. */
+            /** @description Solicitud de mantenimiento creada exitosamente (la misma respuesta, con `Idempotent-Replayed: true`, si se repite la clave con el mismo contenido). `adjunto_url` es una URL firmada que caduca; `adjunto_tipo` dice si es IMAGEN o VIDEO. */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SolicitudCreadaDto"];
+                };
             };
-            /** @description Datos del formulario inválidos. */
+            /** @description Datos del formulario inválidos (VALIDACION) o Idempotency-Key con formato inválido (IDEMPOTENCY_KEY_INVALIDA). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3804,15 +3917,29 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description El contrato del inquilino ya no está activo y no puede reportar solicitudes. */
+            /** @description El contrato del inquilino no está activo y no puede reportar solicitudes (CONTRATO_NO_ACTIVO), o ya hay una solicitud en proceso con la misma Idempotency-Key (SOLICITUD_EN_PROCESO). */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description El tipo de archivo del adjunto no está permitido. */
+            /** @description El adjunto pesa más de 20 MB (CARGA_DEMASIADO_GRANDE). */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description El tipo de archivo del adjunto no está permitido, o su contenido real no coincide con el tipo declarado (ARCHIVO_CONTENIDO_INVALIDO). */
             415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description La misma Idempotency-Key ya se usó con un contenido distinto (IDEMPOTENCY_KEY_REUTILIZADA). */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3849,12 +3976,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Detalle completo de la solicitud con sus relaciones. */
+            /** @description Detalle completo de la solicitud con sus relaciones (unidad, inmueble e inquilino). */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SolicitudArrendadorDto"];
+                };
             };
             /** @description Solicitud no encontrada o no pertenece al arrendador autenticado. */
             404: {
@@ -3891,6 +4020,15 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
+                content: {
+                    "application/json": components["schemas"]["SolicitudArrendadorDto"];
+                };
+            };
+            /** @description El estado debe ser EN_PROCESO o RESUELTO (VALIDACION). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
                 content?: never;
             };
             /** @description Solicitud no encontrada o no pertenece al arrendador autenticado. */
@@ -3900,7 +4038,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description La transición de estado no es válida (ya resuelta o transición no permitida). */
+            /** @description La transición de estado no es válida: ya está RESUELTO o la transición no está permitida (TRANSICION_INVALIDA). */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -3920,12 +4058,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Solicitudes ordenadas de la más reciente a la más antigua, con `adjunto_url` firmada (null si el archivo no está disponible). */
+            /** @description Solicitudes ordenadas de la más reciente a la más antigua, con `adjunto_url` firmada (null si el archivo no está disponible) y `adjunto_tipo` (IMAGEN, VIDEO o null). */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SolicitudInquilinoDto"][];
+                };
             };
             /** @description El contrato del filtro no es válido. */
             404: {
@@ -3947,12 +4087,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description La solicitud con `adjunto_url` firmada (null si el archivo no está disponible). */
+            /** @description La solicitud con `adjunto_url` firmada (null si el archivo no está disponible) y `adjunto_tipo` (IMAGEN, VIDEO o null). */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SolicitudInquilinoDto"];
+                };
             };
             /** @description La solicitud no existe, es de otro inquilino o su unidad no tiene un contrato suyo vinculado. */
             404: {
@@ -3972,7 +4114,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Lista de contratos: id, estado, fechas, unidad (nombre, tipo), inmueble (dirección, ciudad) y estado_pago (al_dia, en_mora, pendiente o null). */
+            /** @description Lista de contratos: id, estado, fechas, unidad (id, nombre, tipo; el id sirve para crear solicitudes de mantenimiento), inmueble (dirección, ciudad) y estado_pago (al_dia, en_mora, pendiente o null). */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4021,7 +4163,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Detalle del contrato con sus documentos. */
+            /** @description Detalle del contrato con sus documentos y `unidad: { id }` (el id de la unidad, para crear solicitudes de mantenimiento). */
             200: {
                 headers: {
                     [name: string]: unknown;

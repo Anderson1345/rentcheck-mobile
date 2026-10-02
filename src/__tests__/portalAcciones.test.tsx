@@ -134,6 +134,7 @@ const AVISO_PROPIO = {
 
 const detalle = (extra: Partial<ContratoInquilinoDetalle> = {}): ContratoInquilinoDetalle => ({
   contratoId: 'c1',
+  unidad: { id: 'u1' },
   estado: 'ACTIVO',
   programado: false,
   canon_centavos: 150_000_000,

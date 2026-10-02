@@ -95,7 +95,7 @@ const resumen = (
   estado: 'ACTIVO',
   fecha_inicio: '2026-01-01T00:00:00.000Z',
   fecha_fin: '2026-12-31T00:00:00.000Z',
-  unidad: { nombre: id === 'c1' ? 'Apto 302' : 'Apto 401', tipo: 'APARTAMENTO' },
+  unidad: { id: `u-${id}`, nombre: id === 'c1' ? 'Apto 302' : 'Apto 401', tipo: 'APARTAMENTO' },
   inmueble: { direccion: id === 'c1' ? 'Calle 45 # 12-30' : 'Carrera 7 # 80-10', ciudad: 'Bogotá' },
   estado_pago: 'al_dia',
   ...extra,
@@ -135,6 +135,7 @@ const DOC: DocumentoContrato = {
 
 const DETALLE: ContratoInquilinoDetalle = {
   contratoId: 'c1',
+  unidad: { id: 'u-c1' },
   estado: 'ACTIVO',
   programado: false,
   canon_centavos: 150_000_000,
@@ -310,12 +311,13 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------------------------
 
 describe('pestañas Pagos y Solicitudes', () => {
-  it('Pagos ya es real (E7-A: períodos e historial) y Solicitudes llega en E8', async () => {
+  it('Pagos (E7-A) y Solicitudes (E8-A) ya son reales: ninguna es un "Próximamente"', async () => {
     const pagos = await montar(<PagosInquilino />);
     expect(todo(pagos.raiz)).not.toContain('Próximamente');
     expect(todo(pagos.raiz)).toContain('Pagos');
     const solicitudes = await montar(<SolicitudesInquilino />);
-    expect(todo(solicitudes.raiz)).toContain('Próximamente (E8)');
+    expect(todo(solicitudes.raiz)).not.toContain('Próximamente');
+    expect(todo(solicitudes.raiz)).toContain('Solicitudes');
   });
 });
 

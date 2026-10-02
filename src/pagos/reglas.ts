@@ -4,7 +4,7 @@
 
 import type { EstadoContratoApi, PeriodoCuenta } from '../api/contratos';
 import type { CuerpoRechazo, MotivoRechazoPago, PeriodoCuentaPago } from '../api/pagos';
-import { generarClaveIdempotencia } from '../utilidades/idempotencia';
+import { BorradorIdempotente as BorradorGenerico } from '../utilidades/borradorIdempotente';
 
 export const AVISO_PARCIAL =
   'Este monto es menor al canon: el período quedará como pago parcial al aprobarse.';
@@ -105,28 +105,25 @@ export interface ContenidoBorrador {
 /**
  * UNA clave de idempotencia por borrador. Se conserva mientras el contenido (período, monto, fecha,
  * archivo) no cambie, aunque haya errores de red o "sin respuesta": así reenviar no duplica el pago.
- * Cambia cuando cambia cualquiera de esos cuatro y tras un envío exitoso (`reiniciar`).
+ * Cambia cuando cambia cualquiera de esos cuatro y tras un envío exitoso (`reiniciar`). La regla
+ * vive en el borrador genérico (src/utilidades/borradorIdempotente.ts); esto solo fija los campos.
  */
 export class BorradorIdempotente {
-  private actual: { huella: string; clave: string } | null = null;
+  private readonly base: BorradorGenerico;
 
-  constructor(private readonly generar: () => string = () => generarClaveIdempotencia()) {}
+  constructor(generar?: () => string) {
+    this.base = new BorradorGenerico(generar);
+  }
 
   claveParaEnvio(contenido: ContenidoBorrador): string {
-    const huella = JSON.stringify([
-      contenido.periodo,
-      contenido.montoCentavos,
-      contenido.fechaReportada,
+    return this.base.claveParaEnvio(
+      [contenido.periodo, contenido.montoCentavos, contenido.fechaReportada],
       contenido.archivoUri,
-    ]);
-    if (!this.actual || this.actual.huella !== huella) {
-      this.actual = { huella, clave: this.generar() };
-    }
-    return this.actual.clave;
+    );
   }
 
   reiniciar(): void {
-    this.actual = null;
+    this.base.reiniciar();
   }
 }
 
