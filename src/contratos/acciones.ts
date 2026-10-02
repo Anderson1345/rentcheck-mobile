@@ -49,7 +49,10 @@ export type AccionContrato =
   | 'regenerarDocumentos'
   // Pagos del arrendador (E7-B): la verificación la aporta la fuente (FuenteDetalle.huboCambio).
   | 'aprobarPago'
-  | 'rechazarPago';
+  | 'rechazarPago'
+  // Solicitudes de mantenimiento del arrendador (E8-B): su fuente aporta la comparación.
+  | 'iniciarSolicitud'
+  | 'resolverSolicitud';
 
 export interface AccionesDisponibles {
   incremento: boolean;
@@ -190,6 +193,10 @@ export function huboCambio(
     case 'aprobarPago':
     case 'rechazarPago':
       // Un pago no es un contrato: su fuente trae su propia comparación (consultas/pagos.ts).
+      return false;
+    case 'iniciarSolicitud':
+    case 'resolverSolicitud':
+      // Tampoco una solicitud: su comparación está en FUENTE_SOLICITUD (consultas/mantenimiento.ts).
       return false;
   }
 }

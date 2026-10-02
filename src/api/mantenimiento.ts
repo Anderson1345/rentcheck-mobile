@@ -14,6 +14,8 @@ export type TipoAdjunto = components['schemas']['TipoAdjunto'];
 export type SolicitudInquilino = components['schemas']['SolicitudInquilinoDto'];
 /** Respuesta 201 de POST /solicitudes-mantenimiento. */
 export type SolicitudCreada = components['schemas']['SolicitudCreadaDto'];
+/** Una solicitud como la ve el arrendador: con su unidad, inmueble e inquilino (E8-B). */
+export type SolicitudArrendador = components['schemas']['SolicitudArrendadorDto'];
 
 /** Las solicitudes del contrato indicado, de la más reciente a la más antigua (orden del servidor). */
 export const listarMisSolicitudes = (contratoId: string) =>
@@ -61,3 +63,34 @@ export const crearSolicitud = (datos: DatosSolicitud) =>
       senal: datos.senal,
     },
   );
+
+// ---- Arrendador (E8-B) ----
+
+export interface FiltrosSolicitudes {
+  estado?: EstadoSolicitud;
+  urgencia?: UrgenciaSolicitud;
+  unidadId?: string;
+}
+
+/**
+ * GET /solicitudes-mantenimiento. Solo se manda el filtro que viene. Sin paginación (B-72): trae
+ * todas las del arrendador, de la más reciente a la más antigua (orden del servidor).
+ */
+export function listarSolicitudes(filtros: FiltrosSolicitudes = {}) {
+  const partes: string[] = [];
+  if (filtros.estado) partes.push(`estado=${encodeURIComponent(filtros.estado)}`);
+  if (filtros.urgencia) partes.push(`urgencia=${encodeURIComponent(filtros.urgencia)}`);
+  if (filtros.unidadId) partes.push(`unidadId=${encodeURIComponent(filtros.unidadId)}`);
+  const consulta = partes.length > 0 ? `?${partes.join('&')}` : '';
+  return api.get<SolicitudArrendador[]>(`/solicitudes-mantenimiento${consulta}`);
+}
+
+/** 404 si la solicitud es de otro arrendador. */
+export const obtenerSolicitud = (id: string) =>
+  api.get<SolicitudArrendador>(`/solicitudes-mantenimiento/${encodeURIComponent(id)}`);
+
+/** PENDIENTE → EN_PROCESO o RESUELTO; EN_PROCESO → RESUELTO. Otra cosa: 409 TRANSICION_INVALIDA. */
+export const cambiarEstadoSolicitud = (id: string, estado: 'EN_PROCESO' | 'RESUELTO') =>
+  api.patch<SolicitudArrendador>(`/solicitudes-mantenimiento/${encodeURIComponent(id)}/estado`, {
+    estado,
+  });
