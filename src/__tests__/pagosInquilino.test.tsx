@@ -8,7 +8,7 @@ import PagosInquilino from '../../app/(inquilino)/(pestanas)/pagos';
 import ReportarPago from '../../app/(inquilino)/reportar-pago';
 import { ErrorApi, ErrorSinConexion } from '../api/cliente';
 import type { EstadoCuenta, PeriodoCuenta } from '../api/contratos';
-import type { PagoInquilino } from '../api/pagos';
+import type { PagoRespuesta } from '../api/pagos';
 import { SelectorFecha } from '../componentes/contratos/PasoFechas';
 import { ContratoSeleccionadoProvider } from '../inquilino/ContratoSeleccionado';
 import { FORMATO_CLAVE_IDEMPOTENCIA } from '../utilidades/idempotencia';
@@ -34,6 +34,9 @@ const mockReplace = jest.fn();
 const mockElegirFoto = jest.fn();
 const mockDocumento = jest.fn();
 const mockManipular = jest.fn();
+const mockDescargar = jest.fn();
+const mockCompartir = jest.fn();
+const mockBorrar = jest.fn();
 let mockParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
@@ -71,6 +74,15 @@ jest.mock('../utilidades/foto', () => ({
   ...jest.requireActual('../utilidades/foto'),
   elegirFoto: (...a: unknown[]) => mockElegirFoto(...a),
 }));
+jest.mock('expo-file-system/legacy', () => ({
+  cacheDirectory: 'file:///cache/',
+  downloadAsync: (...a: unknown[]) => mockDescargar(...a),
+  deleteAsync: (...a: unknown[]) => mockBorrar(...a),
+}));
+jest.mock('expo-sharing', () => ({
+  isAvailableAsync: async () => true,
+  shareAsync: (...a: unknown[]) => mockCompartir(...a),
+}));
 jest.mock('expo-document-picker', () => ({
   getDocumentAsync: (...a: unknown[]) => mockDocumento(...a),
 }));
@@ -104,8 +116,38 @@ const CUENTA: EstadoCuenta = {
   ],
 };
 
-const pago = (id: string, extra: Partial<PagoInquilino> = {}): PagoInquilino => ({
+const CONTRATO_DE_PAGO: PagoRespuesta['contrato'] = {
+  id: 'c1',
+  tipo_plantilla: 'VIVIENDA_URBANA_LEY_820',
+  canon_centavos: 150_000_000,
+  dia_pago: 5,
+  forma_pago: 'Transferencia',
+  deposito_centavos: null,
+  fecha_inicio: '2026-01-01T00:00:00.000Z',
+  fecha_fin: '2027-12-31T00:00:00.000Z',
+  estado: 'ACTIVO',
+  unidad: {
+    id: 'u1',
+    inmueble_id: 'm1',
+    nombre: 'Apto 302',
+    tipo: 'APARTAMENTO',
+    metros_cuadrados: null,
+    numero_habitaciones: null,
+    numero_banos: null,
+    canon_base_centavos: 150_000_000,
+    ocupantes_maximos: null,
+    acepta_mascotas: false,
+    uso_permitido: 'RESIDENCIAL',
+    foto_principal_url: null,
+    creado_en: '2026-01-01T00:00:00.000Z',
+    inmueble: { id: 'm1', direccion: 'Calle 45 # 12-30', ciudad: 'Bogotá' },
+  },
+  inquilino: { id: 'i1', nombre: 'Camilo Pardo', cedula: '1020304050', telefono: '3001234567' },
+};
+
+const pago = (id: string, extra: Partial<PagoRespuesta> = {}): PagoRespuesta => ({
   id,
+  arrendador_id: 'a1',
   contrato_id: 'c1',
   monto_centavos: 150_000_000,
   fecha_reportada: '2026-10-06T00:00:00.000Z',
@@ -114,6 +156,9 @@ const pago = (id: string, extra: Partial<PagoInquilino> = {}): PagoInquilino => 
   motivo_rechazo: null,
   mensaje_rechazo: null,
   comprobante_url: null,
+  comprobante_tipo: null,
+  periodo_cuenta: null,
+  contrato: CONTRATO_DE_PAGO,
   creado_en: '2026-10-06T15:00:00.000Z',
   actualizado_en: '2026-10-06T15:00:00.000Z',
   ...extra,
@@ -197,6 +242,9 @@ const elegirElPdf = (raiz: Raiz) => {
 
 beforeEach(() => {
   jest.restoreAllMocks();
+  mockDescargar.mockReset().mockResolvedValue({ status: 200, uri: 'file:///cache/c' });
+  mockCompartir.mockReset().mockResolvedValue(undefined);
+  mockBorrar.mockReset().mockResolvedValue(undefined);
   for (const m of [
     mockGet,
     mockSubir,
@@ -655,5 +703,78 @@ describe('formulario de reporte de pago', () => {
     datos.cuenta = new ErrorApi({ status: 404, codigo: 'NO_ENCONTRADO', mensaje: 'x' });
     const { raiz } = await montar(<ReportarPago />);
     expect(todo(raiz)).toContain('No encontramos este contrato');
+  });
+});
+
+describe('"Ver comprobante" en Mis pagos del inquilino', () => {
+  const imagenes = (raiz: Raiz) =>
+    raiz.root.findAll(
+      (n) => n.props.accessibilityLabel === 'Comprobante del pago' && n.props.source,
+    );
+
+  it('solo los pagos con comprobante_url ofrecen "Ver comprobante"', async () => {
+    datos.pagos = [
+      pago('p1', { comprobante_url: 'https://b.test/s/a.png?token=A', comprobante_tipo: 'IMAGEN' }),
+      pago('p2', { comprobante_url: null, comprobante_tipo: 'IMAGEN' }),
+    ];
+    const { raiz } = await montar(<PagosInquilino />);
+    expect(cuantos(raiz, 'Ver comprobante')).toBe(1);
+  });
+
+  it('IMAGEN: vuelve a pedir la lista y muestra la vista previa con la URL NUEVA (en memoria)', async () => {
+    datos.pagos = [
+      pago('p1', {
+        comprobante_url: 'https://b.test/s/a.png?token=VIEJA',
+        comprobante_tipo: 'IMAGEN',
+      }),
+    ];
+    const { raiz } = await montar(<PagosInquilino />);
+    expect(imagenes(raiz)).toHaveLength(0);
+    const antes = llamadasA('/pagos/mios?contratoId=c1');
+    datos.pagos = [
+      pago('p1', {
+        comprobante_url: 'https://b.test/s/a.png?token=NUEVA',
+        comprobante_tipo: 'IMAGEN',
+      }),
+    ];
+    await pulsar(raiz, 'Ver comprobante');
+    expect(llamadasA('/pagos/mios?contratoId=c1')).toBeGreaterThan(antes);
+    const i = imagenes(raiz)[0];
+    expect(i.props.source.uri).toContain('NUEVA');
+    expect(i.props.cachePolicy).toBe('memory');
+  });
+
+  it('PDF: pide la lista otra vez, descarga con la URL fresca y comparte', async () => {
+    datos.pagos = [
+      pago('p1', {
+        comprobante_url: 'https://b.test/s/a.pdf?token=VIEJA',
+        comprobante_tipo: 'PDF',
+      }),
+    ];
+    const { raiz } = await montar(<PagosInquilino />);
+    const antes = llamadasA('/pagos/mios?contratoId=c1');
+    datos.pagos = [
+      pago('p1', {
+        comprobante_url: 'https://b.test/s/a.pdf?token=NUEVA',
+        comprobante_tipo: 'PDF',
+      }),
+    ];
+    await pulsar(raiz, 'Ver comprobante');
+    expect(llamadasA('/pagos/mios?contratoId=c1')).toBeGreaterThan(antes);
+    expect(mockDescargar.mock.calls[0][0]).toContain('NUEVA');
+    expect(mockCompartir).toHaveBeenCalledWith(
+      'file:///cache/c',
+      expect.objectContaining({ dialogTitle: 'Compartir comprobante' }),
+    );
+  });
+
+  it('si el pago ya no trae URL al refrescar: "Comprobante no disponible", sin romper', async () => {
+    datos.pagos = [
+      pago('p1', { comprobante_url: 'https://b.test/s/a.png?token=A', comprobante_tipo: 'IMAGEN' }),
+    ];
+    const { raiz } = await montar(<PagosInquilino />);
+    datos.pagos = [pago('p1', { comprobante_url: null, comprobante_tipo: 'IMAGEN' })];
+    await pulsar(raiz, 'Ver comprobante');
+    expect(todo(raiz)).toContain('Comprobante no disponible');
   });
 });

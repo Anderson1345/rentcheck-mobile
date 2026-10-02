@@ -11,7 +11,18 @@ export class ErrorDescarga extends Error {
   }
 }
 
-export async function descargarYCompartir(url: string, nombreArchivo: string): Promise<void> {
+/** Por defecto, un PDF de contrato; los comprobantes de pago pasan su propio título y tipo. */
+export interface OpcionesDescarga {
+  titulo?: string;
+  mimeType?: string;
+  uti?: string;
+}
+
+export async function descargarYCompartir(
+  url: string,
+  nombreArchivo: string,
+  opciones: OpcionesDescarga = {},
+): Promise<void> {
   const destino = `${FileSystem.cacheDirectory}${nombreArchivo}`;
   let descargado = false;
   try {
@@ -20,9 +31,9 @@ export async function descargarYCompartir(url: string, nombreArchivo: string): P
     if (resultado.status < 200 || resultado.status >= 300) throw new ErrorDescarga();
     if (!(await Sharing.isAvailableAsync())) throw new ErrorDescarga();
     await Sharing.shareAsync(resultado.uri, {
-      mimeType: 'application/pdf',
-      dialogTitle: 'Compartir contrato',
-      UTI: 'com.adobe.pdf',
+      mimeType: opciones.mimeType ?? 'application/pdf',
+      dialogTitle: opciones.titulo ?? 'Compartir contrato',
+      UTI: opciones.uti ?? 'com.adobe.pdf',
     });
   } catch {
     // Cualquier fallo (incluido el nativo, que puede traer la URL en su texto) es el mismo error.

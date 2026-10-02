@@ -70,6 +70,10 @@ jest.mock('../api/contratos', () => ({
     codigo_acceso: { codigo: 'RC-AB3D-9KPX', expira_en: '2026-10-31T15:00:00.000Z' },
   }),
 }));
+jest.mock('../api/pagos', () => ({
+  ...jest.requireActual('../api/pagos'),
+  listarPagos: async () => [],
+}));
 jest.mock('../api/inquilino', () => ({
   ...jest.requireActual('../api/inquilino'),
   listarContratosInquilino: async () => [],
@@ -342,14 +346,12 @@ describe('barra inferior del arrendador (layouts reales)', () => {
     expect(m.etiquetasTabs()).toHaveLength(5);
   });
 
-  it.each([['pagos-arrendador', 'Pagos', 'Próximamente (E7)']])(
-    '%s: pantalla "Próximamente" sin lógica',
-    async (ruta, pestana, texto) => {
-      const m = await montar(ARRENDADOR(), ['(arrendador)', '(pestanas)', ruta]);
-      expect(m.textos()).toContain(texto);
-      expect(m.pestana(pestana).props).toMatchObject({ accessibilityState: { selected: true } });
-    },
-  );
+  it('pagos-arrendador: ya es la cola de validación (no "Próximamente") y la pestaña queda activa', async () => {
+    const m = await montar(ARRENDADOR(), ['(arrendador)', '(pestanas)', 'pagos-arrendador']);
+    expect(m.textos()).not.toContain('Próximamente (E7)');
+    expect(m.textos()).toContain('No hay pagos en revisión');
+    expect(m.pestana('Pagos').props).toMatchObject({ accessibilityState: { selected: true } });
+  });
 
   it('Contratos ya no es "Próximamente": lista (vacía aquí), botón "Nuevo contrato" y pestaña activa', async () => {
     const m = await montar(ARRENDADOR(), ['(arrendador)', '(pestanas)', 'contratos-arrendador']);

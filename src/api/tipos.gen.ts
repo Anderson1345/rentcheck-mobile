@@ -1628,11 +1628,124 @@ export interface components {
              */
             fecha_efectiva: string;
         };
+        /** @enum {string} */
+        EstadoPago: "PENDIENTE" | "APROBADO" | "RECHAZADO" | "REEMPLAZADO";
         /**
-         * @description Motivo de una lista fija. Opcional.
+         * @description Solo los pagos RECHAZADO traen valor; los rechazos anteriores a B-59 quedan en null.
          * @enum {string}
          */
         MotivoRechazoPago: "MONTO_NO_COINCIDE" | "PAGO_NO_VISIBLE" | "COMPROBANTE_ILEGIBLE" | "OTRO";
+        /**
+         * @description Tipo del comprobante, derivado de la extensión del archivo guardado. null si no se puede saber.
+         * @enum {string}
+         */
+        ComprobanteTipo: "IMAGEN" | "PDF";
+        /** @enum {string} */
+        EstadoPeriodoPago: "PAGADO" | "EN_REVISION" | "PENDIENTE" | "VENCIDO" | "PARCIAL";
+        PeriodoCuentaDto: {
+            /**
+             * @description Canon que rige en ese período (el del historial de incrementos, no el de hoy).
+             * @example 1500000
+             */
+            canon_vigente_centavos: number;
+            /**
+             * Format: date-time
+             * @description Fecha límite de pago del período (día calendario, medianoche UTC).
+             */
+            fecha_limite: string;
+            /**
+             * @description Suma de los pagos APROBADOS del período.
+             * @example 0
+             */
+            monto_aprobado_centavos: number;
+            estado: components["schemas"]["EstadoPeriodoPago"];
+        };
+        /** @enum {string} */
+        TipoPlantillaContrato: "VIVIENDA_URBANA_LEY_820" | "LOCAL_COMERCIAL" | "PARQUEADERO";
+        /** @enum {string} */
+        EstadoContrato: "ACTIVO" | "VENCIDO" | "PROXIMO_A_VENCER" | "TERMINADO_ANTICIPADAMENTE" | "PROGRAMADO" | "CANCELADO";
+        /** @enum {string} */
+        TipoUnidad: "APARTAMENTO" | "CASA" | "LOCAL" | "PARQUEADERO" | "HABITACION";
+        /** @enum {string} */
+        UsoPermitido: "RESIDENCIAL" | "COMERCIAL";
+        InmuebleDePagoDto: {
+            id: string;
+            direccion: string;
+            ciudad: string;
+        };
+        UnidadDePagoDto: {
+            id: string;
+            inmueble_id: string;
+            nombre: string;
+            tipo: components["schemas"]["TipoUnidad"];
+            /** @description Decimal: llega como texto. */
+            metros_cuadrados: string | null;
+            numero_habitaciones: number | null;
+            numero_banos: number | null;
+            canon_base_centavos: number;
+            ocupantes_maximos: number | null;
+            acepta_mascotas: boolean;
+            uso_permitido: components["schemas"]["UsoPermitido"];
+            /** @description URL firmada de la foto principal, o null (nunca la ruta interna). */
+            foto_principal_url: string | null;
+            /** Format: date-time */
+            creado_en: string;
+            inmueble: components["schemas"]["InmuebleDePagoDto"];
+        };
+        InquilinoDePagoDto: {
+            id: string;
+            nombre: string;
+            cedula: string;
+            telefono: string;
+        };
+        ContratoDePagoDto: {
+            id: string;
+            tipo_plantilla: components["schemas"]["TipoPlantillaContrato"];
+            /** @description Canon VIGENTE hoy (no el del período del pago: para eso, `periodo_cuenta`). */
+            canon_centavos: number;
+            dia_pago: number;
+            forma_pago: string;
+            deposito_centavos: number | null;
+            /** Format: date-time */
+            fecha_inicio: string;
+            /** Format: date-time */
+            fecha_fin: string;
+            estado: components["schemas"]["EstadoContrato"];
+            unidad: components["schemas"]["UnidadDePagoDto"];
+            inquilino: components["schemas"]["InquilinoDePagoDto"];
+        };
+        PagoRespuestaDto: {
+            id: string;
+            arrendador_id: string;
+            contrato_id: string;
+            /** @example 1500000 */
+            monto_centavos: number;
+            /**
+             * Format: date-time
+             * @description Día en que se pagó (medianoche UTC).
+             */
+            fecha_reportada: string;
+            /**
+             * Format: date-time
+             * @description Primer día del mes que cubre (medianoche UTC).
+             */
+            periodo: string;
+            estado: components["schemas"]["EstadoPago"];
+            /** @description Solo los pagos RECHAZADO traen valor; los rechazos anteriores a B-59 quedan en null. */
+            motivo_rechazo: components["schemas"]["MotivoRechazoPago"] | null;
+            mensaje_rechazo: string | null;
+            /** Format: date-time */
+            creado_en: string;
+            /** Format: date-time */
+            actualizado_en: string;
+            /** @description URL firmada del comprobante (caduca), o null si no hay archivo o falló la firma. Nunca la ruta interna. */
+            comprobante_url: string | null;
+            /** @description Tipo del comprobante, derivado de la extensión del archivo guardado. null si no se puede saber. */
+            comprobante_tipo: components["schemas"]["ComprobanteTipo"] | null;
+            /** @description null solo si el cálculo del estado de cuenta no genera el período del pago. */
+            periodo_cuenta: components["schemas"]["PeriodoCuentaDto"] | null;
+            contrato: components["schemas"]["ContratoDePagoDto"];
+        };
         RechazarPagoDto: {
             /** @description Motivo de una lista fija. Opcional. */
             motivo?: components["schemas"]["MotivoRechazoPago"];
@@ -1641,6 +1754,37 @@ export interface components {
              *     blanco cuenta como no enviado.
              */
             mensaje?: string;
+        };
+        PagoCreadoDto: {
+            id: string;
+            arrendador_id: string;
+            contrato_id: string;
+            /** @example 1500000 */
+            monto_centavos: number;
+            /**
+             * Format: date-time
+             * @description Día en que se pagó (medianoche UTC).
+             */
+            fecha_reportada: string;
+            /**
+             * Format: date-time
+             * @description Primer día del mes que cubre (medianoche UTC).
+             */
+            periodo: string;
+            estado: components["schemas"]["EstadoPago"];
+            /** @description Solo los pagos RECHAZADO traen valor; los rechazos anteriores a B-59 quedan en null. */
+            motivo_rechazo: components["schemas"]["MotivoRechazoPago"] | null;
+            mensaje_rechazo: string | null;
+            /** Format: date-time */
+            creado_en: string;
+            /** Format: date-time */
+            actualizado_en: string;
+            /** @description URL firmada del comprobante (caduca), o null si no hay archivo o falló la firma. Nunca la ruta interna. */
+            comprobante_url: string | null;
+            /** @description Tipo del comprobante, derivado de la extensión del archivo guardado. null si no se puede saber. */
+            comprobante_tipo: components["schemas"]["ComprobanteTipo"] | null;
+            /** @description null solo si el cálculo del estado de cuenta no genera el período del pago. */
+            periodo_cuenta: components["schemas"]["PeriodoCuentaDto"] | null;
         };
         VincularContratoDto: {
             /**
@@ -3261,12 +3405,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Lista de pagos con el contrato, la unidad y el inquilino relacionados. Cada pago trae `motivo_rechazo` (enum o null) y `mensaje_rechazo` (texto o null); solo los pagos RECHAZADO traen valor. */
+            /** @description Lista de pagos con el contrato, la unidad y el inquilino relacionados. Cada pago trae `motivo_rechazo` y `mensaje_rechazo` (solo los RECHAZADO traen valor), `comprobante_url` firmada, `comprobante_tipo` (IMAGEN, PDF o null) y `periodo_cuenta` (canon vigente, fecha límite, monto aprobado y estado del período, o null si el cálculo no genera ese período). */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PagoRespuestaDto"][];
+                };
             };
         };
     };
@@ -3306,14 +3452,16 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Pago creado exitosamente. */
+            /** @description Pago creado exitosamente (la misma respuesta, con `Idempotent-Replayed: true`, si se repite la clave con el mismo contenido). No trae el bloque `contrato`; `periodo_cuenta` ya incluye este pago (el período queda EN_REVISION). */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PagoCreadoDto"];
+                };
             };
-            /** @description Datos del formulario inválidos, fecha_reportada anterior al inicio del contrato (FECHA_REPORTADA_ANTERIOR_A_INICIO) o periodo que no corresponde a ningún período del contrato (PERIODO_INVALIDO). */
+            /** @description Datos del formulario inválidos, fecha_reportada anterior al inicio del contrato (FECHA_REPORTADA_ANTERIOR_A_INICIO), periodo que no corresponde a ningún período del contrato (PERIODO_INVALIDO) o Idempotency-Key con formato inválido (IDEMPOTENCY_KEY_INVALIDA). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3334,8 +3482,22 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description El tipo de archivo del comprobante no está permitido. */
+            /** @description El comprobante pesa más de 10 MB (CARGA_DEMASIADO_GRANDE). */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description El tipo de archivo del comprobante no está permitido, o su contenido real no coincide con el tipo declarado (ARCHIVO_CONTENIDO_INVALIDO). */
             415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description La misma Idempotency-Key ya se usó con un contenido distinto (IDEMPOTENCY_KEY_REUTILIZADA). */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3354,12 +3516,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Lista de pagos del inquilino con sus datos de contrato. Cada pago trae `motivo_rechazo` (enum o null) y `mensaje_rechazo` (texto o null); solo los pagos RECHAZADO traen valor. */
+            /** @description Lista de pagos del inquilino con sus datos de contrato. Cada pago trae `motivo_rechazo` y `mensaje_rechazo` (solo los RECHAZADO traen valor), `comprobante_url` firmada, `comprobante_tipo` (IMAGEN, PDF o null) y `periodo_cuenta` (canon vigente, fecha límite, monto aprobado y estado del período, o null si el cálculo no genera ese período). */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PagoRespuestaDto"][];
+                };
             };
         };
     };
@@ -3374,12 +3538,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Detalle del pago con los datos relacionados. Cada pago trae `motivo_rechazo` (enum o null) y `mensaje_rechazo` (texto o null); solo los pagos RECHAZADO traen valor. */
+            /** @description Detalle del pago con los datos relacionados. Cada pago trae `motivo_rechazo` y `mensaje_rechazo` (solo los RECHAZADO traen valor), `comprobante_url` firmada, `comprobante_tipo` (IMAGEN, PDF o null) y `periodo_cuenta` (canon vigente, fecha límite, monto aprobado y estado del período, o null si el cálculo no genera ese período). */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PagoRespuestaDto"];
+                };
             };
             /** @description Pago no encontrado o no pertenece al arrendador. */
             404: {
@@ -3401,12 +3567,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Pago aprobado; el estado de pago del contrato se recalcula a partir de sus períodos. */
+            /** @description Pago aprobado; el estado de pago del contrato se recalcula a partir de sus períodos. `periodo_cuenta` ya refleja el estado nuevo del período. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PagoRespuestaDto"];
+                };
             };
             /** @description Pago no encontrado o no pertenece al arrendador. */
             404: {
@@ -3439,12 +3607,14 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Pago rechazado correctamente, con `motivo_rechazo` y `mensaje_rechazo` (null si no se indicaron). Solo los pagos RECHAZADO traen valor en esos campos. */
+            /** @description Pago rechazado correctamente, con `motivo_rechazo` y `mensaje_rechazo` (null si no se indicaron). Solo los pagos RECHAZADO traen valor en esos campos. `periodo_cuenta` ya refleja el estado nuevo del período. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PagoRespuestaDto"];
+                };
             };
             /** @description VALIDACION (motivo fuera de la lista o mensaje de más de 200 caracteres), MOTIVO_REQUERIDO (mensaje sin motivo) o MENSAJE_REQUERIDO (motivo OTRO sin mensaje). */
             400: {

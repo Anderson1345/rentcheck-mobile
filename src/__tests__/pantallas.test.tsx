@@ -150,7 +150,7 @@ describe.each([
   ['Página no disponible', () => <NoEncontrada />],
   ['Panel provisional del arrendador', () => <PanelArrendador />, true],
   ['Contratos del arrendador', () => <ContratosArrendador />, true],
-  ['Pagos del arrendador (próximamente)', () => <PagosArrendador />, true],
+  ['Pagos del arrendador', () => <PagosArrendador />, true],
   ['Más del arrendador', () => <MasArrendador />, true],
   ['Nuevo inmueble', () => <NuevoInmueble />, true],
   [

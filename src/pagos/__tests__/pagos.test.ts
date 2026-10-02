@@ -1,9 +1,23 @@
 // Pagos del inquilino (E7-A): idempotencia, reglas de período y monto, motivo de rechazo, API, preparación
 // del comprobante (reducción de imágenes y PDF) y mensajes de error de archivo.
 import { ErrorApi, ErrorArchivo, ErrorSinConexion, ErrorTimeout } from '../../api/cliente';
-import { mensajeDeErrorFoto, mensajeDeErrorPago, MENSAJES_ERROR } from '../../api/errores';
+import {
+  esConflictoDeEstado,
+  mensajeDeErrorAccion,
+  mensajeDeErrorFoto,
+  mensajeDeErrorPago,
+  MENSAJES_ERROR,
+} from '../../api/errores';
 import type { PeriodoCuenta } from '../../api/contratos';
-import { listarMisPagos, reportarPago } from '../../api/pagos';
+import {
+  aprobarPago,
+  listarMisPagos,
+  listarPagos,
+  obtenerPago,
+  rechazarPago,
+  reportarPago,
+} from '../../api/pagos';
+import { descargarYCompartir } from '../../utilidades/documentos';
 import {
   MENSAJE_ARCHIVO_GRANDE,
   MENSAJE_COMPROBANTE_NO_VALIDO,
@@ -15,10 +29,17 @@ import {
   generarClaveIdempotencia,
 } from '../../utilidades/idempotencia';
 import {
+  AVISO_APROBAR_MAYOR,
+  AVISO_APROBAR_PARCIAL,
   AVISO_MAYOR,
   AVISO_PARCIAL,
   avisoDeMonto,
   BorradorIdempotente,
+  comparacionDePago,
+  efectoDeAprobar,
+  MAXIMO_MENSAJE_RECHAZO,
+  MOTIVOS_RECHAZO,
+  validarRechazo,
   montoSugerido,
   periodoInicial,
   periodosReportables,
@@ -27,12 +48,26 @@ import {
 
 const mockGet = jest.fn();
 const mockSubir = jest.fn();
+const mockPatch = jest.fn();
 jest.mock('../../api/cliente', () => ({
   ...jest.requireActual('../../api/cliente'),
   api: {
     get: (...a: unknown[]) => mockGet(...a),
     subirArchivo: (...a: unknown[]) => mockSubir(...a),
+    patch: (...a: unknown[]) => mockPatch(...a),
   },
+}));
+const mockDescargar = jest.fn();
+const mockCompartir = jest.fn();
+const mockBorrar = jest.fn();
+jest.mock('expo-file-system/legacy', () => ({
+  cacheDirectory: 'file:///cache/',
+  downloadAsync: (...a: unknown[]) => mockDescargar(...a),
+  deleteAsync: (...a: unknown[]) => mockBorrar(...a),
+}));
+jest.mock('expo-sharing', () => ({
+  isAvailableAsync: async () => true,
+  shareAsync: (...a: unknown[]) => mockCompartir(...a),
 }));
 
 const mockManipular = jest.fn();
@@ -50,6 +85,10 @@ beforeEach(() => {
   mockSubir.mockReset().mockResolvedValue({});
   mockManipular.mockReset();
   mockDocumento.mockReset();
+  mockPatch.mockReset().mockResolvedValue({});
+  mockDescargar.mockReset().mockResolvedValue({ status: 200, uri: 'file:///cache/x' });
+  mockCompartir.mockReset().mockResolvedValue(undefined);
+  mockBorrar.mockReset().mockResolvedValue(undefined);
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -514,5 +553,217 @@ describe('describirTamano', () => {
     expect(describirTamano(800)).toBe('800 B');
     expect(describirTamano(250_000)).toBe('244 KB');
     expect(describirTamano(2_621_440)).toBe('2,5 MB');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// E7-B: pagos del arrendador
+// ---------------------------------------------------------------------------------------------
+
+describe('API de pagos del arrendador', () => {
+  it('listarPagos sin filtro: GET /pagos', async () => {
+    mockGet.mockResolvedValueOnce([{ id: 'p1' }]);
+    await expect(listarPagos()).resolves.toEqual([{ id: 'p1' }]);
+    expect(mockGet).toHaveBeenCalledWith('/pagos');
+  });
+
+  it.each(['PENDIENTE', 'APROBADO', 'RECHAZADO', 'REEMPLAZADO'] as const)(
+    'listarPagos("%s"): GET /pagos?estado=%s',
+    async (estado) => {
+      await listarPagos(estado);
+      expect(mockGet).toHaveBeenCalledWith(`/pagos?estado=${estado}`);
+    },
+  );
+
+  it('obtenerPago: GET /pagos/:id (con el id codificado)', async () => {
+    await obtenerPago('p1');
+    expect(mockGet).toHaveBeenCalledWith('/pagos/p1');
+    await obtenerPago('a/b');
+    expect(mockGet).toHaveBeenLastCalledWith('/pagos/a%2Fb');
+  });
+
+  it('aprobarPago: PATCH /pagos/:id/aprobar sin cuerpo', async () => {
+    await aprobarPago('p1');
+    expect(mockPatch).toHaveBeenCalledWith('/pagos/p1/aprobar');
+  });
+
+  it('rechazarPago: PATCH con { motivo, mensaje } y sin mensaje cuando no lo hay', async () => {
+    await rechazarPago('p1', { motivo: 'MONTO_NO_COINCIDE', mensaje: 'Faltan 50.000' });
+    expect(mockPatch).toHaveBeenLastCalledWith('/pagos/p1/rechazar', {
+      motivo: 'MONTO_NO_COINCIDE',
+      mensaje: 'Faltan 50.000',
+    });
+    await rechazarPago('p1', { motivo: 'PAGO_NO_VISIBLE' });
+    expect(mockPatch).toHaveBeenLastCalledWith('/pagos/p1/rechazar', { motivo: 'PAGO_NO_VISIBLE' });
+  });
+});
+
+describe('rechazo: motivos y validación (la app nunca rechaza sin motivo)', () => {
+  it('lista fija de motivos, con texto humano', () => {
+    expect(MOTIVOS_RECHAZO.map((m) => [m.valor, m.etiqueta])).toEqual([
+      ['MONTO_NO_COINCIDE', 'El monto no coincide'],
+      ['PAGO_NO_VISIBLE', 'No se ve el pago'],
+      ['COMPROBANTE_ILEGIBLE', 'El comprobante no se lee'],
+      ['OTRO', 'Otro'],
+    ]);
+    expect(MAXIMO_MENSAJE_RECHAZO).toBe(200);
+  });
+
+  it('sin motivo: error', () => {
+    expect(validarRechazo(null, 'algo')).toEqual({ error: 'Elige el motivo del rechazo.' });
+  });
+
+  it('OTRO exige mensaje (vacío o solo espacios no vale)', () => {
+    const esperado = { error: 'Escribe un mensaje que explique el rechazo.' };
+    expect(validarRechazo('OTRO', '')).toEqual(esperado);
+    expect(validarRechazo('OTRO', '    ')).toEqual(esperado);
+    expect(validarRechazo('OTRO', ' Foto borrosa ')).toEqual({
+      cuerpo: { motivo: 'OTRO', mensaje: 'Foto borrosa' },
+    });
+  });
+
+  it('con los demás motivos el mensaje es opcional y vacío se omite del cuerpo', () => {
+    expect(validarRechazo('PAGO_NO_VISIBLE', '')).toEqual({
+      cuerpo: { motivo: 'PAGO_NO_VISIBLE' },
+    });
+    expect(validarRechazo('PAGO_NO_VISIBLE', '   ')).toEqual({
+      cuerpo: { motivo: 'PAGO_NO_VISIBLE' },
+    });
+    expect(validarRechazo('MONTO_NO_COINCIDE', '  Faltan 50.000 ')).toEqual({
+      cuerpo: { motivo: 'MONTO_NO_COINCIDE', mensaje: 'Faltan 50.000' },
+    });
+  });
+
+  it('tope de 200 caracteres (contados tras recortar)', () => {
+    expect(validarRechazo('OTRO', ` ${'a'.repeat(200)} `).cuerpo?.mensaje).toHaveLength(200);
+    expect(validarRechazo('OTRO', 'a'.repeat(201))).toEqual({
+      error: 'El mensaje puede tener hasta 200 caracteres.',
+    });
+  });
+});
+
+describe('comparacionDePago: esperado vs. reportado (valores del servidor)', () => {
+  const bloque = (aprobado: number, canon = 100_000_000) => ({
+    canon_vigente_centavos: canon,
+    fecha_limite: '2026-10-05T00:00:00.000Z',
+    monto_aprobado_centavos: aprobado,
+    estado: 'EN_REVISION' as const,
+  });
+
+  it('canon, aprobado, saldo (canon − aprobado), reportado y diferencia', () => {
+    expect(
+      comparacionDePago({
+        monto_centavos: 60_000_000,
+        periodo: '2026-10-01T00:00:00.000Z',
+        periodo_cuenta: bloque(40_000_000),
+      }),
+    ).toEqual({
+      canon: 100_000_000,
+      aprobado: 40_000_000,
+      saldo: 60_000_000,
+      reportado: 60_000_000,
+      diferencia: 0,
+      aviso: null,
+    });
+  });
+
+  it('menor al saldo: diferencia negativa y aviso parcial', () => {
+    const c = comparacionDePago({
+      monto_centavos: 40_000_000,
+      periodo: '2026-10-01T00:00:00.000Z',
+      periodo_cuenta: bloque(40_000_000),
+    });
+    expect(c?.diferencia).toBe(-20_000_000);
+    expect(c?.aviso).toBe('parcial');
+  });
+
+  it('mayor al saldo: diferencia positiva y aviso de monto mayor', () => {
+    const c = comparacionDePago({
+      monto_centavos: 90_000_000,
+      periodo: '2026-10-01T00:00:00.000Z',
+      periodo_cuenta: bloque(40_000_000),
+    });
+    expect(c?.diferencia).toBe(30_000_000);
+    expect(c?.aviso).toBe('mayor');
+  });
+
+  it('periodo_cuenta null: no hay comparación (no se inventa nada)', () => {
+    expect(
+      comparacionDePago({
+        monto_centavos: 1,
+        periodo: '2026-10-01T00:00:00.000Z',
+        periodo_cuenta: null,
+      }),
+    ).toBeNull();
+    expect(
+      efectoDeAprobar({
+        monto_centavos: 1,
+        periodo: '2026-10-01T00:00:00.000Z',
+        periodo_cuenta: null,
+      }),
+    ).toBeNull();
+  });
+
+  it('efecto de aprobar: Pagado si cubre el saldo (o lo supera), Parcial si es menor', () => {
+    const pago = (monto: number) => ({
+      monto_centavos: monto,
+      periodo: '2026-10-01T00:00:00.000Z',
+      periodo_cuenta: bloque(40_000_000),
+    });
+    expect(efectoDeAprobar(pago(60_000_000))).toBe('PAGADO');
+    expect(efectoDeAprobar(pago(90_000_000))).toBe('PAGADO');
+    expect(efectoDeAprobar(pago(10_000_000))).toBe('PARCIAL');
+  });
+
+  it('textos del aviso al aprobar', () => {
+    expect(AVISO_APROBAR_PARCIAL).toBe('Al aprobar, el período quedará como pago parcial.');
+    expect(AVISO_APROBAR_MAYOR).toBe('Un monto mayor no cubre otros períodos.');
+  });
+});
+
+describe('errores de aprobar y rechazar, por código', () => {
+  const api = (status: number, codigo: string) =>
+    new ErrorApi({ status, codigo, mensaje: 'técnico' });
+
+  it('PAGO_YA_PROCESADO: "Este pago ya fue procesado." y cuenta como conflicto de estado', () => {
+    const e = api(409, 'PAGO_YA_PROCESADO');
+    expect(mensajeDeErrorAccion(e)).toBe('Este pago ya fue procesado.');
+    expect(esConflictoDeEstado(e)).toBe(true);
+  });
+
+  it('MOTIVO_REQUERIDO y MENSAJE_REQUERIDO', () => {
+    expect(mensajeDeErrorAccion(api(400, 'MOTIVO_REQUERIDO'))).toBe('Elige el motivo del rechazo.');
+    expect(mensajeDeErrorAccion(api(400, 'MENSAJE_REQUERIDO'))).toBe(
+      'Escribe un mensaje que explique el rechazo.',
+    );
+  });
+});
+
+describe('descargarYCompartir: el diálogo de contratos no cambió y el de comprobantes es propio', () => {
+  it('por defecto: PDF y "Compartir contrato"', async () => {
+    await descargarYCompartir('https://b.test/a.pdf?token=S', 'contrato-c1-v1.pdf');
+    expect(mockCompartir).toHaveBeenCalledWith('file:///cache/x', {
+      mimeType: 'application/pdf',
+      dialogTitle: 'Compartir contrato',
+      UTI: 'com.adobe.pdf',
+    });
+  });
+
+  it('con opciones: título y tipo propios del comprobante', async () => {
+    await descargarYCompartir('https://b.test/a?token=S', 'comprobante-p1', {
+      titulo: 'Compartir comprobante',
+      mimeType: '*/*',
+      uti: 'public.data',
+    });
+    expect(mockCompartir).toHaveBeenCalledWith('file:///cache/x', {
+      mimeType: '*/*',
+      dialogTitle: 'Compartir comprobante',
+      UTI: 'public.data',
+    });
+  });
+
+  it('el archivo descargado se borra del caché después de compartir', async () => {
+    await descargarYCompartir('https://b.test/a.pdf', 'comprobante-p1.pdf');
+    expect(mockBorrar).toHaveBeenCalled();
   });
 });

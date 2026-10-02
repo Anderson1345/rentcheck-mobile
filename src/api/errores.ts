@@ -102,7 +102,9 @@ export const MENSAJES_ERROR: Record<string, string> = {
   SIN_PERIODOS_PENDIENTES: 'No hay períodos pendientes de pago.',
   FECHA_REPORTADA_ANTERIOR_A_INICIO:
     'La fecha del pago no puede ser anterior al inicio del contrato.',
-  PAGO_YA_PROCESADO: 'Este pago ya fue aprobado o rechazado.',
+  PAGO_YA_PROCESADO: 'Este pago ya fue procesado.',
+  MOTIVO_REQUERIDO: 'Elige el motivo del rechazo.',
+  MENSAJE_REQUERIDO: 'Escribe un mensaje que explique el rechazo.',
 
   // Solicitudes y envíos repetidos
   SOLICITUD_EN_PROCESO: 'Ya hay una solicitud en proceso.',
@@ -374,9 +376,10 @@ const CODIGOS_DE_ESTADO = new Set([
   'AVISO_FUERA_DE_PLAZO',
   'INCREMENTO_YA_APLICADO',
   'PRORROGA_YA_APLICADA',
+  'PAGO_YA_PROCESADO',
 ]);
 
-/** 409 por estado desactualizado (alguien cambió el contrato): conviene recargar el detalle. */
+/** 409 por estado desactualizado (alguien cambió el contrato o el pago): conviene recargar el detalle. */
 export function esConflictoDeEstado(error: unknown): boolean {
   return (
     error instanceof ErrorApi &&

@@ -3,7 +3,7 @@
 // monto precargar, qué avisar) y se mantiene la clave de idempotencia de cada borrador.
 
 import type { EstadoContratoApi, PeriodoCuenta } from '../api/contratos';
-import type { MotivoRechazoPago } from '../api/pagos';
+import type { CuerpoRechazo, MotivoRechazoPago, PeriodoCuentaPago } from '../api/pagos';
 import { generarClaveIdempotencia } from '../utilidades/idempotencia';
 
 export const AVISO_PARCIAL =
@@ -128,4 +128,89 @@ export class BorradorIdempotente {
   reiniciar(): void {
     this.actual = null;
   }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Arrendador (E7-B): comparar lo esperado con lo reportado y rechazar con motivo
+// ---------------------------------------------------------------------------------------------
+
+export const AVISO_APROBAR_PARCIAL = 'Al aprobar, el período quedará como pago parcial.';
+export const AVISO_APROBAR_MAYOR = 'Un monto mayor no cubre otros períodos.';
+
+interface PagoConPeriodo {
+  monto_centavos: number;
+  /** Primer día del mes que cubre. */
+  periodo: string;
+  periodo_cuenta: PeriodoCuentaPago | null;
+}
+
+export interface ComparacionDePago {
+  canon: number;
+  aprobado: number;
+  /** Lo que falta por cubrir: canon vigente del período menos lo ya aprobado. */
+  saldo: number;
+  reportado: number;
+  /** Reportado menos saldo: negativo = menor, positivo = mayor. */
+  diferencia: number;
+  aviso: 'parcial' | 'mayor' | null;
+}
+
+/**
+ * "Esperado vs. reportado" con los valores del servidor (periodo_cuenta). Sin periodo_cuenta no hay
+ * comparación: no se inventa nada. El aviso es el mismo criterio de E7-A (avisoDeMonto).
+ */
+export function comparacionDePago(pago: PagoConPeriodo): ComparacionDePago | null {
+  const bloque = pago.periodo_cuenta;
+  if (!bloque) return null;
+  const saldo = Math.max(0, bloque.canon_vigente_centavos - bloque.monto_aprobado_centavos);
+  const aviso = avisoDeMonto(pago.monto_centavos, {
+    periodo: pago.periodo,
+    fechaLimite: bloque.fecha_limite,
+    canonVigenteCentavos: bloque.canon_vigente_centavos,
+    estado: bloque.estado,
+    montoAprobadoCentavos: bloque.monto_aprobado_centavos,
+  });
+  return {
+    canon: bloque.canon_vigente_centavos,
+    aprobado: bloque.monto_aprobado_centavos,
+    saldo,
+    reportado: pago.monto_centavos,
+    diferencia: pago.monto_centavos - saldo,
+    aviso,
+  };
+}
+
+/** Cómo quedaría el período al aprobar: Parcial si el monto es menor al saldo; si no, Pagado. */
+export function efectoDeAprobar(pago: PagoConPeriodo): 'PAGADO' | 'PARCIAL' | null {
+  const comparacion = comparacionDePago(pago);
+  if (!comparacion) return null;
+  return comparacion.aviso === 'parcial' ? 'PARCIAL' : 'PAGADO';
+}
+
+export const MAXIMO_MENSAJE_RECHAZO = 200;
+
+export const MOTIVOS_RECHAZO: readonly { valor: MotivoRechazoPago; etiqueta: string }[] = [
+  { valor: 'MONTO_NO_COINCIDE', etiqueta: 'El monto no coincide' },
+  { valor: 'PAGO_NO_VISIBLE', etiqueta: 'No se ve el pago' },
+  { valor: 'COMPROBANTE_ILEGIBLE', etiqueta: 'El comprobante no se lee' },
+  { valor: 'OTRO', etiqueta: 'Otro' },
+];
+
+/**
+ * El cuerpo del rechazo: la app nunca rechaza sin motivo, "Otro" exige mensaje (hasta 200 caracteres)
+ * y un mensaje vacío se omite. El servidor vuelve a validar.
+ */
+export function validarRechazo(
+  motivo: MotivoRechazoPago | null,
+  mensaje: string,
+): { cuerpo: CuerpoRechazo; error?: undefined } | { error: string; cuerpo?: undefined } {
+  if (motivo === null) return { error: 'Elige el motivo del rechazo.' };
+  const texto = mensaje.trim();
+  if (motivo === 'OTRO' && texto === '') {
+    return { error: 'Escribe un mensaje que explique el rechazo.' };
+  }
+  if (texto.length > MAXIMO_MENSAJE_RECHAZO) {
+    return { error: `El mensaje puede tener hasta ${MAXIMO_MENSAJE_RECHAZO} caracteres.` };
+  }
+  return { cuerpo: texto === '' ? { motivo } : { motivo, mensaje: texto } };
 }
