@@ -6,7 +6,15 @@ import type { ContratoDetalle } from '../api/contratos';
 import { formatearFechaLarga } from '../utilidades/fechas';
 
 export type AccionContrato =
-  'incremento' | 'prorroga' | 'darAviso' | 'cancelarAviso' | 'cancelarProgramado';
+  | 'incremento'
+  | 'prorroga'
+  | 'darAviso'
+  | 'cancelarAviso'
+  | 'cancelarProgramado'
+  | 'solicitarTerminacion'
+  | 'confirmarTerminacion'
+  | 'cancelarTerminacion'
+  | 'regenerarDocumentos';
 
 export interface AccionesDisponibles {
   incremento: boolean;
@@ -25,6 +33,17 @@ export function accionesDisponibles(c: ContratoDetalle): AccionesDisponibles {
     cancelarAviso: activo && c.aviso_no_renovacion?.puede_cancelar === true,
     cancelarProgramado: c.estado === 'PROGRAMADO',
   };
+}
+
+/** No existe puede_solicitar: se ofrece solo con el contrato ACTIVO y sin solicitud (el servidor decide el resto). */
+export function puedeSolicitarTerminacion(c: ContratoDetalle): boolean {
+  const estado = c.terminacion_anticipada?.estado;
+  return c.estado === 'ACTIVO' && (estado === undefined || estado === 'NINGUNA');
+}
+
+/** Corregir datos: solo sin vincular y PROGRAMADO o ACTIVO. Si hay pagos o incrementos, responde el servidor. */
+export function puedeCorregir(c: ContratoDetalle): boolean {
+  return !c.vinculado && (c.estado === 'PROGRAMADO' || c.estado === 'ACTIVO');
 }
 
 export const MENSAJE_PORCENTAJE =
@@ -89,5 +108,23 @@ export function huboCambio(
       );
     case 'cancelarProgramado':
       return antes.estado === 'PROGRAMADO' && despues.estado === 'CANCELADO';
+    case 'solicitarTerminacion':
+      return (
+        (antes.terminacion_anticipada?.estado ?? 'NINGUNA') === 'NINGUNA' &&
+        (despues.terminacion_anticipada?.estado ?? 'NINGUNA') !== 'NINGUNA'
+      );
+    case 'confirmarTerminacion':
+      return (
+        antes.terminacion_anticipada?.estado !== 'CONFIRMADA' &&
+        despues.terminacion_anticipada?.estado === 'CONFIRMADA'
+      );
+    case 'cancelarTerminacion':
+      return (
+        antes.terminacion_anticipada?.estado === 'SOLICITADA' &&
+        (despues.terminacion_anticipada?.estado ?? 'NINGUNA') === 'NINGUNA'
+      );
+    case 'regenerarDocumentos':
+      // Los documentos no cuelgan del detalle: se compara con la lista de documentos.
+      return false;
   }
 }

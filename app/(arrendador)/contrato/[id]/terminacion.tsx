@@ -1,8 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { darAvisoNoRenovacion } from '@/api/contratos';
+import { solicitarTerminacion } from '@/api/contratos';
+import { Aviso } from '@/componentes/Aviso';
 import { Boton } from '@/componentes/Boton';
 import { CampoTexto } from '@/componentes/CampoTexto';
 import {
@@ -10,19 +11,26 @@ import {
   confirmarAccion,
   MensajeAccion,
 } from '@/componentes/contratos/AccionesContrato';
-import { Aviso } from '@/componentes/Aviso';
+import { SelectorFecha } from '@/componentes/contratos/PasoFechas';
 import { Texto } from '@/componentes/Texto';
 import { useAccionContrato } from '@/contratos/useAccionContrato';
 import { colores, espaciado } from '@/tema';
+import { formatearFechaLarga, hoyBogota } from '@/utilidades/fechas';
 
 const MAXIMO_MOTIVO = 1000;
+// Advertencia obligatoria de la interfaz (Contexto §13, Ley 820 art. 21): texto exacto.
+const ADVERTENCIA =
+  'Esto es una terminación por mutuo acuerdo. No reemplaza el aviso escrito ni las causales de una terminación unilateral (Ley 820, arts. 22 a 24).';
 
-export default function AvisoNoRenovacion() {
+export default function TerminacionAnticipada() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const accion = useAccionContrato(id, 'darAviso');
+  const accion = useAccionContrato(id, 'solicitarTerminacion');
+  const hoy = useMemo(() => hoyBogota(), []);
   // El motivo es dato del contrato: solo vive aquí, nunca se registra.
   const [motivo, setMotivo] = useState('');
+  const [fecha, setFecha] = useState(hoy);
+  const [errorMotivo, setErrorMotivo] = useState<string | null>(null);
   const ocupado = accion.fase === 'enviando' || accion.fase === 'verificando';
 
   return (
@@ -32,25 +40,40 @@ export default function AvisoNoRenovacion() {
           return (
             <View style={estilos.grupo}>
               <Texto variante="titulo" accessibilityRole="header">
-                Aviso de no renovación
+                Terminación anticipada
               </Texto>
-              <Aviso tono="exito" mensaje="Aviso de no renovación dado." />
+              <Aviso tono="exito" mensaje="Solicitud enviada. La otra parte debe confirmarla." />
               <Boton titulo="Listo" ancho="completo" onPress={() => router.back()} />
             </View>
           );
         }
+
+        function solicitar() {
+          const texto = motivo.trim();
+          if (texto === '') {
+            setErrorMotivo('Escribe el motivo de la terminación.');
+            return;
+          }
+          setErrorMotivo(null);
+          confirmarAccion(
+            'Solicitar terminación anticipada',
+            `Fecha efectiva: ${formatearFechaLarga(fecha)}. Motivo: ${texto}. La otra parte debe confirmarla.`,
+            'Solicitar',
+            () => void accion.iniciar(() => solicitarTerminacion(id, texto, fecha)),
+          );
+        }
+
         return (
           <View style={estilos.grupo}>
             <Texto variante="titulo" accessibilityRole="header">
-              Dar aviso de no renovación
+              Solicitar terminación anticipada
             </Texto>
-            <Texto variante="cuerpo">
-              Sin aviso, el contrato se prorroga automáticamente por el mismo término.
-            </Texto>
+            <Aviso tono="advertencia" mensaje={ADVERTENCIA} />
             <CampoTexto
-              etiqueta="Motivo (opcional)"
+              etiqueta="Motivo"
               valor={motivo}
               onCambio={setMotivo}
+              error={errorMotivo ?? undefined}
               keyboardType="default"
               autoCapitalize="sentences"
               maxLength={MAXIMO_MOTIVO}
@@ -59,6 +82,7 @@ export default function AvisoNoRenovacion() {
             <Texto variante="secundario" color={colores.textoSecundario}>
               {`${motivo.length} / ${MAXIMO_MOTIVO}`}
             </Texto>
+            <SelectorFecha etiqueta="Fecha efectiva" valor={fecha} hoy={hoy} onCambio={setFecha} />
             <MensajeAccion
               fase={accion.fase}
               error={accion.error}
@@ -68,18 +92,11 @@ export default function AvisoNoRenovacion() {
             />
             {accion.fase === 'incierto' ? null : (
               <Boton
-                titulo="Dar aviso"
-                tituloCargando="Enviando aviso…"
+                titulo="Solicitar terminación"
+                tituloCargando="Enviando solicitud…"
                 cargando={ocupado}
                 ancho="completo"
-                onPress={() =>
-                  confirmarAccion(
-                    'Dar aviso de no renovación',
-                    'Al llegar la fecha de fin, el contrato vencerá y no se prorrogará.',
-                    'Dar aviso',
-                    () => void accion.iniciar(() => darAvisoNoRenovacion(id, motivo)),
-                  )
-                }
+                onPress={solicitar}
               />
             )}
           </View>

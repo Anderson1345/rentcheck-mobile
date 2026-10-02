@@ -5,6 +5,7 @@
 import { api } from './cliente';
 import type { TipoUnidad } from './inmuebles';
 import type { TipoPlantilla } from '../contratos/plantilla';
+import type { CuerpoCorregirContrato, CuerpoCorregirInquilino } from '../contratos/correccion';
 import type { CuerpoCrearContrato } from '../contratos/cuerpo';
 
 export type EstadoContratoApi =
@@ -46,13 +47,17 @@ export interface ResumenAviso {
   puede_cancelar?: boolean;
 }
 
-/** Resumen de solo lectura (resumenTerminacion del backend). */
+/** resumenTerminacion del backend. Los booleanos mandan: no existe puede_solicitar. */
 export interface ResumenTerminacionContrato {
   estado: 'NINGUNA' | 'SOLICITADA' | 'CONFIRMADA';
   solicitada_por: RolContrato | null;
   solicitada_en: string | null;
   motivo: string | null;
   fecha_efectiva: string | null;
+  confirmada_por?: RolContrato | null;
+  confirmada_en?: string | null;
+  puede_confirmar?: boolean;
+  puede_cancelar?: boolean;
 }
 
 /** GET /contratos/:id/documentos. `url_firmada` es temporal: nunca se guarda ni se registra. */
@@ -75,7 +80,12 @@ export interface ContratoDetalle {
   tipo_plantilla: TipoPlantilla;
   vinculado: boolean;
   dia_pago?: number;
+  forma_pago?: string;
+  /** Para el arrendador llega con valor; se tolera null (regla 11 del Contexto aplica al inquilino). */
+  datos_recaudo?: string | null;
   deposito_centavos?: number | null;
+  datos_fiador_o_poliza?: string | null;
+  condicionesParticularesTexto?: string | null;
   inquilino: {
     id: string;
     nombre: string;
@@ -199,3 +209,44 @@ export const cancelarAvisoNoRenovacion = (id: string) =>
 /** No borra nada: el contrato queda CANCELADO. */
 export const cancelarProgramado = (id: string) =>
   api.post<unknown>(`/contratos/${encodeURIComponent(id)}/cancelar-programado`);
+
+// ---- Terminación anticipada, correcciones y documentos (E5-C) ----
+
+/** El motivo es obligatorio (≤1000); la fecha efectiva va "AAAA-MM-DD". */
+export const solicitarTerminacion = (id: string, motivo: string, fechaEfectiva: string) =>
+  api.post<unknown>(`/contratos/${encodeURIComponent(id)}/solicitar-terminacion-anticipada`, {
+    motivo: motivo.trim(),
+    fecha_efectiva: fechaEfectiva,
+  });
+
+/** IRREVERSIBLE; solo la contraparte de quien solicitó. */
+export const confirmarTerminacion = (id: string) =>
+  api.post<unknown>(`/contratos/${encodeURIComponent(id)}/confirmar-terminacion-anticipada`);
+
+export const cancelarTerminacion = (id: string) =>
+  api.post<unknown>(`/contratos/${encodeURIComponent(id)}/cancelar-terminacion-anticipada`);
+
+export interface DocumentoCorregido {
+  id: string;
+  tipo: TipoDocumentoContrato;
+  version: number;
+}
+
+/** Respuesta de los PATCH: el contrato más `documento` (null si el PDF falló) y, si cambió la cédula, el código nuevo. */
+export interface RespuestaCorreccion {
+  documento: DocumentoCorregido | null;
+  codigo_acceso?: { codigo: string; expira_en: string };
+}
+
+/** Sin cambios reales responde 200 sin versión nueva; es seguro reintentar. */
+export const corregirContrato = (id: string, cuerpo: CuerpoCorregirContrato) =>
+  api.patch<RespuestaCorreccion>(`/contratos/${encodeURIComponent(id)}`, cuerpo);
+
+export const corregirInquilino = (id: string, cuerpo: CuerpoCorregirInquilino) =>
+  api.patch<RespuestaCorreccion>(`/contratos/${encodeURIComponent(id)}/inquilino`, cuerpo);
+
+/** Idempotente: genera solo lo que falta. 500 DOCUMENTO_NO_GENERADO si alguno falla. */
+export const regenerarDocumentos = (id: string) =>
+  api.post<{ generados: { tipo: TipoDocumentoContrato; version: number }[]; ya_existian: number }>(
+    `/contratos/${encodeURIComponent(id)}/documentos/regenerar`,
+  );
