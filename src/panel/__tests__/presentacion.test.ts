@@ -83,15 +83,36 @@ describe('tendenciaSinIngresos', () => {
 
 describe('textos de conteo', () => {
   it('unidades: "7 de 8 unidades" y el singular', () => {
-    expect(textoUnidades({ unidades: 8, ocupadas: 7, libres: 1, con_contrato_programado: 0 })).toBe(
-      '7 de 8 unidades',
-    );
-    expect(textoUnidades({ unidades: 1, ocupadas: 1, libres: 0, con_contrato_programado: 0 })).toBe(
-      '1 de 1 unidad',
-    );
-    expect(textoUnidades({ unidades: 0, ocupadas: 0, libres: 0, con_contrato_programado: 0 })).toBe(
-      '0 de 0 unidades',
-    );
+    expect(
+      textoUnidades({
+        unidades: 8,
+        ocupadas: 7,
+        libres: 1,
+        con_contrato_programado: 0,
+        porcentaje: null,
+        unidades_detalle: [],
+      }),
+    ).toBe('7 de 8 unidades');
+    expect(
+      textoUnidades({
+        unidades: 1,
+        ocupadas: 1,
+        libres: 0,
+        con_contrato_programado: 0,
+        porcentaje: null,
+        unidades_detalle: [],
+      }),
+    ).toBe('1 de 1 unidad');
+    expect(
+      textoUnidades({
+        unidades: 0,
+        ocupadas: 0,
+        libres: 0,
+        con_contrato_programado: 0,
+        porcentaje: null,
+        unidades_detalle: [],
+      }),
+    ).toBe('0 de 0 unidades');
   });
 
   it('mora: contratos y períodos, en singular y plural', () => {

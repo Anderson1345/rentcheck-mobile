@@ -83,6 +83,16 @@ const millones = (n: number) => Math.round(n * MILLON);
 const PANEL_COMPLETO: PanelArrendador = {
   mes: '2026-10',
   calculado_para: '2026-10-02',
+  // R2-A: campos de B0.7-B (el Panel de la app aún no los muestra).
+  morosos: [],
+  anio: {
+    anio: 2026,
+    meses: [],
+    total_actual_centavos: 0,
+    total_anterior_centavos: 0,
+    variacion_porcentual: null,
+  },
+  por_inmueble: [],
   ingresos_mes_centavos: millones(13.65),
   recaudo: {
     esperado_centavos: millones(17.6),
@@ -91,7 +101,14 @@ const PANEL_COMPLETO: PanelArrendador = {
     sin_reportar_centavos: millones(0.6),
     contratos: 8,
   },
-  ocupacion: { unidades: 8, ocupadas: 7, libres: 1, con_contrato_programado: 1 },
+  ocupacion: {
+    unidades: 8,
+    ocupadas: 7,
+    libres: 1,
+    con_contrato_programado: 1,
+    porcentaje: 88,
+    unidades_detalle: [],
+  },
   mora: { contratos: 2, periodos: 4, total_centavos: millones(21) },
   tendencia: [
     { mes: '2026-05', ingresos_centavos: millones(17) },
@@ -104,6 +121,7 @@ const PANEL_COMPLETO: PanelArrendador = {
   pendientes: {
     comprobantes_por_validar: 3,
     mantenimientos_pendientes: 2,
+    solicitudes_abiertas: { total: 3, urgentes: 1 },
     contratos_por_vencer: {
       cantidad: 7,
       contratos: [
@@ -157,6 +175,16 @@ const PANEL_COMPLETO: PanelArrendador = {
 const PANEL_EN_CERO: PanelArrendador = {
   mes: '2026-10',
   calculado_para: '2026-10-02',
+  // R2-A: campos de B0.7-B (el Panel de la app aún no los muestra).
+  morosos: [],
+  anio: {
+    anio: 2026,
+    meses: [],
+    total_actual_centavos: 0,
+    total_anterior_centavos: 0,
+    variacion_porcentual: null,
+  },
+  por_inmueble: [],
   ingresos_mes_centavos: 0,
   recaudo: {
     esperado_centavos: 0,
@@ -165,7 +193,14 @@ const PANEL_EN_CERO: PanelArrendador = {
     sin_reportar_centavos: 0,
     contratos: 0,
   },
-  ocupacion: { unidades: 0, ocupadas: 0, libres: 0, con_contrato_programado: 0 },
+  ocupacion: {
+    unidades: 0,
+    ocupadas: 0,
+    libres: 0,
+    con_contrato_programado: 0,
+    porcentaje: null,
+    unidades_detalle: [],
+  },
   mora: { contratos: 0, periodos: 0, total_centavos: 0 },
   tendencia: ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10'].map((mes) => ({
     mes,
@@ -174,6 +209,7 @@ const PANEL_EN_CERO: PanelArrendador = {
   pendientes: {
     comprobantes_por_validar: 0,
     mantenimientos_pendientes: 0,
+    solicitudes_abiertas: { total: 0, urgentes: 0 },
     contratos_por_vencer: { cantidad: 0, contratos: [] },
     incrementos_disponibles: { cantidad: 0, contratos: [] },
     terminaciones_por_confirmar: { cantidad: 0, contratos: [] },

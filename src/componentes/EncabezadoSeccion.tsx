@@ -5,8 +5,8 @@ import { Texto } from './Texto';
 
 interface Props {
   titulo: string;
-  /** Enlace a la derecha ("Ver todas"). */
-  enlace?: { etiqueta: string; onPress: () => void };
+  /** Enlace a la derecha ("Ver todas"). `etiquetaAccesible` es lo que lee el lector ("Agregar unidad"). */
+  enlace?: { etiqueta: string; onPress: () => void; etiquetaAccesible?: string };
 }
 
 /**
@@ -24,7 +24,7 @@ export function EncabezadoSeccion({ titulo, enlace }: Props) {
       {enlace ? (
         <Pressable
           accessibilityRole="link"
-          accessibilityLabel={enlace.etiqueta}
+          accessibilityLabel={enlace.etiquetaAccesible ?? enlace.etiqueta}
           onPress={enlace.onPress}
           style={estilos.enlace}
         >

@@ -6,9 +6,11 @@ import { claveCachePortada } from '../../inmuebles/claveImagen';
 import { colores, radios, tintaAlfa } from '../../tema';
 import { Icono, type NombreIcono } from '../iconos/Icono';
 import { MotivoCurvas } from '../motivo/MotivoCurvas';
+import { Texto } from '../Texto';
 import { ImagenAmpliable } from '../VisorImagen';
 
-export type VariantePortada = 'miniatura' | 'grande';
+/** miniatura 56 dp; tarjeta 150 dp de alto (lista de inmuebles, sin radio: lo pone la tarjeta); grande 200 dp. */
+export type VariantePortada = 'miniatura' | 'tarjeta' | 'grande';
 
 interface Props {
   /** URL firmada de la portada (expira en 1 hora), una imagen local de vista previa o null. */
@@ -29,6 +31,8 @@ interface Props {
   alFallarUrl?: () => void;
   /** Tocar la foto la abre a pantalla completa con zoom (solo si hay foto y se ve). */
   ampliable?: boolean;
+  /** Texto bajo el icono del marcador sin foto ("Sin foto"). */
+  textoSinFoto?: string;
 }
 
 /** Refrescos automáticos permitidos por portada: uno solo, para no entrar en bucle sin red. */
@@ -47,10 +51,11 @@ export function PortadaInmueble({
   descripcion,
   alFallarUrl,
   ampliable = false,
+  textoSinFoto,
 }: Props) {
   const [urlFallida, setUrlFallida] = useState<string | null>(null);
   const refrescos = useRef(0);
-  const grande = variante === 'grande';
+  const grande = variante !== 'miniatura';
   const mostrarImagen = url !== null && url !== urlFallida;
   const cacheKey = inmuebleId ? claveCachePortada(inmuebleId, url) : null;
 
@@ -66,7 +71,11 @@ export function PortadaInmueble({
     <View
       style={[
         estilos.base,
-        grande ? estilos.grande : estilos.miniatura,
+        variante === 'grande'
+          ? estilos.grande
+          : variante === 'tarjeta'
+            ? estilos.tarjeta
+            : estilos.miniatura,
         mostrarImagen ? estilos.cargando : estilos.marco,
       ]}
     >
@@ -85,6 +94,11 @@ export function PortadaInmueble({
         <View testID="portada-marcador" style={estilos.marcador}>
           <MotivoCurvas opacidad={grande ? 0.16 : 0.22} />
           <Icono nombre={icono} tamano={grande ? 40 : 24} color={colores.lima} grosor={1.7} />
+          {textoSinFoto ? (
+            <Texto variante="secundario" color={colores.sobreTinta} style={estilos.textoSinFoto}>
+              {textoSinFoto}
+            </Texto>
+          ) : null}
         </View>
       )}
     </View>
@@ -112,6 +126,8 @@ const estilos = StyleSheet.create({
   marco: { backgroundColor: colores.tinta },
   miniatura: { width: 56, height: 56, borderRadius: radios.medio, flexShrink: 0 },
   grande: { width: '100%', height: 200, borderRadius: radios.grande },
+  tarjeta: { width: '100%', height: 150 },
+  textoSinFoto: { marginTop: 6 },
   marcador: {
     ...StyleSheet.absoluteFill,
     overflow: 'hidden',

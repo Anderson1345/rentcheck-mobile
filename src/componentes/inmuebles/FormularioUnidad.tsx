@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRef, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 import { Controller, type Resolver, useForm, useWatch } from 'react-hook-form';
 import { StyleSheet, Switch, type TextInput, View } from 'react-native';
 
@@ -22,6 +22,7 @@ import {
 import { colores, espaciado } from '../../tema';
 import { Aviso } from '../Aviso';
 import { Boton } from '../Boton';
+import { PantallaPila } from '../PantallaPila';
 import { CampoDinero } from '../CampoDinero';
 import { CampoTexto } from '../CampoTexto';
 import { ControlSegmentado } from '../ControlSegmentado';
@@ -34,8 +35,22 @@ const OPCIONES_USO = [
   { valor: 'COMERCIAL', etiqueta: 'Comercial' },
 ] as const;
 
-type Props = { inmueble: Inmueble; onEditarInmueble: () => void } & (
-  | { modo: 'crear'; onCrear: (cuerpo: DatosCrearUnidad) => Promise<void> }
+type Props = {
+  inmueble: Inmueble;
+  onEditarInmueble: () => void;
+  /** Antes de los campos (avisos de la pantalla). */
+  encabezado?: ReactNode;
+  /** Después de los campos (foto, duplicar, eliminar). */
+  pie?: ReactNode;
+} & (
+  | {
+      modo: 'crear';
+      onCrear: (cuerpo: DatosCrearUnidad) => Promise<void>;
+      /** Duplicar (R2-A): los campos de otra unidad, con el nombre vacío. */
+      valoresIniciales?: ValoresUnidad;
+      /** Enfoca el nombre al abrir (al duplicar, es lo único que falta). */
+      enfocarNombre?: boolean;
+    }
   | {
       modo: 'editar';
       unidad: UnidadInmueble;
@@ -45,7 +60,8 @@ type Props = { inmueble: Inmueble; onEditarInmueble: () => void } & (
 );
 
 /**
- * Formulario de unidad (crear y editar). Residencial pide área, habitaciones, baños, ocupantes y
+ * Formulario de unidad (crear y editar), con su propia pantalla: el formulario es largo, así que el botón
+ * principal queda fijo abajo (`accionFija`). Residencial pide área, habitaciones, baños, ocupantes y
  * mascotas; Comercial los oculta (y no se envían). Dinero en centavos con CampoDinero.
  */
 export function FormularioUnidad(props: Props) {
@@ -69,7 +85,11 @@ export function FormularioUnidad(props: Props) {
     formState: { errors, isSubmitting },
   } = useForm<ValoresUnidad>({
     resolver: zodResolver(esquemaUnidad) as unknown as Resolver<ValoresUnidad>,
-    defaultValues: unidad ? valoresDeUnidad(unidad) : VALORES_UNIDAD_VACIOS,
+    defaultValues: unidad
+      ? valoresDeUnidad(unidad)
+      : props.modo === 'crear' && props.valoresIniciales
+        ? props.valoresIniciales
+        : VALORES_UNIDAD_VACIOS,
   });
   const uso = useWatch({ control, name: 'uso' });
   const residencial = uso === 'RESIDENCIAL';
@@ -108,190 +128,197 @@ export function FormularioUnidad(props: Props) {
     }
   }
 
+  const boton = (
+    <Boton
+      titulo={crear ? 'Crear unidad' : 'Guardar cambios'}
+      tituloCargando={crear ? 'Creando unidad…' : 'Guardando…'}
+      cargando={isSubmitting}
+      ancho="completo"
+      onPress={() => void enviar()}
+    />
+  );
+
   return (
-    <View style={estilos.formulario}>
-      {errorServidor ? (
-        <View style={estilos.grupo}>
-          <Aviso mensaje={errorServidor.mensaje} />
-          <DetalleTecnico detalle={errorServidor.detalle} />
-        </View>
-      ) : null}
-      {sinCambios ? <Aviso mensaje="No hiciste ningún cambio." tono="informacion" /> : null}
+    <PantallaPila accionFija={boton}>
+      {props.encabezado}
+      <View style={estilos.formulario}>
+        {errorServidor ? (
+          <View style={estilos.grupo}>
+            <Aviso mensaje={errorServidor.mensaje} />
+            <DetalleTecnico detalle={errorServidor.detalle} />
+          </View>
+        ) : null}
+        {sinCambios ? <Aviso mensaje="No hiciste ningún cambio." tono="informacion" /> : null}
 
-      <Controller
-        control={control}
-        name="nombre"
-        render={({ field }) => (
-          <CampoTexto
-            etiqueta="Nombre de la unidad"
-            valor={field.value}
-            onCambio={field.onChange}
-            onBlur={field.onBlur}
-            error={errors.nombre?.message}
-            keyboardType="default"
-            autoCapitalize="words"
-            returnKeyType="done"
-          />
-        )}
-      />
-
-      <Controller
-        control={control}
-        name="tipo"
-        render={({ field }) => (
-          <SelectorTipoUnidad
-            valor={field.value}
-            onCambio={(tipo) => {
-              field.onChange(tipo);
-              const sugerido = tipoSugeridoUso(tipo);
-              if (sugerido) setValue('uso', sugerido);
-            }}
-          />
-        )}
-      />
-
-      <View style={estilos.grupo}>
-        <Texto variante="etiqueta" color={colores.textoFuerte}>
-          Uso
-        </Texto>
         <Controller
           control={control}
-          name="uso"
+          name="nombre"
           render={({ field }) => (
-            <ControlSegmentado
-              opciones={OPCIONES_USO}
+            <CampoTexto
+              etiqueta="Nombre de la unidad"
               valor={field.value}
               onCambio={field.onChange}
+              onBlur={field.onBlur}
+              error={errors.nombre?.message}
+              keyboardType="default"
+              autoCapitalize="words"
+              returnKeyType="done"
+              autoFocus={props.modo === 'crear' && props.enfocarNombre === true}
             />
           )}
         />
-      </View>
 
-      <Controller
-        control={control}
-        name="canonCentavos"
-        render={({ field }) => (
-          <CampoDinero
-            etiqueta="Canon base"
-            valorCentavos={field.value}
-            onCambio={field.onChange}
-            error={errors.canonCentavos?.message}
-          />
-        )}
-      />
+        <Controller
+          control={control}
+          name="tipo"
+          render={({ field }) => (
+            <SelectorTipoUnidad
+              valor={field.value}
+              onCambio={(tipo) => {
+                field.onChange(tipo);
+                const sugerido = tipoSugeridoUso(tipo);
+                if (sugerido) setValue('uso', sugerido);
+              }}
+            />
+          )}
+        />
 
-      {avisarEstrato ? (
         <View style={estilos.grupo}>
-          <Aviso
-            tono="advertencia"
-            mensaje="Este inmueble no tiene estrato; edítalo para agregar una unidad residencial."
-          />
-          <Boton
-            titulo="Editar inmueble"
-            variante="secundario"
-            ancho="completo"
-            onPress={props.onEditarInmueble}
+          <Texto variante="etiqueta" color={colores.textoFuerte}>
+            Uso
+          </Texto>
+          <Controller
+            control={control}
+            name="uso"
+            render={({ field }) => (
+              <ControlSegmentado
+                opciones={OPCIONES_USO}
+                valor={field.value}
+                onCambio={field.onChange}
+              />
+            )}
           />
         </View>
-      ) : null}
 
-      {residencial ? (
-        <>
-          <Controller
-            control={control}
-            name="area"
-            render={({ field }) => (
-              <CampoTexto
-                etiqueta="Área (m²)"
-                valor={field.value}
-                onCambio={field.onChange}
-                onBlur={field.onBlur}
-                error={errors.area?.message}
-                inputRef={area}
-                keyboardType="decimal-pad"
-                returnKeyType="next"
-                onSubmitEditing={() => habitaciones.current?.focus()}
-              />
-            )}
-          />
-          <Controller
-            control={control}
-            name="habitaciones"
-            render={({ field }) => (
-              <CampoTexto
-                etiqueta="Habitaciones"
-                valor={field.value}
-                onCambio={field.onChange}
-                onBlur={field.onBlur}
-                error={errors.habitaciones?.message}
-                inputRef={habitaciones}
-                keyboardType="number-pad"
-                returnKeyType="next"
-                onSubmitEditing={() => banos.current?.focus()}
-              />
-            )}
-          />
-          <Controller
-            control={control}
-            name="banos"
-            render={({ field }) => (
-              <CampoTexto
-                etiqueta="Baños"
-                valor={field.value}
-                onCambio={field.onChange}
-                onBlur={field.onBlur}
-                error={errors.banos?.message}
-                inputRef={banos}
-                keyboardType="number-pad"
-                returnKeyType="next"
-                onSubmitEditing={() => ocupantes.current?.focus()}
-              />
-            )}
-          />
-          <Controller
-            control={control}
-            name="ocupantes"
-            render={({ field }) => (
-              <CampoTexto
-                etiqueta="Ocupantes máximos"
-                valor={field.value}
-                onCambio={field.onChange}
-                onBlur={field.onBlur}
-                error={errors.ocupantes?.message}
-                inputRef={ocupantes}
-                keyboardType="number-pad"
-                returnKeyType="done"
-              />
-            )}
-          />
-          <Controller
-            control={control}
-            name="mascotas"
-            render={({ field }) => (
-              <View style={estilos.interruptor}>
-                <Texto variante="cuerpoFuerte" style={estilos.textoInterruptor}>
-                  Acepta mascotas
-                </Texto>
-                <Switch
-                  accessibilityLabel="Acepta mascotas"
-                  value={field.value}
-                  onValueChange={field.onChange}
-                  trackColor={{ true: colores.tinta }}
+        <Controller
+          control={control}
+          name="canonCentavos"
+          render={({ field }) => (
+            <CampoDinero
+              etiqueta="Canon base"
+              valorCentavos={field.value}
+              onCambio={field.onChange}
+              error={errors.canonCentavos?.message}
+            />
+          )}
+        />
+
+        {avisarEstrato ? (
+          <View style={estilos.grupo}>
+            <Aviso
+              tono="advertencia"
+              mensaje="Este inmueble no tiene estrato; edítalo para agregar una unidad residencial."
+            />
+            <Boton
+              titulo="Editar inmueble"
+              variante="secundario"
+              ancho="completo"
+              onPress={props.onEditarInmueble}
+            />
+          </View>
+        ) : null}
+
+        {residencial ? (
+          <>
+            <Controller
+              control={control}
+              name="area"
+              render={({ field }) => (
+                <CampoTexto
+                  etiqueta="Área (m²)"
+                  valor={field.value}
+                  onCambio={field.onChange}
+                  onBlur={field.onBlur}
+                  error={errors.area?.message}
+                  inputRef={area}
+                  keyboardType="decimal-pad"
+                  returnKeyType="next"
+                  onSubmitEditing={() => habitaciones.current?.focus()}
                 />
-              </View>
-            )}
-          />
-        </>
-      ) : null}
-
-      <Boton
-        titulo={crear ? 'Crear unidad' : 'Guardar cambios'}
-        tituloCargando={crear ? 'Creando unidad…' : 'Guardando…'}
-        cargando={isSubmitting}
-        ancho="completo"
-        onPress={() => void enviar()}
-      />
-    </View>
+              )}
+            />
+            <Controller
+              control={control}
+              name="habitaciones"
+              render={({ field }) => (
+                <CampoTexto
+                  etiqueta="Habitaciones"
+                  valor={field.value}
+                  onCambio={field.onChange}
+                  onBlur={field.onBlur}
+                  error={errors.habitaciones?.message}
+                  inputRef={habitaciones}
+                  keyboardType="number-pad"
+                  returnKeyType="next"
+                  onSubmitEditing={() => banos.current?.focus()}
+                />
+              )}
+            />
+            <Controller
+              control={control}
+              name="banos"
+              render={({ field }) => (
+                <CampoTexto
+                  etiqueta="Baños"
+                  valor={field.value}
+                  onCambio={field.onChange}
+                  onBlur={field.onBlur}
+                  error={errors.banos?.message}
+                  inputRef={banos}
+                  keyboardType="number-pad"
+                  returnKeyType="next"
+                  onSubmitEditing={() => ocupantes.current?.focus()}
+                />
+              )}
+            />
+            <Controller
+              control={control}
+              name="ocupantes"
+              render={({ field }) => (
+                <CampoTexto
+                  etiqueta="Ocupantes máximos"
+                  valor={field.value}
+                  onCambio={field.onChange}
+                  onBlur={field.onBlur}
+                  error={errors.ocupantes?.message}
+                  inputRef={ocupantes}
+                  keyboardType="number-pad"
+                  returnKeyType="done"
+                />
+              )}
+            />
+            <Controller
+              control={control}
+              name="mascotas"
+              render={({ field }) => (
+                <View style={estilos.interruptor}>
+                  <Texto variante="cuerpoFuerte" style={estilos.textoInterruptor}>
+                    Acepta mascotas
+                  </Texto>
+                  <Switch
+                    accessibilityLabel="Acepta mascotas"
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    trackColor={{ true: colores.tinta }}
+                  />
+                </View>
+              )}
+            />
+          </>
+        ) : null}
+      </View>
+      {props.pie}
+    </PantallaPila>
   );
 }
 
