@@ -246,6 +246,83 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/arrendadores/panel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Panel del arrendador (mes actual de Bogotá)
+         * @description Todo lo que muestra el Panel en una sola respuesta de solo lectura: ingresos del mes, recaudo esperado frente al real (aprobado, en revisión y sin reportar), ocupación, cartera en mora, tendencia de ingresos de 6 meses y centro de pendientes. Todo se calcula al día de hoy en America/Bogota y solo con los datos del arrendador autenticado. No recibe parámetros.
+         */
+        get: operations["PanelArrendadorController_obtener"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/alertas/feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Feed de alertas del arrendador (paginado por cursor)
+         * @description Más recientes primero. `no_leidas` es el total de no leídas del arrendador, con o sin filtro. `recurso` dice a dónde navegar (pago, solicitud de mantenimiento, período o contrato).
+         */
+        get: operations["AlertaController_feed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/alertas/conteo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cuántas alertas sin leer tiene el arrendador */
+        get: operations["AlertaController_conteo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/alertas/leidas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Marcar como leídas todas las alertas del arrendador
+         * @description Solo las propias y solo las que seguían sin leer.
+         */
+        patch: operations["AlertaController_marcarTodasLeidas"];
+        trace?: never;
+    };
     "/alertas": {
         parameters: {
             query?: never;
@@ -253,7 +330,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Listar alertas del arrendador autenticado */
+        /**
+         * Listar alertas del arrendador autenticado
+         * @deprecated
+         * @description OBSOLETO: usar `GET /alertas/feed` (paginado, con contador y recurso). Se conserva sin cambios para clientes antiguos.
+         */
         get: operations["AlertaController_listar"];
         put?: never;
         post?: never;
@@ -278,6 +359,83 @@ export interface paths {
         head?: never;
         /** Marcar una alerta como leída */
         patch: operations["AlertaController_marcarComoLeida"];
+        trace?: never;
+    };
+    "/inquilino/alertas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Feed de alertas del inquilino (paginado por cursor)
+         * @description Más recientes primero. `no_leidas` es el total de no leídas del inquilino, con o sin filtro. `recurso` dice a dónde navegar (pago, solicitud de mantenimiento, período o contrato).
+         */
+        get: operations["AlertaInquilinoController_feed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inquilino/alertas/conteo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cuántas alertas sin leer tiene el inquilino */
+        get: operations["AlertaInquilinoController_conteo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/inquilino/alertas/leidas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Marcar como leídas todas las alertas del inquilino
+         * @description Solo las propias y solo las que seguían sin leer.
+         */
+        patch: operations["AlertaInquilinoController_marcarTodasLeidas"];
+        trace?: never;
+    };
+    "/inquilino/alertas/{id}/leida": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Marcar una alerta del inquilino como leída
+         * @description Idempotente: marcar una ya leída devuelve la misma alerta.
+         */
+        patch: operations["AlertaInquilinoController_marcarLeida"];
         trace?: never;
     };
     "/inmuebles": {
@@ -1503,6 +1661,229 @@ export interface components {
             telefono?: string;
             cedula?: string;
         };
+        RecaudoPanelDto: {
+            /**
+             * @description Suma del canon de los períodos cuya fecha límite cae en el mes (cada uno con el canon que regía entonces).
+             * @example 4000000
+             */
+            esperado_centavos: number;
+            /**
+             * @description Lo aprobado de esos períodos, sin pasar del canon de cada uno.
+             * @example 3400000
+             */
+            aprobado_centavos: number;
+            /**
+             * @description Lo que está pendiente de aprobación en períodos EN_REVISION, sin pasar del saldo del período.
+             * @example 600000
+             */
+            en_revision_centavos: number;
+            /**
+             * @description Lo que falta: esperado − aprobado − en revisión (incluye lo que aún no vence).
+             * @example 0
+             */
+            sin_reportar_centavos: number;
+            /**
+             * @description Contratos con al menos un período en el mes.
+             * @example 4
+             */
+            contratos: number;
+        };
+        OcupacionPanelDto: {
+            /**
+             * @description Todas las unidades de sus inmuebles, también la "Unidad principal" sin completar.
+             * @example 8
+             */
+            unidades: number;
+            /**
+             * @description Unidades con un contrato ACTIVO.
+             * @example 4
+             */
+            ocupadas: number;
+            /** @example 4 */
+            libres: number;
+            /**
+             * @description De las libres, las que ya tienen un contrato PROGRAMADO (no bloquea la unidad).
+             * @example 1
+             */
+            con_contrato_programado: number;
+        };
+        MoraPanelDto: {
+            /**
+             * @description Contratos con al menos un período VENCIDO o PARCIAL, en cualquier estado (también los ya cerrados).
+             * @example 2
+             */
+            contratos: number;
+            /**
+             * @description Períodos VENCIDO o PARCIAL; un período EN_REVISION no es mora.
+             * @example 4
+             */
+            periodos: number;
+            /**
+             * @description Suma de (canon del período − aprobado), nunca negativa.
+             * @example 3600000
+             */
+            total_centavos: number;
+        };
+        TendenciaMesDto: {
+            /** @example 2027-03 */
+            mes: string;
+            /**
+             * @description Pagos APROBADOS cuya fecha_reportada cae en ese mes.
+             * @example 3400000
+             */
+            ingresos_centavos: number;
+        };
+        ContratoPendienteDto: {
+            contrato_id: string;
+            /**
+             * @description Nombre de la unidad.
+             * @example Apto 101
+             */
+            unidad: string;
+            /**
+             * @description Dirección del inmueble.
+             * @example Calle 45 # 12-30
+             */
+            inmueble: string;
+            /** @example 2027-03-31 */
+            fecha_fin: string;
+        };
+        ContratosPorVencerPanelDto: {
+            /**
+             * @description Total real (la lista se limita a 5).
+             * @example 1
+             */
+            cantidad: number;
+            /** @description Los 5 que vencen primero, por fecha de fin ascendente. */
+            contratos: components["schemas"]["ContratoPendienteDto"][];
+        };
+        IncrementoDisponibleDto: {
+            contrato_id: string;
+            /** @example Apto 101 */
+            unidad: string;
+            /** @example Calle 45 # 12-30 */
+            inmueble: string;
+            /**
+             * @description 12 meses después del último incremento o del inicio del contrato.
+             * @example 2027-03-01
+             */
+            disponible_desde: string;
+            /**
+             * @description true si falta el IPC del año anterior: aplicar el incremento respondería 409 IPC_NO_CONFIGURADO.
+             * @example false
+             */
+            ipc_faltante: boolean;
+        };
+        IncrementosDisponiblesPanelDto: {
+            /** @example 1 */
+            cantidad: number;
+            /** @description Los 5 que lo tienen disponible desde hace más tiempo. */
+            contratos: components["schemas"]["IncrementoDisponibleDto"][];
+        };
+        TerminacionesPorConfirmarPanelDto: {
+            /** @example 1 */
+            cantidad: number;
+            contratos: components["schemas"]["ContratoPendienteDto"][];
+        };
+        PendientesPanelDto: {
+            /**
+             * @description Pagos en estado PENDIENTE de todos sus contratos.
+             * @example 2
+             */
+            comprobantes_por_validar: number;
+            /**
+             * @description Solicitudes de mantenimiento en estado PENDIENTE (no cuenta las EN_PROCESO).
+             * @example 2
+             */
+            mantenimientos_pendientes: number;
+            /** @description Contratos ACTIVO con fecha de fin entre hoy y dentro de 30 días. */
+            contratos_por_vencer: components["schemas"]["ContratosPorVencerPanelDto"];
+            /** @description Contratos ACTIVO con 12 meses cumplidos desde el último incremento (o el inicio): ya se puede aplicar uno. */
+            incrementos_disponibles: components["schemas"]["IncrementosDisponiblesPanelDto"];
+            /** @description Terminaciones anticipadas pedidas por el inquilino que el arrendador aún no confirma. */
+            terminaciones_por_confirmar: components["schemas"]["TerminacionesPorConfirmarPanelDto"];
+        };
+        PanelArrendadorDto: {
+            /**
+             * @description Mes actual de Bogotá.
+             * @example 2027-03
+             */
+            mes: string;
+            /** @example 2027-03-15 */
+            calculado_para: string;
+            /**
+             * @description Caja real del mes: suma de los pagos APROBADOS cuya fecha_reportada cae en el mes, sin tope por
+             *     canon. Puede diferir de `recaudo.aprobado_centavos`, que mira los períodos que vencen en el mes
+             *     y limita cada uno a su canon.
+             * @example 3400000
+             */
+            ingresos_mes_centavos: number;
+            /** @description Recaudo esperado frente al real de los períodos del mes: esperado = aprobado + en revisión + sin reportar. */
+            recaudo: components["schemas"]["RecaudoPanelDto"];
+            ocupacion: components["schemas"]["OcupacionPanelDto"];
+            /** @description Cartera en mora (de cualquier mes) calculada al día de hoy. */
+            mora: components["schemas"]["MoraPanelDto"];
+            /** @description Siempre 6 meses, del más antiguo al actual, con los ingresos (caja real) de cada uno. */
+            tendencia: components["schemas"]["TendenciaMesDto"][];
+            pendientes: components["schemas"]["PendientesPanelDto"];
+        };
+        /** @enum {string} */
+        TipoAlerta: "AJUSTE_IPC_PENDIENTE" | "INQUILINO_EN_MORA" | "CONTRATO_PROXIMO_A_VENCER" | "RECORDATORIO_PAGO_PROXIMO" | "SOLICITUD_MANTENIMIENTO_SIN_ATENDER" | "TERMINACION_ANTICIPADA_SOLICITADA" | "TERMINACION_ANTICIPADA_CANCELADA" | "TERMINACION_ANTICIPADA_CONFIRMADA" | "AVISO_NO_RENOVACION_DADO" | "AVISO_NO_RENOVACION_CANCELADO" | "CONTRATO_PRORROGADO_AUTOMATICAMENTE" | "CONTRATO_VINCULADO_POR_INQUILINO" | "PAGO_APROBADO" | "PAGO_RECHAZADO" | "PAGO_ANULADO" | "SOLICITUD_MANTENIMIENTO_CREADA" | "MANTENIMIENTO_CAMBIO_ESTADO" | "PRORROGA_APLICADA" | "INCREMENTO_APLICADO";
+        /** @enum {string} */
+        TipoRecursoAlerta: "PAGO" | "SOLICITUD_MANTENIMIENTO" | "PERIODO" | "CONTRATO";
+        AlertaRecursoDto: {
+            /** @example PAGO */
+            tipo: components["schemas"]["TipoRecursoAlerta"];
+            /**
+             * @description Id del recurso: el pago, la solicitud de mantenimiento o el contrato. Es null en `PERIODO` (un
+             *     período no tiene id propio: se abre con `contrato_id` + `periodo`).
+             */
+            id: string | null;
+            /**
+             * @description Contrato al que pertenece. Es siempre null en `SOLICITUD_MANTENIMIENTO` (la solicitud no guarda
+             *     contrato, B-74) y puede ser null en un `PAGO` sin contrato registrado en la alerta.
+             */
+            contrato_id: string | null;
+            /**
+             * @description Primer día del mes que cubre, `AAAA-MM-DD`. Siempre presente en `PERIODO`; en `PAGO` puede ser
+             *     null; no se envía en `SOLICITUD_MANTENIMIENTO` ni en `CONTRATO`.
+             * @example 2026-10-01
+             */
+            periodo?: string | null;
+        };
+        AlertaDto: {
+            id: string;
+            tipo: components["schemas"]["TipoAlerta"];
+            /** @example Tu pago de octubre fue aprobado. */
+            mensaje: string;
+            leida: boolean;
+            /** Format: date-time */
+            creado_en: string;
+            /** @description A dónde navegar; null si la alerta no apunta a nada. */
+            recurso: components["schemas"]["AlertaRecursoDto"] | null;
+        };
+        FeedAlertasDto: {
+            /** @description Más recientes primero. */
+            items: components["schemas"]["AlertaDto"][];
+            /** @description Cursor opaco para pedir la página siguiente; null si no hay más. */
+            siguiente_cursor: string | null;
+            /**
+             * @description Total de alertas no leídas del usuario, sin importar el filtro `leida` ni la página.
+             * @example 3
+             */
+            no_leidas: number;
+        };
+        ConteoAlertasDto: {
+            /** @example 3 */
+            no_leidas: number;
+        };
+        MarcadasDto: {
+            /**
+             * @description Cuántas alertas pasaron de no leída a leída en esta llamada.
+             * @example 3
+             */
+            marcadas: number;
+        };
         ActualizarInmuebleDto: {
             direccion?: string;
             ciudad?: string;
@@ -2374,6 +2755,125 @@ export interface operations {
             };
         };
     };
+    PanelArrendadorController_obtener: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description El Panel del arrendador. Dinero en centavos; fechas de día `AAAA-MM-DD`; meses `AAAA-MM`. Un arrendador sin datos recibe todo en cero y la tendencia con sus 6 meses. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PanelArrendadorDto"];
+                };
+            };
+            /** @description Sin sesión, con un token vencido o de otro rol. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AlertaController_feed: {
+        parameters: {
+            query?: {
+                /** @description Solo leídas (`true`) o solo no leídas (`false`). Sin él, todas. No cambia `no_leidas`. */
+                leida?: boolean;
+                /** @description Alertas por página (1 a 50). */
+                limite?: number;
+                /** @description Cursor opaco: el `siguiente_cursor` de la página anterior. Uno inválido responde 400. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedAlertasDto"];
+                };
+            };
+            /** @description 400 VALIDACION: `limite` fuera de 1 a 50, `leida` que no es booleano o `cursor` inválido. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Sin sesión, con un token vencido o de otro rol. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AlertaController_conteo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConteoAlertasDto"];
+                };
+            };
+            /** @description Sin sesión, con un token vencido o de otro rol. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AlertaController_marcarTodasLeidas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarcadasDto"];
+                };
+            };
+            /** @description Sin sesión, con un token vencido o de otro rol. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AlertaController_listar: {
         parameters: {
             query?: {
@@ -2414,6 +2914,133 @@ export interface operations {
                 content?: never;
             };
             /** @description Alerta no encontrada o no pertenece al arrendador. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AlertaInquilinoController_feed: {
+        parameters: {
+            query?: {
+                /** @description Solo leídas (`true`) o solo no leídas (`false`). Sin él, todas. No cambia `no_leidas`. */
+                leida?: boolean;
+                /** @description Alertas por página (1 a 50). */
+                limite?: number;
+                /** @description Cursor opaco: el `siguiente_cursor` de la página anterior. Uno inválido responde 400. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedAlertasDto"];
+                };
+            };
+            /** @description 400 VALIDACION: `limite` fuera de 1 a 50, `leida` que no es booleano o `cursor` inválido. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Sin sesión, con un token vencido o de otro rol. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AlertaInquilinoController_conteo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConteoAlertasDto"];
+                };
+            };
+            /** @description Sin sesión, con un token vencido o de otro rol. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AlertaInquilinoController_marcarTodasLeidas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarcadasDto"];
+                };
+            };
+            /** @description Sin sesión, con un token vencido o de otro rol. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AlertaInquilinoController_marcarLeida: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertaDto"];
+                };
+            };
+            /** @description Sin sesión, con un token vencido o de otro rol. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Alerta inexistente o de otro usuario (no se distingue). */
             404: {
                 headers: {
                     [name: string]: unknown;
