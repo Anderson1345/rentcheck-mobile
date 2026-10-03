@@ -47,10 +47,13 @@ export function TituloCabecera({
   titulo,
   subtitulo,
   onVolver,
+  accion,
 }: {
   titulo: string;
   subtitulo?: string;
   onVolver?: () => void;
+  /** Ranura derecha de la fila (p. ej. la campana de alertas). */
+  accion?: ReactNode;
 }) {
   return (
     <View style={estilos.filaTitulo}>
@@ -73,6 +76,7 @@ export function TituloCabecera({
           </Texto>
         ) : null}
       </View>
+      {accion}
     </View>
   );
 }

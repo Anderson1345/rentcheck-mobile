@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CampanaAlertas } from '@/componentes/alertas/CampanaAlertas';
 import { Boton } from '@/componentes/Boton';
 import { CabeceraTinta, ContenidoBajoCabecera, TituloCabecera } from '@/componentes/CabeceraTinta';
 import { EsqueletoCarga } from '@/componentes/EsqueletoCarga';
@@ -40,7 +41,7 @@ export default function MiPanel() {
   return (
     <View style={estilos.pantalla}>
       <CabeceraTinta conSolapa>
-        <TituloCabecera titulo="Mi panel" />
+        <TituloCabecera titulo="Mi panel" accion={<CampanaAlertas rol="inquilino" />} />
         {contrato ? <SelectorContrato contrato={contrato} /> : null}
       </CabeceraTinta>
       <ContenidoBajoCabecera style={estilos.cuerpo}>
