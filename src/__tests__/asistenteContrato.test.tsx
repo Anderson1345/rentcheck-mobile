@@ -585,9 +585,7 @@ describe('Asistente: correcciones de E4-A', () => {
     await irAFechas(raiz);
     // Solo el campo de inicio: la fecha de fin por defecto (hoy + 12 meses) puede coincidir con el
     // día siguiente al fin del contrato ocupado ("1 de octubre de 2027") según el día en que se corra.
-    expect(textoDeCampoFecha(raiz, 'Fecha de inicio')).toBe(
-      `Fecha de inicio|${formatearFechaLarga(HOY)}`,
-    );
+    expect(textoDeCampoFecha(raiz, 'Fecha de inicio')).toBe(formatearFechaLarga(HOY));
     expect(textoDeCampoFecha(raiz, 'Fecha de inicio')).not.toContain('1 de octubre de 2027');
   });
 
@@ -627,8 +625,8 @@ describe('Asistente: correcciones de E4-A', () => {
       await pulsar(raiz, 'Local 1');
       await pulsar(raiz, 'Apto 302');
       await irAFechas(raiz);
-      expect(textoDeCampoFecha(raiz, 'Fecha de inicio')).toBe(`Fecha de inicio|${inicio}`);
-      expect(textoDeCampoFecha(raiz, 'Fecha de fin')).toBe(`Fecha de fin|${fin}`);
+      expect(textoDeCampoFecha(raiz, 'Fecha de inicio')).toBe(inicio);
+      expect(textoDeCampoFecha(raiz, 'Fecha de fin')).toBe(fin);
     });
   });
 
@@ -939,7 +937,8 @@ describe('Contrato creado', () => {
     datos.detalle = DETALLE;
     const { raiz } = await montarCreado();
     const textos = textosDe(raiz);
-    expect(textos).toContain('Contrato creado');
+    // U8: el título lo pone el encabezado de la pila; el cuerpo no lo repite.
+    expect(textos).not.toContain('Contrato creado');
     expect(textos).toContain('Activo');
     expect(textos).toContain('Apto 302');
     expect(textos).toContain('Camilo Pardo');

@@ -3,10 +3,12 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import type { BorradorContrato } from '../../contratos/esquemas';
-import { colores, espaciado, radios, tintaAlfa } from '../../tema';
+import { colores, espaciado } from '../../tema';
 import { compararFechas, formatearFechaLarga } from '../../utilidades/fechas';
 import { Aviso } from '../Aviso';
 import { Boton } from '../Boton';
+import { estilosCampo } from '../CampoTexto';
+import { Icono } from '../iconos/Icono';
 import { Texto } from '../Texto';
 
 type Errores = Partial<Record<keyof BorradorContrato, string>>;
@@ -58,20 +60,26 @@ export function SelectorFecha({
     if (evento.type === 'set' && fecha) onCambio(textoDeFechaElegida(fecha));
   };
   return (
-    <View style={estilos.campo}>
+    <View style={estilosCampo.contenedor}>
+      <Texto variante="etiqueta" color={colores.textoFuerte}>
+        {etiqueta}
+      </Texto>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={etiqueta}
         onPress={() => setAbierto(true)}
-        style={[estilos.caja, error ? estilos.conError : null]}
+        style={[estilosCampo.caja, estilos.cajaFecha, error ? estilosCampo.conError : null]}
       >
-        <Texto variante="etiqueta" color={colores.textoSecundario}>
-          {etiqueta}
-        </Texto>
-        <Texto variante="cuerpoFuerte">{valor ? formatearFechaLarga(valor) : 'Elegir fecha'}</Texto>
+        <Texto variante="cuerpo">{valor ? formatearFechaLarga(valor) : 'Elegir fecha'}</Texto>
+        <Icono nombre="calendario" tamano={22} color={colores.textoSecundario} grosor={1.7} />
       </Pressable>
       {error ? (
-        <Texto variante="secundario" color={colores.peligroTexto}>
+        <Texto
+          variante="secundario"
+          color={colores.peligroTexto}
+          accessibilityLiveRegion="polite"
+          style={estilosCampo.ayuda}
+        >
           {error}
         </Texto>
       ) : null}
@@ -141,15 +149,8 @@ export function PasoFechas({ valores, errores, hoy, cambiar }: Props) {
 
 const estilos = StyleSheet.create({
   grupo: { gap: espaciado.sm },
-  campo: { gap: espaciado.xxs },
-  caja: {
-    minHeight: 64,
-    borderRadius: radios.medio,
-    backgroundColor: tintaAlfa(0.05),
-    paddingHorizontal: espaciado.md,
-    paddingVertical: espaciado.xs,
-    justifyContent: 'center',
-  },
-  conError: { boxShadow: `0 0 0 2px ${colores.peligroTexto}` },
+  // La caja es la de los demás campos (etiqueta fuera, 56 dp, borde fino); aquí el valor y el calendario
+  // van en los extremos.
+  cajaFecha: { justifyContent: 'space-between' },
   atajos: { flexDirection: 'row', flexWrap: 'wrap', gap: espaciado.xs },
 });

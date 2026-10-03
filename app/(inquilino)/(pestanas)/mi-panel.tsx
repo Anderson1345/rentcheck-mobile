@@ -46,6 +46,7 @@ export default function MiPanel() {
       </CabeceraTinta>
       <ContenidoBajoCabecera style={estilos.cuerpo}>
         <ScrollView
+          showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           refreshControl={<RefreshControl refreshing={refrescando} onRefresh={arrastrar} />}
           contentContainerStyle={[estilos.contenido, { paddingBottom: bottom + espaciado.xl }]}

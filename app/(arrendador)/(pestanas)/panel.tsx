@@ -33,6 +33,7 @@ export default function PanelArrendador() {
 
   return (
     <ScrollView
+      showsVerticalScrollIndicator={false}
       style={estilos.pantalla}
       refreshControl={<RefreshControl refreshing={refrescando} onRefresh={arrastrar} />}
       contentContainerStyle={{ paddingBottom: bottom + espaciado.xl }}

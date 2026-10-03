@@ -83,9 +83,6 @@ export default function ProrrogaContrato() {
 
         return (
           <View style={estilos.grupo}>
-            <Texto variante="titulo" accessibilityRole="header">
-              Prórroga
-            </Texto>
             <OpcionesRadio opciones={OPCIONES} valor={opcion} onCambio={setOpcion} />
             {opcion === 'otro' ? (
               <CampoTexto

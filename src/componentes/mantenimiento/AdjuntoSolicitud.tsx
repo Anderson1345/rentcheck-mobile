@@ -6,7 +6,7 @@
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useRef, useState } from 'react';
-import { Modal, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import type { TipoAdjunto } from '../../api/mantenimiento';
 import { colores, espaciado, radios, tintaAlfa } from '../../tema';
@@ -14,6 +14,7 @@ import { descargarYCompartir } from '../../utilidades/documentos';
 import { Aviso } from '../Aviso';
 import { Boton } from '../Boton';
 import { Texto } from '../Texto';
+import { VisorImagen } from '../VisorImagen';
 
 export interface AdjuntoFresco {
   adjunto_url: string | null;
@@ -176,15 +177,23 @@ export function AdjuntoSolicitud({ solicitudId, tipo, url, obtenerFresco }: Prop
       {tipoActual === 'IMAGEN' ? (
         <>
           {urlImagen ? (
-            <Image
-              source={{ uri: urlImagen }}
-              contentFit="cover"
-              cachePolicy="memory"
-              accessibilityLabel="Foto de la solicitud"
-              accessible
-              onError={() => void alFallarImagen()}
-              style={estilos.vistaPrevia}
-            />
+            // Tocar la foto la amplía igual que "Ampliar" (con la URL recién pedida).
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Ampliar foto de la solicitud"
+              disabled={trabajando}
+              onPress={() => void ampliar()}
+            >
+              <Image
+                source={{ uri: urlImagen }}
+                contentFit="cover"
+                cachePolicy="memory"
+                accessibilityLabel="Foto de la solicitud"
+                accessible
+                onError={() => void alFallarImagen()}
+                style={estilos.vistaPrevia}
+              />
+            </Pressable>
           ) : null}
           <Boton
             titulo="Ampliar"
@@ -219,27 +228,14 @@ export function AdjuntoSolicitud({ solicitudId, tipo, url, obtenerFresco }: Prop
         />
       )}
 
-      <Modal visible={ampliada} animationType="fade" onRequestClose={() => setAmpliada(false)}>
-        <View style={estilos.modal}>
-          {urlImagen ? (
-            <Image
-              source={{ uri: urlImagen }}
-              contentFit="contain"
-              cachePolicy="memory"
-              accessibilityLabel="Foto de la solicitud"
-              accessible
-              onError={() => void alFallarImagen()}
-              style={estilos.imagenAmpliada}
-            />
-          ) : null}
-          <Boton
-            titulo="Cerrar"
-            variante="sobreTinta"
-            ancho="completo"
-            onPress={() => setAmpliada(false)}
-          />
-        </View>
-      </Modal>
+      <VisorImagen
+        visible={ampliada}
+        uri={urlImagen}
+        descripcion="Foto de la solicitud"
+        cachePolicy="memory"
+        onCerrar={() => setAmpliada(false)}
+        onError={() => void alFallarImagen()}
+      />
     </View>
   );
 }
@@ -253,12 +249,4 @@ const estilos = StyleSheet.create({
     backgroundColor: tintaAlfa(0.06),
   },
   video: { width: '100%', height: 220, borderRadius: radios.medio, backgroundColor: colores.tinta },
-  modal: {
-    flex: 1,
-    backgroundColor: colores.tinta,
-    padding: espaciado.md,
-    paddingTop: espaciado.xxl,
-    gap: espaciado.md,
-  },
-  imagenAmpliada: { flex: 1, width: '100%' },
 });

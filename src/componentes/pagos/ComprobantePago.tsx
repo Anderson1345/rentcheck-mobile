@@ -4,13 +4,14 @@
 
 import { Image } from 'expo-image';
 import { useRef, useState } from 'react';
-import { Modal, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { descargarYCompartir } from '../../utilidades/documentos';
 import { colores, espaciado, radios, tintaAlfa } from '../../tema';
 import { Aviso } from '../Aviso';
 import { Boton } from '../Boton';
 import { Texto } from '../Texto';
+import { VisorImagen } from '../VisorImagen';
 
 export type TipoComprobante = 'IMAGEN' | 'PDF' | null;
 
@@ -127,15 +128,23 @@ export function ComprobantePago({ pagoId, tipo, url, obtenerFresco, vistaPrevia 
 
       {esImagen && urlImagen ? (
         <>
-          <Image
-            source={{ uri: urlImagen }}
-            contentFit="cover"
-            cachePolicy="memory"
-            accessibilityLabel="Comprobante del pago"
-            accessible
-            onError={() => void alFallarImagen()}
-            style={estilos.vistaPrevia}
-          />
+          {/* Tocar la imagen la amplía igual que "Ampliar" (con la URL recién pedida). */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Ampliar comprobante"
+            disabled={trabajando}
+            onPress={() => void verImagen(true)}
+          >
+            <Image
+              source={{ uri: urlImagen }}
+              contentFit="cover"
+              cachePolicy="memory"
+              accessibilityLabel="Comprobante del pago"
+              accessible
+              onError={() => void alFallarImagen()}
+              style={estilos.vistaPrevia}
+            />
+          </Pressable>
           <Boton
             titulo="Ampliar"
             variante="secundario"
@@ -164,27 +173,14 @@ export function ComprobantePago({ pagoId, tipo, url, obtenerFresco, vistaPrevia 
         />
       )}
 
-      <Modal visible={ampliada} animationType="fade" onRequestClose={() => setAmpliada(false)}>
-        <View style={estilos.modal}>
-          {urlImagen ? (
-            <Image
-              source={{ uri: urlImagen }}
-              contentFit="contain"
-              cachePolicy="memory"
-              accessibilityLabel="Comprobante del pago"
-              accessible
-              onError={() => void alFallarImagen()}
-              style={estilos.imagenAmpliada}
-            />
-          ) : null}
-          <Boton
-            titulo="Cerrar"
-            variante="sobreTinta"
-            ancho="completo"
-            onPress={() => setAmpliada(false)}
-          />
-        </View>
-      </Modal>
+      <VisorImagen
+        visible={ampliada}
+        uri={urlImagen}
+        descripcion="Comprobante del pago"
+        cachePolicy="memory"
+        onCerrar={() => setAmpliada(false)}
+        onError={() => void alFallarImagen()}
+      />
     </View>
   );
 }
@@ -197,12 +193,4 @@ const estilos = StyleSheet.create({
     borderRadius: radios.medio,
     backgroundColor: tintaAlfa(0.06),
   },
-  modal: {
-    flex: 1,
-    backgroundColor: colores.tinta,
-    padding: espaciado.md,
-    paddingTop: espaciado.xxl,
-    gap: espaciado.md,
-  },
-  imagenAmpliada: { flex: 1, width: '100%' },
 });

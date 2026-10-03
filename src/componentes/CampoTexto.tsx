@@ -1,4 +1,4 @@
-import { type RefObject, useState } from 'react';
+import { type ReactNode, type RefObject, useState } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -9,16 +9,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import {
-  alturas,
-  cifras,
-  colores,
-  espaciado,
-  radios,
-  sombras,
-  tintaAlfa,
-  tipografia,
-} from '../tema';
+import { alturas, cifras, colores, fuentes, radios, sombras, tintaAlfa } from '../tema';
 import { Texto } from './Texto';
 
 interface Props extends Pick<
@@ -36,28 +27,32 @@ interface Props extends Pick<
   valor: string;
   onCambio: (texto: string) => void;
   onBlur?: () => void;
-  /** Texto de ayuda debajo. */
+  /** Texto de ayuda debajo de la caja. */
   ayuda?: string;
-  /** Mensaje de error debajo; reemplaza a la ayuda. */
+  /** Mensaje de error debajo de la caja; reemplaza a la ayuda. */
   error?: string;
-  /** Campo de contraseña: oculta el texto y muestra el botón "Mostrar" / "Ocultar". */
+  /** Campo de contraseña: oculta el texto y muestra "Mostrar" / "Ocultar" dentro de la caja, a la derecha. */
   contrasena?: boolean;
+  /** Texto fijo dentro de la caja, a la izquierda del valor ("+57"). */
+  prefijo?: string;
+  /** Acción a la derecha, dentro de la caja (un botón de texto). La entrada ocupa lo que sobra. */
+  accion?: ReactNode;
+  /** A la derecha de la etiqueta, en su misma fila ("¿La olvidaste?"). */
+  etiquetaDerecha?: ReactNode;
   /** Referencia para pasar el foco al siguiente campo. */
   inputRef?: RefObject<TextInput | null>;
   style?: StyleProp<ViewStyle>;
 }
 
-/** Espacio a la derecha que reserva el botón "Mostrar" / "Ocultar". */
-const ANCHO_ALTERNAR = 92;
-
 /**
- * Campo de texto del sistema Medianoche: etiqueta flotante, mismo alto, radio y foco que
- * CampoDinero. No corrige ni recorta lo que escribe la persona (eso lo hace el esquema).
+ * Campo de texto del sistema Medianoche (R1, U1): la etiqueta va FUERA de la caja, arriba (14 sp negrita,
+ * textoFuerte, 8 dp de separación); la caja mide 56 dp con borde fino y fondo superficie; la ayuda y el
+ * error van debajo. El foco solo cambia el borde (2 dp de tintaCapa más el anillo lima). No corrige ni
+ * recorta lo que escribe la persona (eso lo hace el esquema).
  *
- * El TextInput ocupa SIEMPRE el mismo lugar de la caja, visible: cualquier toque sobre el campo
- * cae directamente en él. Solo la etiqueta (un texto que no recibe toques) se mueve al enfocar o
- * escribir. Cambiar la disposición del TextInput al enfocarlo hacía que Android perdiera el foco
- * y lo diera al primer campo del formulario.
+ * El TextInput ocupa SIEMPRE el mismo lugar de la caja y nunca se vuelve a montar: cualquier toque
+ * sobre el campo cae directamente en él. Cambiar su disposición al enfocarlo hacía que Android
+ * perdiera el foco y lo diera al primer campo del formulario; por eso aquí solo cambia el borde.
  */
 export function CampoTexto({
   etiqueta,
@@ -67,25 +62,34 @@ export function CampoTexto({
   ayuda,
   error,
   contrasena = false,
+  prefijo,
+  accion,
+  etiquetaDerecha,
   inputRef,
   style,
   ...entrada
 }: Props) {
   const [enfocado, setEnfocado] = useState(false);
   const [visible, setVisible] = useState(false);
-  const flotante = enfocado || valor !== '';
   const oculto = contrasena && !visible;
 
   return (
     <View style={[estilos.contenedor, style]}>
+      <View style={estilos.filaEtiqueta}>
+        <Texto variante="etiqueta" color={colores.textoFuerte}>
+          {etiqueta}
+        </Texto>
+        {etiquetaDerecha}
+      </View>
       <View
-        style={[
-          estilos.caja,
-          flotante ? estilos.cajaLlena : estilos.cajaVacia,
-          enfocado && estilos.enfocado,
-          error ? estilos.conError : null,
-        ]}
+        testID="campo-caja"
+        style={[estilos.caja, enfocado && estilos.enfocado, error ? estilos.conError : null]}
       >
+        {prefijo ? (
+          <Texto variante="cuerpo" color={colores.textoSecundario} style={estilos.prefijo}>
+            {prefijo}
+          </Texto>
+        ) : null}
         <TextInput
           {...entrada}
           ref={inputRef}
@@ -102,38 +106,31 @@ export function CampoTexto({
           accessibilityLabel={etiqueta}
           cursorColor={colores.tintaCapa}
           selectionColor={colores.lima}
-          style={[
-            tipografia.valorGrande,
-            contrasena ? null : cifras,
-            estilos.entrada,
-            contrasena && estilos.entradaConAlternar,
-          ]}
+          style={[estilos.entrada, contrasena ? null : cifras]}
         />
-        <View pointerEvents="none" style={estilos.zonaEtiqueta}>
-          <Texto
-            variante={flotante ? 'etiqueta' : 'cuerpo'}
-            color={enfocado ? colores.tintaCapa : colores.textoSecundario}
-            style={flotante ? estilos.etiquetaArriba : estilos.etiquetaCentro}
-          >
-            {etiqueta}
-          </Texto>
-        </View>
         {contrasena ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'}
             onPress={() => setVisible((actual) => !actual)}
             hitSlop={8}
-            style={estilos.alternar}
+            style={estilos.accion}
           >
             <Texto variante="etiqueta" color={colores.tintaCapa}>
               {visible ? 'Ocultar' : 'Mostrar'}
             </Texto>
           </Pressable>
-        ) : null}
+        ) : (
+          accion
+        )}
       </View>
       {error ? (
-        <Texto variante="secundario" color={colores.peligroTexto} style={estilos.ayuda}>
+        <Texto
+          variante="secundario"
+          color={colores.peligroTexto}
+          accessibilityLiveRegion="polite"
+          style={estilos.ayuda}
+        >
           {error}
         </Texto>
       ) : ayuda ? (
@@ -145,35 +142,46 @@ export function CampoTexto({
   );
 }
 
-const estilos = StyleSheet.create({
-  contenedor: { gap: 6 },
-  caja: { height: alturas.campo, borderRadius: radios.medio },
-  cajaVacia: { backgroundColor: tintaAlfa(0.05) },
-  cajaLlena: { backgroundColor: colores.superficie, boxShadow: `0 0 0 1px ${tintaAlfa(0.12)}` },
+export const estilosCampo = StyleSheet.create({
+  contenedor: { gap: 8 },
+  filaEtiqueta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  caja: {
+    minHeight: alturas.campo,
+    height: alturas.campo,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    borderRadius: radios.medio,
+    backgroundColor: colores.superficie,
+    boxShadow: `0 0 0 1px ${tintaAlfa(0.14)}`,
+  },
   enfocado: { boxShadow: sombras.campoEnfocado },
   conError: { boxShadow: `0 0 0 2px ${colores.peligroTexto}` },
+  ayuda: { paddingLeft: 4 },
+});
+
+const estilos = StyleSheet.create({
+  ...estilosCampo,
+  prefijo: { fontFamily: fuentes.negrita },
   entrada: {
-    position: 'absolute',
-    left: espaciado.md,
-    right: espaciado.md,
-    top: 24,
-    height: 36,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
     padding: 0,
     margin: 0,
+    height: alturas.campo - 4,
+    fontFamily: fuentes.regular,
+    fontSize: 16,
     color: colores.texto,
   },
-  entradaConAlternar: { right: ANCHO_ALTERNAR },
-  zonaEtiqueta: { ...StyleSheet.absoluteFill, paddingHorizontal: espaciado.md },
-  etiquetaCentro: { position: 'absolute', top: 19 },
-  etiquetaArriba: { position: 'absolute', top: 7 },
-  alternar: {
-    position: 'absolute',
-    right: 4,
-    top: 10,
+  // Dentro de la caja, a la derecha del texto: el margen negativo compensa el relleno de la caja para
+  // que el área táctil (44 dp) quede pegada al borde sin encimarse con lo escrito.
+  accion: {
     minWidth: 76,
     minHeight: 44,
+    marginRight: -8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ayuda: { paddingLeft: 4 },
 });

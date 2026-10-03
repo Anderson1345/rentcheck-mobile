@@ -44,6 +44,7 @@ import { EstadoMensaje } from '../EstadoMensaje';
 import { Icono } from '../iconos/Icono';
 import { Superficie } from '../Superficie';
 import { Texto } from '../Texto';
+import { ImagenAmpliable } from '../VisorImagen';
 
 const ESTADO_PAGO = { al_dia: 'AL_DIA', en_mora: 'EN_MORA', pendiente: 'PENDIENTE' } as const;
 
@@ -357,17 +358,23 @@ function FotoEntrega({ foto }: { foto: FotoInventario }) {
   return (
     <View style={estilos.foto}>
       {url ? (
-        <Image
-          source={{
-            uri: url,
-            cacheKey: claveCachePortada(`inventario:${foto.id}`, url) ?? undefined,
-          }}
-          contentFit="cover"
-          accessibilityLabel={`Foto de entrega: ${foto.zona}`}
-          accessible
+        <ImagenAmpliable
+          uri={url}
+          descripcion={`Foto de entrega: ${foto.zona}`}
           onError={() => setFallida(true)}
-          style={estilos.imagen}
-        />
+        >
+          <Image
+            source={{
+              uri: url,
+              cacheKey: claveCachePortada(`inventario:${foto.id}`, url) ?? undefined,
+            }}
+            contentFit="cover"
+            accessibilityLabel={`Foto de entrega: ${foto.zona}`}
+            accessible
+            onError={() => setFallida(true)}
+            style={estilos.imagen}
+          />
+        </ImagenAmpliable>
       ) : (
         <View style={[estilos.imagen, estilos.sinFoto]}>
           <Texto variante="secundario" color={colores.textoSecundario}>

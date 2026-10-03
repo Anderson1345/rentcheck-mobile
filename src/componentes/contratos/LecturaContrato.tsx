@@ -218,9 +218,6 @@ export function FilaPeriodo({
 export function VistaEstadoCuenta({ data }: { data: EstadoCuenta }) {
   return (
     <>
-      <Texto variante="titulo" accessibilityRole="header">
-        Estado de cuenta
-      </Texto>
       <Superficie style={estilos.encabezado}>
         <Texto variante="etiqueta" color={colores.textoSecundario}>
           Estado de pago

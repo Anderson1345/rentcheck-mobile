@@ -60,9 +60,6 @@ function Contenido({ contrato }: { contrato: ContratoInquilinoDetalle }) {
   const t = contrato.terminacion_anticipada;
   return (
     <View style={estilos.grupo}>
-      <Texto variante="titulo" accessibilityRole="header">
-        Terminación anticipada
-      </Texto>
       <AvisosContrato aviso={undefined} terminacion={t} />
       {t.estado === 'NINGUNA' ? (
         <Texto variante="cuerpo" color={colores.textoSecundario}>
@@ -89,9 +86,6 @@ function FormularioSolicitud({ id }: { id: string }) {
   if (accion.fase === 'exito') {
     return (
       <View style={estilos.grupo}>
-        <Texto variante="titulo" accessibilityRole="header">
-          Terminación anticipada
-        </Texto>
         <Aviso tono="exito" mensaje="Solicitud enviada. La otra parte debe confirmarla." />
         <Boton titulo="Listo" ancho="completo" onPress={() => router.back()} />
       </View>

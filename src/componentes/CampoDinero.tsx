@@ -1,17 +1,9 @@
 import { useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
-import {
-  alturas,
-  cifras,
-  colores,
-  espaciado,
-  radios,
-  sombras,
-  tintaAlfa,
-  tipografia,
-} from '../tema';
+import { cifras, colores, fuentes } from '../tema';
 import { centavosAPesosTexto, pesosTextoACentavos } from '../utilidades/dinero';
+import { estilosCampo } from './CampoTexto';
 import { Texto } from './Texto';
 
 interface Props {
@@ -19,13 +11,10 @@ interface Props {
   /** Valor en centavos (entero) o null si está vacío. */
   valorCentavos: number | null;
   onCambio: (centavos: number | null) => void;
-  /** Texto de ayuda debajo ("Valor del período: $ 1.850.000"). */
+  /** Texto de ayuda debajo de la caja ("Saldo del período: $ 1.850.000"). */
   ayuda?: string;
   error?: string;
 }
-
-/** Ancho que se reserva al prefijo "$" a la izquierda del texto. */
-const ANCHO_PREFIJO = 16;
 
 /** Centavos → texto del campo sin el "$" ("1.850.000"). */
 function aTextoCampo(centavos: number | null): string {
@@ -34,16 +23,14 @@ function aTextoCampo(centavos: number | null): string {
 }
 
 /**
- * Campo de dinero: etiqueta flotante, prefijo "$" y teclado numérico. Solo admite pesos enteros
- * (el diseño no tiene centavos); el texto se convierte a centavos con utilidades/dinero.ts.
- *
- * Igual que CampoTexto, el TextInput ocupa siempre el mismo lugar y está visible: solo la
- * etiqueta y el "$" (textos que no reciben toques) cambian al enfocar o escribir.
+ * Campo de dinero (R1): misma estructura que CampoTexto (etiqueta fuera, ayuda y error debajo), con el
+ * prefijo "$" dentro de la caja, en la misma fila y centrado con el valor (20 sp extranegrita, cifras de
+ * ancho fijo) y teclado numérico. Solo admite pesos enteros; el texto se convierte a centavos con
+ * utilidades/dinero.ts. El TextInput no cambia de lugar ni se vuelve a montar al enfocar.
  */
 export function CampoDinero({ etiqueta, valorCentavos, onCambio, ayuda, error }: Props) {
   const [enfocado, setEnfocado] = useState(false);
   const texto = aTextoCampo(valorCentavos);
-  const flotante = enfocado || texto !== '';
 
   function alEscribir(nuevo: string) {
     const digitos = nuevo.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
@@ -57,15 +44,23 @@ export function CampoDinero({ etiqueta, valorCentavos, onCambio, ayuda, error }:
   }
 
   return (
-    <View style={estilos.contenedor}>
+    <View style={estilosCampo.contenedor}>
+      <View style={estilosCampo.filaEtiqueta}>
+        <Texto variante="etiqueta" color={colores.textoFuerte}>
+          {etiqueta}
+        </Texto>
+      </View>
       <View
+        testID="campo-caja"
         style={[
-          estilos.caja,
-          flotante ? estilos.cajaLlena : estilos.cajaVacia,
-          enfocado && estilos.enfocado,
-          error ? estilos.conError : null,
+          estilosCampo.caja,
+          enfocado && estilosCampo.enfocado,
+          error ? estilosCampo.conError : null,
         ]}
       >
+        <Texto variante="valorGrande" color={colores.textoSecundario} style={estilos.prefijo}>
+          $
+        </Texto>
         <TextInput
           value={texto}
           onChangeText={alEscribir}
@@ -76,29 +71,20 @@ export function CampoDinero({ etiqueta, valorCentavos, onCambio, ayuda, error }:
           accessibilityLabel={etiqueta}
           cursorColor={colores.tintaCapa}
           selectionColor={colores.lima}
-          style={[tipografia.valorGrande, cifras, estilos.entrada]}
+          style={[estilos.entrada, cifras]}
         />
-        <View pointerEvents="none" style={estilos.zonaTextos}>
-          <Texto
-            variante={flotante ? 'etiqueta' : 'cuerpo'}
-            color={enfocado ? colores.tintaCapa : colores.textoSecundario}
-            style={flotante ? estilos.etiquetaArriba : estilos.etiquetaCentro}
-          >
-            {etiqueta}
-          </Texto>
-          {flotante ? (
-            <Texto variante="cuerpo" color={colores.textoSecundario} style={estilos.prefijo}>
-              $
-            </Texto>
-          ) : null}
-        </View>
       </View>
       {error ? (
-        <Texto variante="secundario" color={colores.peligroTexto} style={estilos.ayuda}>
+        <Texto
+          variante="secundario"
+          color={colores.peligroTexto}
+          accessibilityLiveRegion="polite"
+          style={estilosCampo.ayuda}
+        >
           {error}
         </Texto>
       ) : ayuda ? (
-        <Texto variante="secundario" color={colores.textoSecundario} style={estilos.ayuda}>
+        <Texto variante="secundario" color={colores.textoSecundario} style={estilosCampo.ayuda}>
           {ayuda}
         </Texto>
       ) : null}
@@ -107,25 +93,16 @@ export function CampoDinero({ etiqueta, valorCentavos, onCambio, ayuda, error }:
 }
 
 const estilos = StyleSheet.create({
-  contenedor: { gap: 6 },
-  caja: { height: alturas.campo, borderRadius: radios.medio },
-  cajaVacia: { backgroundColor: tintaAlfa(0.05) },
-  cajaLlena: { backgroundColor: colores.superficie, boxShadow: `0 0 0 1px ${tintaAlfa(0.12)}` },
-  enfocado: { boxShadow: sombras.campoEnfocado },
-  conError: { boxShadow: `0 0 0 2px ${colores.peligroTexto}` },
+  prefijo: { fontSize: 20 },
   entrada: {
-    position: 'absolute',
-    left: espaciado.md + ANCHO_PREFIJO,
-    right: espaciado.md,
-    top: 24,
-    height: 36,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
     padding: 0,
     margin: 0,
+    height: 52,
+    fontFamily: fuentes.extranegrita,
+    fontSize: 20,
     color: colores.texto,
   },
-  zonaTextos: { ...StyleSheet.absoluteFill, paddingHorizontal: espaciado.md },
-  etiquetaCentro: { position: 'absolute', top: 19 },
-  etiquetaArriba: { position: 'absolute', top: 7 },
-  prefijo: { position: 'absolute', top: 31 },
-  ayuda: { paddingLeft: 4 },
 });

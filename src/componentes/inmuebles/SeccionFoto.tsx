@@ -59,6 +59,7 @@ export function SeccionFoto({
         icono={icono}
         descripcion={descripcion}
         alFallarUrl={alFallarUrl}
+        ampliable
       />
       {nota ? (
         <Texto variante="secundario" color={colores.textoSecundario}>

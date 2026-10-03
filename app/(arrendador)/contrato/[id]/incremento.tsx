@@ -93,9 +93,6 @@ export default function IncrementoContrato() {
 
         return (
           <View style={estilos.grupo}>
-            <Texto variante="titulo" accessibilityRole="header">
-              Incremento anual
-            </Texto>
             <ControlSegmentado opciones={OPCIONES} valor={modo} onCambio={setModo} />
             {modo === 'ipc' ? (
               <Texto variante="cuerpo">IPC del año anterior (lo calcula el servidor)</Texto>

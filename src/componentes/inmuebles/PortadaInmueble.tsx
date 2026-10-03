@@ -6,6 +6,7 @@ import { claveCachePortada } from '../../inmuebles/claveImagen';
 import { colores, radios, tintaAlfa } from '../../tema';
 import { Icono, type NombreIcono } from '../iconos/Icono';
 import { MotivoCurvas } from '../motivo/MotivoCurvas';
+import { ImagenAmpliable } from '../VisorImagen';
 
 export type VariantePortada = 'miniatura' | 'grande';
 
@@ -26,6 +27,8 @@ interface Props {
    * para que la pantalla vuelva a pedir el inmueble y reciba una URL nueva.
    */
   alFallarUrl?: () => void;
+  /** Tocar la foto la abre a pantalla completa con zoom (solo si hay foto y se ve). */
+  ampliable?: boolean;
 }
 
 /** Refrescos automáticos permitidos por portada: uno solo, para no entrar en bucle sin red. */
@@ -43,6 +46,7 @@ export function PortadaInmueble({
   icono = 'inmuebles',
   descripcion,
   alFallarUrl,
+  ampliable = false,
 }: Props) {
   const [urlFallida, setUrlFallida] = useState<string | null>(null);
   const refrescos = useRef(0);
@@ -58,7 +62,7 @@ export function PortadaInmueble({
     }
   }
 
-  return (
+  const marco = (
     <View
       style={[
         estilos.base,
@@ -85,9 +89,23 @@ export function PortadaInmueble({
       )}
     </View>
   );
+
+  if (!ampliable || !mostrarImagen || url === null) return marco;
+  return (
+    <ImagenAmpliable
+      uri={url}
+      descripcion={descripcion ?? 'foto'}
+      cachePolicy={cachePolicy}
+      onError={alFallarImagen}
+      style={grande ? estilos.anchoCompleto : undefined}
+    >
+      {marco}
+    </ImagenAmpliable>
+  );
 }
 
 const estilos = StyleSheet.create({
+  anchoCompleto: { width: '100%' },
   base: { overflow: 'hidden' },
   // Fondo neutro mientras la imagen carga; la tinta queda para el marcador sin foto.
   cargando: { backgroundColor: tintaAlfa(0.06) },

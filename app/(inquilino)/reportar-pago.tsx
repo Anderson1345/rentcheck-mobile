@@ -50,27 +50,25 @@ export default function ReportarPago() {
   }
 
   const contrato = lista.data?.find((c) => c.id === contratoId);
-  let cuerpo;
   if (lista.data === undefined) {
-    cuerpo = lista.isPending ? (
-      <EsqueletoCarga filas={3} />
-    ) : (
-      <ErrorConReintento error={lista.error} onReintentar={() => void lista.refetch()} />
+    return (
+      <PantallaPila>
+        {lista.isPending ? (
+          <EsqueletoCarga filas={3} />
+        ) : (
+          <ErrorConReintento error={lista.error} onReintentar={() => void lista.refetch()} />
+        )}
+      </PantallaPila>
     );
-  } else if (!contrato) {
-    cuerpo = <ContratoNoEncontrado textoBoton="Volver" onPress={volver} />;
-  } else {
-    cuerpo = <Formulario contrato={contrato} periodoParam={periodo} onListo={volver} />;
   }
-
-  return (
-    <PantallaPila>
-      <Texto variante="titulo" accessibilityRole="header">
-        Reportar pago
-      </Texto>
-      {cuerpo}
-    </PantallaPila>
-  );
+  if (!contrato) {
+    return (
+      <PantallaPila>
+        <ContratoNoEncontrado textoBoton="Volver" onPress={volver} />
+      </PantallaPila>
+    );
+  }
+  return <Formulario contrato={contrato} periodoParam={periodo} onListo={volver} />;
 }
 
 function Formulario({
@@ -92,29 +90,43 @@ function Formulario({
 
   if (noEncontrado) {
     return (
-      <ContratoNoEncontrado
-        textoBoton="Ver mis contratos"
-        onPress={() => router.push('/mis-contratos')}
-      />
+      <PantallaPila>
+        <ContratoNoEncontrado
+          textoBoton="Ver mis contratos"
+          onPress={() => router.push('/mis-contratos')}
+        />
+      </PantallaPila>
     );
   }
   if (cuenta.data === undefined) {
-    return cuenta.isPending ? (
-      <EsqueletoCarga filas={3} />
-    ) : (
-      <ErrorConReintento error={cuenta.error} onReintentar={() => void cuenta.refetch()} />
+    return (
+      <PantallaPila>
+        {cuenta.isPending ? (
+          <EsqueletoCarga filas={3} />
+        ) : (
+          <ErrorConReintento error={cuenta.error} onReintentar={() => void cuenta.refetch()} />
+        )}
+      </PantallaPila>
     );
   }
-  if (necesitaPanel && panel.isPending) return <EsqueletoCarga filas={3} />;
+  if (necesitaPanel && panel.isPending) {
+    return (
+      <PantallaPila>
+        <EsqueletoCarga filas={3} />
+      </PantallaPila>
+    );
+  }
 
   const proximo =
     panel.data && 'proximo_periodo' in panel.data ? panel.data.proximo_periodo?.periodo : undefined;
   const inicial = periodoInicial(cuenta.data.periodos, contrato.estado, [periodoParam, proximo]);
   if (inicial === null) {
     return (
-      <Texto variante="cuerpo" color={colores.textoSecundario}>
-        Este contrato no tiene períodos para reportar.
-      </Texto>
+      <PantallaPila>
+        <Texto variante="cuerpo" color={colores.textoSecundario}>
+          Este contrato no tiene períodos para reportar.
+        </Texto>
+      </PantallaPila>
     );
   }
   return (
@@ -186,67 +198,19 @@ function Campos({
 
   if (reporte.fase === 'exito') {
     return (
-      <View style={estilos.grupo}>
-        <Aviso tono="exito" mensaje="Pago reportado. Tu arrendador lo revisará." />
-        <Boton titulo="Listo" ancho="completo" onPress={onListo} />
-      </View>
+      <PantallaPila>
+        <View style={estilos.grupo}>
+          <Aviso tono="exito" mensaje="Pago reportado. Tu arrendador lo revisará." />
+          <Boton titulo="Listo" ancho="completo" onPress={onListo} />
+        </View>
+      </PantallaPila>
     );
   }
 
   const enviando = reporte.fase === 'enviando';
-  return (
+  // El botón queda fijo abajo (maqueta Formulario); el error del envío va justo encima.
+  const accionFija = (
     <View style={estilos.grupo}>
-      <Texto variante="etiqueta" color={colores.textoSecundario}>
-        Período
-      </Texto>
-      <OpcionesRadio
-        opciones={periodos.map((p) => ({ valor: p.periodo, etiqueta: mesDePeriodo(p.periodo) }))}
-        valor={periodo.periodo}
-        onCambio={cambiarPeriodo}
-      />
-      {periodo.estado === 'EN_REVISION' ? (
-        <Aviso tono="advertencia" mensaje={AVISO_REEMPLAZO} />
-      ) : null}
-
-      <CampoDinero
-        etiqueta="Monto pagado"
-        valorCentavos={monto}
-        onCambio={(valor) => {
-          setMonto(valor);
-          setErrores((e) => ({ ...e, monto: undefined }));
-        }}
-        error={errores.monto}
-        ayuda={`Saldo del período: ${centavosAPesosTexto(montoSugerido(periodo))}`}
-      />
-      {aviso === 'parcial' ? <Aviso tono="advertencia" mensaje={AVISO_PARCIAL} /> : null}
-      {aviso === 'mayor' ? <Aviso tono="informacion" mensaje={AVISO_MAYOR} /> : null}
-
-      <SelectorFecha
-        etiqueta="Fecha del pago"
-        valor={fecha}
-        hoy={hoy}
-        minimo={minimo}
-        maximo={hoy}
-        error={errores.fecha}
-        onCambio={(f) => {
-          setFecha(f);
-          setErrores((e) => ({ ...e, fecha: undefined }));
-        }}
-      />
-
-      <Texto variante="etiqueta" color={colores.textoSecundario}>
-        Comprobante
-      </Texto>
-      <SelectorComprobante
-        valor={comprobante}
-        onCambio={(c) => {
-          setComprobante(c);
-          setErrores((e) => ({ ...e, comprobante: undefined }));
-        }}
-        deshabilitado={enviando}
-        error={errores.comprobante}
-      />
-
       {reporte.error ? <Aviso mensaje={reporte.error} /> : null}
       <Boton
         titulo="Enviar"
@@ -256,6 +220,62 @@ function Campos({
         onPress={enviar}
       />
     </View>
+  );
+  return (
+    <PantallaPila accionFija={accionFija}>
+      <View style={estilos.grupo}>
+        <Texto variante="etiqueta" color={colores.textoSecundario}>
+          Período
+        </Texto>
+        <OpcionesRadio
+          opciones={periodos.map((p) => ({ valor: p.periodo, etiqueta: mesDePeriodo(p.periodo) }))}
+          valor={periodo.periodo}
+          onCambio={cambiarPeriodo}
+        />
+        {periodo.estado === 'EN_REVISION' ? (
+          <Aviso tono="advertencia" mensaje={AVISO_REEMPLAZO} />
+        ) : null}
+
+        <CampoDinero
+          etiqueta="Monto pagado"
+          valorCentavos={monto}
+          onCambio={(valor) => {
+            setMonto(valor);
+            setErrores((e) => ({ ...e, monto: undefined }));
+          }}
+          error={errores.monto}
+          ayuda={`Saldo del período: ${centavosAPesosTexto(montoSugerido(periodo))}`}
+        />
+        {aviso === 'parcial' ? <Aviso tono="advertencia" mensaje={AVISO_PARCIAL} /> : null}
+        {aviso === 'mayor' ? <Aviso tono="informacion" mensaje={AVISO_MAYOR} /> : null}
+
+        <SelectorFecha
+          etiqueta="Fecha del pago"
+          valor={fecha}
+          hoy={hoy}
+          minimo={minimo}
+          maximo={hoy}
+          error={errores.fecha}
+          onCambio={(f) => {
+            setFecha(f);
+            setErrores((e) => ({ ...e, fecha: undefined }));
+          }}
+        />
+
+        <Texto variante="etiqueta" color={colores.textoSecundario}>
+          Comprobante
+        </Texto>
+        <SelectorComprobante
+          valor={comprobante}
+          onCambio={(c) => {
+            setComprobante(c);
+            setErrores((e) => ({ ...e, comprobante: undefined }));
+          }}
+          deshabilitado={enviando}
+          error={errores.comprobante}
+        />
+      </View>
+    </PantallaPila>
   );
 }
 

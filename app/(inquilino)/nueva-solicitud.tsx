@@ -69,14 +69,7 @@ export default function NuevaSolicitud() {
     cuerpo = <Formulario contrato={contrato} onListo={volver} />;
   }
 
-  return (
-    <PantallaPila>
-      <Texto variante="titulo" accessibilityRole="header">
-        Nueva solicitud
-      </Texto>
-      {cuerpo}
-    </PantallaPila>
-  );
+  return <PantallaPila>{cuerpo}</PantallaPila>;
 }
 
 function Formulario({

@@ -49,9 +49,6 @@ function Contenido({ contrato }: { contrato: ContratoInquilinoDetalle }) {
   if (dando) return <FormularioAviso id={contrato.contratoId} />;
   return (
     <View style={estilos.grupo}>
-      <Texto variante="titulo" accessibilityRole="header">
-        Aviso de no renovación
-      </Texto>
       <AvisosContrato aviso={contrato.aviso_no_renovacion} terminacion={undefined} />
       {contrato.aviso_no_renovacion.estado !== 'DADO' ? (
         <Texto variante="cuerpo" color={colores.textoSecundario}>
@@ -72,9 +69,6 @@ function FormularioAviso({ id }: { id: string }) {
   if (accion.fase === 'exito') {
     return (
       <View style={estilos.grupo}>
-        <Texto variante="titulo" accessibilityRole="header">
-          Aviso de no renovación
-        </Texto>
         <Aviso tono="exito" mensaje="Aviso de no renovación dado." />
         <Boton titulo="Listo" ancho="completo" onPress={() => router.back()} />
       </View>

@@ -879,7 +879,8 @@ describe('Estado de cuenta del inquilino', () => {
     const { raiz } = await montar(<EstadoCuentaInquilino />);
     const t = todo(raiz);
     expect(mockGet).toHaveBeenCalledWith('/inquilino/contratos/c1/estado-cuenta');
-    expect(t).toContain('Estado de cuenta');
+    // U8: el título lo pone el encabezado de la pila; el cuerpo no lo repite.
+    expect(t).not.toContain('Estado de cuenta');
     expect(t).toContain('En mora');
     expect(t).toContain('Octubre de 2026');
     expect(t).toContain('Vencido');
