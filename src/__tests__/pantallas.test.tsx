@@ -148,7 +148,7 @@ describe.each([
   ['Recuperar contraseña', () => <RecuperarContrasena />],
   ['Restablecer contraseña', () => <RestablecerContrasena />],
   ['Página no disponible', () => <NoEncontrada />],
-  ['Panel provisional del arrendador', () => <PanelArrendador />, true],
+  ['Panel del arrendador', () => <PanelArrendador />, true],
   ['Contratos del arrendador', () => <ContratosArrendador />, true],
   ['Pagos del arrendador', () => <PagosArrendador />, true],
   ['Más del arrendador', () => <MasArrendador />, true],

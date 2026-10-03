@@ -29,6 +29,11 @@ interface Props {
   etiquetaBurbuja?: string;
   /** Descripción para el lector de pantalla. */
   descripcion: string;
+  /**
+   * Línea punteada con el promedio de los meses cerrados (la dibuja la propia gráfica; la galería la
+   * conserva). El Panel real la apaga: el servidor no entrega ningún promedio y la app no inventa uno.
+   */
+  conPromedio?: boolean;
 }
 
 const ALTO = 170;
@@ -41,6 +46,7 @@ export function GraficaAreaIngresos({
   ultimoEnCurso = false,
   etiquetaBurbuja,
   descripcion,
+  conPromedio = true,
 }: Props) {
   const [ancho, setAncho] = useState(0);
   const valores = meses.map((m) => m.centavos);
@@ -51,7 +57,9 @@ export function GraficaAreaIngresos({
   const destacado = puntos[puntos.length - 1];
   const valoresCerrados = ultimoEnCurso ? valores.slice(0, -1) : valores;
   const yPromedio =
-    valoresCerrados.length > 0 ? yDeValor(promedio(valoresCerrados), valores, caja) : null;
+    conPromedio && valoresCerrados.length > 0
+      ? yDeValor(promedio(valoresCerrados), valores, caja)
+      : null;
   const xBurbuja = Math.max(0, ancho - ANCHO_BURBUJA);
 
   return (
