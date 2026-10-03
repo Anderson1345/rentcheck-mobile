@@ -22,6 +22,7 @@ interface Props extends Pick<
   | 'onSubmitEditing'
   | 'editable'
   | 'maxLength'
+  | 'autoFocus'
 > {
   etiqueta: string;
   valor: string;

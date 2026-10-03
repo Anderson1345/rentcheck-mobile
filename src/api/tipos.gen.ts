@@ -1688,6 +1688,26 @@ export interface components {
              */
             contratos: number;
         };
+        /**
+         * @description EN_MORA: contrato ACTIVO con algún período VENCIDO o PARCIAL. AL_DIA: contrato ACTIVO sin mora.
+         *     PROGRAMADA: sin contrato ACTIVO pero con uno PROGRAMADO. LIBRE: el resto.
+         * @enum {string}
+         */
+        EstadoOcupacionUnidad: "EN_MORA" | "AL_DIA" | "PROGRAMADA" | "LIBRE";
+        UnidadOcupacionPanelDto: {
+            unidad_id: string;
+            /** @example Apto 101 */
+            nombre: string;
+            inmueble_id: string;
+            /** @example Calle 45 # 12-30 */
+            inmueble_direccion: string;
+            /**
+             * @description EN_MORA: contrato ACTIVO con algún período VENCIDO o PARCIAL. AL_DIA: contrato ACTIVO sin mora.
+             *     PROGRAMADA: sin contrato ACTIVO pero con uno PROGRAMADO. LIBRE: el resto.
+             * @example AL_DIA
+             */
+            estado: components["schemas"]["EstadoOcupacionUnidad"];
+        };
         OcupacionPanelDto: {
             /**
              * @description Todas las unidades de sus inmuebles, también la "Unidad principal" sin completar.
@@ -1706,6 +1726,13 @@ export interface components {
              * @example 1
              */
             con_contrato_programado: number;
+            /**
+             * @description ocupadas / unidades × 100, entero redondeado; null sin unidades.
+             * @example 50
+             */
+            porcentaje: number | null;
+            /** @description Todas las unidades, por dirección del inmueble y nombre. */
+            unidades_detalle: components["schemas"]["UnidadOcupacionPanelDto"][];
         };
         MoraPanelDto: {
             /**
@@ -1724,6 +1751,50 @@ export interface components {
              */
             total_centavos: number;
         };
+        UnidadMorosoPanelDto: {
+            id: string;
+            /** @example Apto 102 */
+            nombre: string;
+        };
+        InmuebleMorosoPanelDto: {
+            id: string;
+            /** @example Calle 45 # 12-30 */
+            direccion: string;
+        };
+        InquilinoMorosoPanelDto: {
+            /**
+             * @description El nombre que guarda el contrato (lo que firmó el arrendador), nunca el perfil global.
+             * @example Camilo Pardo
+             */
+            nombre: string;
+        };
+        MorosoPanelDto: {
+            contrato_id: string;
+            unidad: components["schemas"]["UnidadMorosoPanelDto"];
+            inmueble: components["schemas"]["InmuebleMorosoPanelDto"];
+            /** @description null si el contrato no guarda el nombre del inquilino. */
+            inquilino: components["schemas"]["InquilinoMorosoPanelDto"] | null;
+            /**
+             * @description Períodos VENCIDO o PARCIAL del contrato.
+             * @example 2
+             */
+            periodos: number;
+            /**
+             * @description Lo que debe: suma de (canon del período − aprobado). Misma regla que `mora.total_centavos`.
+             * @example 1600000
+             */
+            monto_centavos: number;
+            /**
+             * @description Días (de Bogotá) desde la fecha límite del período en mora más antiguo hasta hoy; siempre ≥ 1.
+             * @example 38
+             */
+            dias_mora: number;
+            /**
+             * @description Primer día del mes del período en mora más antiguo.
+             * @example 2027-02-01
+             */
+            periodo_mas_antiguo: string;
+        };
         TendenciaMesDto: {
             /** @example 2027-03 */
             mes: string;
@@ -1732,6 +1803,73 @@ export interface components {
              * @example 3400000
              */
             ingresos_centavos: number;
+        };
+        MesAnioPanelDto: {
+            /** @example 2027-02 */
+            mes: string;
+            /**
+             * @description Pagos APROBADOS con fecha_reportada en ese mes del año en curso.
+             * @example 3400000
+             */
+            actual_centavos: number;
+            /**
+             * @description Pagos APROBADOS con fecha_reportada en el mismo mes (completo) del año anterior.
+             * @example 3000000
+             */
+            anterior_centavos: number;
+        };
+        AnioPanelDto: {
+            /**
+             * @description Año en curso en Bogotá.
+             * @example 2027
+             */
+            anio: number;
+            /** @description Un elemento por mes, de enero al mes actual inclusive. */
+            meses: components["schemas"]["MesAnioPanelDto"][];
+            /**
+             * @description Del 1 de enero hasta hoy.
+             * @example 10800000
+             */
+            total_actual_centavos: number;
+            /**
+             * @description Del 1 de enero hasta el mismo día del año anterior (un 29 de febrero se compara con el 28).
+             * @example 9000000
+             */
+            total_anterior_centavos: number;
+            /**
+             * @description (actual − anterior) / anterior × 100, entero redondeado; null si el año anterior suma 0.
+             * @example 20
+             */
+            variacion_porcentual: number | null;
+        };
+        InmueblePanelDto: {
+            inmueble_id: string;
+            /** @example Calle 45 # 12-30 */
+            direccion: string;
+            /**
+             * @description Como `anio.total_actual_centavos`, solo de los contratos de este inmueble (también los cerrados).
+             * @example 6400000
+             */
+            ingresos_anio_centavos: number;
+            /** @example 4 */
+            unidades: number;
+            /**
+             * @description Unidades con un contrato ACTIVO.
+             * @example 3
+             */
+            ocupadas: number;
+        };
+        SolicitudesAbiertasPanelDto: {
+            /**
+             * @description Solicitudes de mantenimiento PENDIENTE o EN_PROCESO.
+             * @example 3
+             */
+            total: number;
+            /**
+             * @description De esas, las de urgencia ALTO (la más alta).
+             * @example 1
+             */
+            urgentes: number;
         };
         ContratoPendienteDto: {
             contrato_id: string;
@@ -1796,6 +1934,8 @@ export interface components {
              * @example 2
              */
             mantenimientos_pendientes: number;
+            /** @description Solicitudes abiertas (PENDIENTE y EN_PROCESO) y cuántas son urgentes. */
+            solicitudes_abiertas: components["schemas"]["SolicitudesAbiertasPanelDto"];
             /** @description Contratos ACTIVO con fecha de fin entre hoy y dentro de 30 días. */
             contratos_por_vencer: components["schemas"]["ContratosPorVencerPanelDto"];
             /** @description Contratos ACTIVO con 12 meses cumplidos desde el último incremento (o el inicio): ya se puede aplicar uno. */
@@ -1823,8 +1963,17 @@ export interface components {
             ocupacion: components["schemas"]["OcupacionPanelDto"];
             /** @description Cartera en mora (de cualquier mes) calculada al día de hoy. */
             mora: components["schemas"]["MoraPanelDto"];
+            /**
+             * @description Quién me debe: hasta 10 contratos en mora (el total es `mora.contratos`), por monto descendente,
+             *     luego días de mora descendente y luego contrato_id. Incluye contratos ya cerrados con deuda.
+             */
+            morosos: components["schemas"]["MorosoPanelDto"][];
             /** @description Siempre 6 meses, del más antiguo al actual, con los ingresos (caja real) de cada uno. */
             tendencia: components["schemas"]["TendenciaMesDto"][];
+            /** @description Cómo va el año: ingresos (caja real) del año en curso frente al anterior, mes a mes. */
+            anio: components["schemas"]["AnioPanelDto"];
+            /** @description Todos los inmuebles (también sin ingresos), por ingresos del año descendente y luego dirección. */
+            por_inmueble: components["schemas"]["InmueblePanelDto"][];
             pendientes: components["schemas"]["PendientesPanelDto"];
         };
         /** @enum {string} */
@@ -1932,6 +2081,97 @@ export interface components {
             acepta_mascotas?: boolean;
             /** @enum {string} */
             uso_permitido?: "RESIDENCIAL" | "COMERCIAL";
+        };
+        /** @enum {string} */
+        TipoUnidad: "APARTAMENTO" | "CASA" | "LOCAL" | "PARQUEADERO" | "HABITACION";
+        UnidadContratoListaDto: {
+            id: string;
+            /** @example Apto 101 */
+            nombre: string;
+            tipo: components["schemas"]["TipoUnidad"];
+        };
+        InquilinoContratoListaDto: {
+            id: string;
+            /**
+             * @description El nombre que guarda el contrato (lo que escribió el arrendador), nunca el perfil global.
+             * @example Camilo Pardo
+             */
+            nombre: string;
+        };
+        CodigoAccesoContratoListaDto: {
+            /** @example RC-AB3D-9KPX */
+            codigo: string;
+            /** Format: date-time */
+            expira_en: string;
+        };
+        /** @enum {string} */
+        TipoPlantillaContrato: "VIVIENDA_URBANA_LEY_820" | "LOCAL_COMERCIAL" | "PARQUEADERO";
+        /** @enum {string} */
+        EstadoContrato: "ACTIVO" | "VENCIDO" | "PROXIMO_A_VENCER" | "TERMINADO_ANTICIPADAMENTE" | "PROGRAMADO" | "CANCELADO";
+        /**
+         * @description Estado de pago GUARDADO: lo recalcula la corrida diaria (contratos ACTIVO y, desde B-77, los
+         *     cerrados con deuda o cerrados hace poco) y cada aprobación o rechazo de pago. No se recalcula en
+         *     esta petición.
+         * @enum {string}
+         */
+        EstadoPagoContrato: "AL_DIA" | "PENDIENTE" | "EN_MORA";
+        /** @enum {string} */
+        RolSolicitante: "ARRENDADOR" | "INQUILINO";
+        ContratoListaDto: {
+            id: string;
+            arrendador_id: string;
+            unidad_id: string;
+            inquilino_id: string;
+            unidad: components["schemas"]["UnidadContratoListaDto"];
+            inquilino: components["schemas"]["InquilinoContratoListaDto"];
+            /** @description null si el contrato no tiene código de acceso. */
+            codigo_acceso: components["schemas"]["CodigoAccesoContratoListaDto"] | null;
+            tipo_plantilla: components["schemas"]["TipoPlantillaContrato"];
+            /**
+             * @description Canon vigente hoy.
+             * @example 1500000
+             */
+            canon_centavos: number;
+            /** @example 5 */
+            dia_pago: number;
+            /** @example Transferencia */
+            forma_pago: string;
+            deposito_centavos: number | null;
+            datos_recaudo: string;
+            datos_fiador_o_poliza: string | null;
+            condicionesParticularesTexto: string | null;
+            /** Format: date-time */
+            fecha_inicio: string;
+            /** Format: date-time */
+            fecha_fin: string;
+            estado: components["schemas"]["EstadoContrato"];
+            /**
+             * @description Estado de pago GUARDADO: lo recalcula la corrida diaria (contratos ACTIVO y, desde B-77, los
+             *     cerrados con deuda o cerrados hace poco) y cada aprobación o rechazo de pago. No se recalcula en
+             *     esta petición.
+             * @example AL_DIA
+             */
+            estado_pago: components["schemas"]["EstadoPagoContrato"];
+            /** Format: date-time */
+            creado_en: string;
+            terminacionAnticipadaSolicitada: boolean;
+            terminacionAnticipadaSolicitadaPor: components["schemas"]["RolSolicitante"] | null;
+            /** Format: date-time */
+            terminacionAnticipadaSolicitadaEn: string | null;
+            terminacionAnticipadaMotivo: string | null;
+            /** Format: date-time */
+            terminacionAnticipadaConfirmadaEn: string | null;
+            /** Format: date-time */
+            terminacion_fecha_efectiva: string | null;
+            terminacion_confirmada_por: components["schemas"]["RolSolicitante"] | null;
+            /** Format: date-time */
+            cancelado_en: string | null;
+            /** Format: date-time */
+            vinculado_en: string | null;
+            /** @description true si el inquilino ya vinculó el contrato a su cuenta. */
+            vinculado: boolean;
+            /** @description PDF heredado (DEPRECADO, ver documentos del contrato); URL firmada o null. */
+            pdf_contrato_url: string | null;
         };
         CorregirContratoDto: {
             canon_centavos?: number;
@@ -2044,12 +2284,6 @@ export interface components {
             monto_aprobado_centavos: number;
             estado: components["schemas"]["EstadoPeriodoPago"];
         };
-        /** @enum {string} */
-        TipoPlantillaContrato: "VIVIENDA_URBANA_LEY_820" | "LOCAL_COMERCIAL" | "PARQUEADERO";
-        /** @enum {string} */
-        EstadoContrato: "ACTIVO" | "VENCIDO" | "PROXIMO_A_VENCER" | "TERMINADO_ANTICIPADAMENTE" | "PROGRAMADO" | "CANCELADO";
-        /** @enum {string} */
-        TipoUnidad: "APARTAMENTO" | "CASA" | "LOCAL" | "PARQUEADERO" | "HABITACION";
         /** @enum {string} */
         UsoPermitido: "RESIDENCIAL" | "COMERCIAL";
         InmuebleDePagoDto: {
@@ -2785,7 +3019,7 @@ export interface operations {
     AlertaController_feed: {
         parameters: {
             query?: {
-                /** @description Solo leídas (`true`) o solo no leídas (`false`). Sin él, todas. No cambia `no_leidas`. */
+                /** @description Sin él: las no leídas (de cualquier edad) y las leídas en los últimos 7 días (las leídas hace más de 7 días ya no se muestran y se borran a los 60). `false`: solo las no leídas. `true`: solo las leídas de los últimos 7 días. No cambia `no_leidas`. */
                 leida?: boolean;
                 /** @description Alertas por página (1 a 50). */
                 limite?: number;
@@ -2925,7 +3159,7 @@ export interface operations {
     AlertaInquilinoController_feed: {
         parameters: {
             query?: {
-                /** @description Solo leídas (`true`) o solo no leídas (`false`). Sin él, todas. No cambia `no_leidas`. */
+                /** @description Sin él: las no leídas (de cualquier edad) y las leídas en los últimos 7 días (las leídas hace más de 7 días ya no se muestran y se borran a los 60). `false`: solo las no leídas. `true`: solo las leídas de los últimos 7 días. No cambia `no_leidas`. */
                 leida?: boolean;
                 /** @description Alertas por página (1 a 50). */
                 limite?: number;
@@ -3551,12 +3785,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Lista de contratos con su unidad e inquilino relacionados. */
+            /** @description Lista de contratos con su unidad e inquilino relacionados y su estado de pago guardado (`estado_pago`). */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ContratoListaDto"][];
+                };
             };
         };
     };

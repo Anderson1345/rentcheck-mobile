@@ -479,3 +479,117 @@ describe('Foto de la unidad', () => {
     expect(fuente.cacheKey).not.toContain('token');
   });
 });
+
+describe('Duplicar unidad (R2-A)', () => {
+  it('desde la unidad, "Duplicar unidad" abre la nueva unidad del mismo inmueble con ?desde=', async () => {
+    const { raiz } = await renderizarPantalla(<EditarUnidad />);
+    await pulsar(raiz, 'Duplicar unidad');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/inmueble/[id]/unidad/nueva',
+      params: { id: 'i1', desde: 'u1' },
+    });
+  });
+
+  it('la nueva unidad llega con todo copiado salvo el nombre (vacío y enfocado) y sin foto', async () => {
+    mockParams = { id: 'i1', desde: 'u1' };
+    mockGet.mockResolvedValue(
+      inmuebleEjemplo({
+        unidades: [unidadEjemplo({ foto_principal_url: 'https://firmada/u1' })],
+      }),
+    );
+    const { raiz } = await renderizarPantalla(<NuevaUnidad />);
+    const nombre = campoDe(raiz, 'Nombre de la unidad');
+    expect(nombre?.props.value).toBe('');
+    expect(nombre?.props.autoFocus).toBe(true);
+    expect(campoDe(raiz, 'Canon base')?.props.value).toBe('1.800.000');
+    expect(campoDe(raiz, 'Área (m²)')?.props.value).toBe('58.5');
+    expect(campoDe(raiz, 'Habitaciones')?.props.value).toBe('2');
+    expect(campoDe(raiz, 'Baños')?.props.value).toBe('2');
+    expect(campoDe(raiz, 'Ocupantes máximos')?.props.value).toBe('4');
+    expect(interruptor(raiz).props.value).toBe(true);
+    expect(porEtiqueta(raiz, 'Apartamento')[0].props.accessibilityState).toMatchObject({
+      selected: true,
+    });
+    expect(porEtiqueta(raiz, 'Residencial')[0].props.accessibilityState).toMatchObject({
+      selected: true,
+    });
+    // La foto no se copia: la nueva unidad no muestra ninguna imagen.
+    expect(raiz.root.findAllByType(Image)).toHaveLength(0);
+    expect(textosDe(raiz).join(' ')).toContain('Apto 302');
+  });
+
+  it('al guardar es una creación normal con los valores copiados y el nombre nuevo', async () => {
+    mockParams = { id: 'i1', desde: 'u1' };
+    const { raiz } = await renderizarPantalla(<NuevaUnidad />);
+    await escribirEn(raiz, 'Nombre de la unidad', 'Apto 303');
+    await pulsar(raiz, 'Crear unidad');
+    await esperar();
+    expect(mockPost).toHaveBeenCalledTimes(1);
+    expect(mockPost).toHaveBeenCalledWith('/inmuebles/i1/unidades', {
+      nombre: 'Apto 303',
+      tipo: 'APARTAMENTO',
+      uso_permitido: 'RESIDENCIAL',
+      canon_base_centavos: 180_000_000,
+      metros_cuadrados: 58.5,
+      numero_habitaciones: 2,
+      numero_banos: 2,
+      ocupantes_maximos: 4,
+      acepta_mascotas: true,
+    });
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('sin nombre no se envía (misma validación de siempre)', async () => {
+    mockParams = { id: 'i1', desde: 'u1' };
+    const { raiz } = await renderizarPantalla(<NuevaUnidad />);
+    await pulsar(raiz, 'Crear unidad');
+    await esperar();
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it('una unidad comercial se copia comercial (sin los campos residenciales)', async () => {
+    mockParams = { id: 'i1', desde: 'u9' };
+    mockGet.mockResolvedValue(
+      inmuebleEjemplo({
+        unidades: [
+          unidadEjemplo({
+            id: 'u9',
+            nombre: 'Local 1',
+            tipo: 'LOCAL',
+            uso_permitido: 'COMERCIAL',
+            canon_base_centavos: 250_000_000,
+            metros_cuadrados: null,
+            numero_habitaciones: null,
+            numero_banos: null,
+            ocupantes_maximos: null,
+            acepta_mascotas: false,
+          }),
+        ],
+      }),
+    );
+    const { raiz } = await renderizarPantalla(<NuevaUnidad />);
+    await escribirEn(raiz, 'Nombre de la unidad', 'Local 2');
+    await pulsar(raiz, 'Crear unidad');
+    await esperar();
+    expect(mockPost).toHaveBeenCalledWith('/inmuebles/i1/unidades', {
+      nombre: 'Local 2',
+      tipo: 'LOCAL',
+      uso_permitido: 'COMERCIAL',
+      canon_base_centavos: 250_000_000,
+      acepta_mascotas: false,
+    });
+  });
+
+  it('si la unidad a duplicar ya no está, avisa y deja el formulario vacío', async () => {
+    mockParams = { id: 'i1', desde: 'no-existe' };
+    const { raiz } = await renderizarPantalla(<NuevaUnidad />);
+    expect(textosDe(raiz).join(' ')).toContain('No encontramos la unidad para duplicar');
+    expect(campoDe(raiz, 'Canon base')?.props.value).toBe('');
+  });
+
+  it('el botón principal queda fijo abajo en la nueva unidad (formulario largo)', async () => {
+    const { raiz } = await renderizarPantalla(<NuevaUnidad />);
+    const barra = raiz.root.findByProps({ testID: 'accion-fija' });
+    expect(barra.findAll((n) => n.props.children === 'Crear unidad').length).toBeGreaterThan(0);
+  });
+});

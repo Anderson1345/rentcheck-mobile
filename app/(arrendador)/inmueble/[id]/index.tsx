@@ -13,6 +13,7 @@ import type { ArchivoFoto, Inmueble } from '@/api/inmuebles';
 import { Aviso } from '@/componentes/Aviso';
 import { Boton } from '@/componentes/Boton';
 import { DetalleTecnico } from '@/componentes/DetalleTecnico';
+import { EncabezadoSeccion } from '@/componentes/EncabezadoSeccion';
 import { EsqueletoCarga } from '@/componentes/EsqueletoCarga';
 import { EstadoMensaje } from '@/componentes/EstadoMensaje';
 import { FilaUnidad } from '@/componentes/inmuebles/FilaUnidad';
@@ -23,6 +24,9 @@ import { Superficie } from '@/componentes/Superficie';
 import { Texto } from '@/componentes/Texto';
 import { useRefrescarAlEnfocar } from '@/consultas/enfoque';
 import { useEliminarInmueble, useInmueble, useSubirPortada } from '@/consultas/inmuebles';
+import { usePanelArrendador } from '@/consultas/panel';
+import { estadoDeUnidad } from '@/inmuebles/cobro';
+import { textoUnidades } from '@/inmuebles/etiquetas';
 import { colores, espaciado } from '@/tema';
 
 const AVISO_FOTO_FALLIDA =
@@ -38,6 +42,8 @@ export default function DetalleInmueble() {
   // Al eliminar se deja de consultar el detalle: pedirlo otra vez daría 404.
   const [eliminando, setEliminando] = useState(false);
   const consulta = useInmueble(id, !eliminando);
+  // Solo para el estado de ocupación de cada unidad: sin Panel, las filas se ven sin estado.
+  const panel = usePanelArrendador();
   const eliminarInmueble = useEliminarInmueble(id);
   const [errorEliminar, setErrorEliminar] = useState<{
     mensaje: string;
@@ -215,24 +221,26 @@ export default function DetalleInmueble() {
         </Superficie>
       ) : null}
 
-      <Texto variante="tituloSeccion" accessibilityRole="header" style={estilos.titulo}>
-        Unidades
-      </Texto>
+      <View style={estilos.titulo}>
+        <EncabezadoSeccion
+          titulo="Unidades"
+          enlace={{
+            etiqueta: 'Agregar',
+            etiquetaAccesible: 'Agregar unidad',
+            onPress: () =>
+              router.push({
+                pathname: '/inmueble/[id]/unidad/nueva',
+                params: { id: inmueble.id },
+              }),
+          }}
+        />
+      </View>
       <Boton
         titulo="Nuevo contrato"
         icono="contratos"
         ancho="completo"
         onPress={() =>
           router.push({ pathname: '/contrato/nuevo', params: { inmuebleId: inmueble.id } })
-        }
-      />
-      <Boton
-        titulo="Agregar unidad"
-        icono="anadir"
-        variante="secundario"
-        ancho="completo"
-        onPress={() =>
-          router.push({ pathname: '/inmueble/[id]/unidad/nueva', params: { id: inmueble.id } })
         }
       />
       {inmueble.unidades.length === 0 ? (
@@ -245,7 +253,9 @@ export default function DetalleInmueble() {
             <FilaUnidad
               key={unidad.id}
               unidad={unidad}
+              estado={estadoDeUnidad(panel.data, unidad.id)}
               separador={indice > 0}
+              alFallarFoto={() => void refetch({ cancelRefetch: false })}
               onPress={() =>
                 router.push({
                   pathname: '/inmueble/[id]/unidad/[unidadId]',
@@ -282,28 +292,40 @@ export default function DetalleInmueble() {
   );
 }
 
+/** Datos del inmueble en una tarjeta: la dirección como título y el resto en una grilla de 2 columnas. */
 function DatosInmueble({ inmueble }: { inmueble: Inmueble }) {
+  const datos: { etiqueta: string; valor: string }[] = [
+    { etiqueta: 'Ciudad', valor: inmueble.ciudad },
+    ...(inmueble.estrato !== null
+      ? [{ etiqueta: 'Estrato', valor: String(inmueble.estrato) }]
+      : []),
+    { etiqueta: 'Matrícula inmobiliaria', valor: inmueble.matricula_inmobiliaria },
+    { etiqueta: 'Unidades', valor: textoUnidades(inmueble.unidades.length) },
+  ];
   return (
     <Superficie style={estilos.datos}>
       <Texto variante="titulo" accessibilityRole="header">
         {inmueble.direccion}
       </Texto>
-      <Texto variante="cuerpo" color={colores.textoSecundario}>
-        {inmueble.ciudad}
-      </Texto>
-      {inmueble.estrato !== null ? (
-        <Texto variante="cuerpoFuerte">{`Estrato ${inmueble.estrato}`}</Texto>
-      ) : null}
-      <Texto variante="secundario" color={colores.textoSecundario}>
-        {`Matrícula inmobiliaria ${inmueble.matricula_inmobiliaria}`}
-      </Texto>
+      <View style={estilos.grilla}>
+        {datos.map((dato) => (
+          <View key={dato.etiqueta} style={estilos.celda}>
+            <Texto variante="secundario" color={colores.textoSecundario}>
+              {dato.etiqueta}
+            </Texto>
+            <Texto variante="cuerpoFuerte">{dato.valor}</Texto>
+          </View>
+        ))}
+      </View>
     </Superficie>
   );
 }
 
 const estilos = StyleSheet.create({
   grupo: { gap: espaciado.xs },
-  datos: { gap: espaciado.xxs },
+  datos: { gap: espaciado.sm },
+  grilla: { flexDirection: 'row', flexWrap: 'wrap', rowGap: espaciado.sm },
+  celda: { width: '50%', gap: 2, paddingRight: espaciado.xs },
   acciones: { flexDirection: 'row', gap: espaciado.xs },
   accion: { flex: 1 },
   titulo: { marginTop: espaciado.xs },

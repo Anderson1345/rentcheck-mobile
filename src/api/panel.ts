@@ -13,6 +13,10 @@ export type TendenciaMes = components['schemas']['TendenciaMesDto'];
 export type PendientesPanel = components['schemas']['PendientesPanelDto'];
 export type ContratoPendiente = components['schemas']['ContratoPendienteDto'];
 export type IncrementoDisponible = components['schemas']['IncrementoDisponibleDto'];
+// B0.7-B: ocupación por unidad e ingresos por inmueble (los usa la pestaña Inmuebles, R2-A).
+export type UnidadOcupacionPanel = components['schemas']['UnidadOcupacionPanelDto'];
+export type EstadoOcupacionUnidad = components['schemas']['EstadoOcupacionUnidad'];
+export type InmueblePanel = components['schemas']['InmueblePanelDto'];
 
 /** Todo el Panel en una sola respuesta de solo lectura, sin parámetros. */
 export const obtenerPanelArrendador = () => api.get<PanelArrendador>('/arrendadores/panel');

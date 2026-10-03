@@ -10,7 +10,6 @@ import { ConInmueble } from '@/componentes/inmuebles/ConInmueble';
 import { FormularioUnidad } from '@/componentes/inmuebles/FormularioUnidad';
 import { SeccionFoto } from '@/componentes/inmuebles/SeccionFoto';
 import { useSubidaFoto } from '@/componentes/inmuebles/useSubidaFoto';
-import { PantallaPila } from '@/componentes/PantallaPila';
 import {
   claveFotoUnidad,
   useActualizarUnidad,
@@ -70,46 +69,61 @@ export default function EditarUnidad() {
         const unidad = inmueble.unidades.find((u) => u.id === unidadId);
         if (!unidad) return null;
         return (
-          <PantallaPila>
-            <FormularioUnidad
-              key={unidad.id}
-              modo="editar"
-              inmueble={inmueble}
-              unidad={unidad}
-              onEditarInmueble={() =>
-                router.push({ pathname: '/inmueble/[id]/editar', params: { id } })
-              }
-              onGuardar={async (cambios) => {
-                await actualizar.mutateAsync(cambios);
-                volver();
-              }}
-            />
+          <FormularioUnidad
+            key={unidad.id}
+            modo="editar"
+            inmueble={inmueble}
+            unidad={unidad}
+            onEditarInmueble={() =>
+              router.push({ pathname: '/inmueble/[id]/editar', params: { id } })
+            }
+            onGuardar={async (cambios) => {
+              await actualizar.mutateAsync(cambios);
+              volver();
+            }}
+            pie={
+              <>
+                <SeccionFoto
+                  titulo="Foto de la unidad"
+                  url={unidad.foto_principal_url}
+                  claveCache={claveFotoUnidad(unidad.id)}
+                  descripcion={`Foto de ${unidad.nombre}`}
+                  subida={subida}
+                  onElegida={(foto) => void subida.elegir(foto)}
+                  alFallarUrl={() => void refetch({ cancelRefetch: false })}
+                />
 
-            <SeccionFoto
-              titulo="Foto de la unidad"
-              url={unidad.foto_principal_url}
-              claveCache={claveFotoUnidad(unidad.id)}
-              descripcion={`Foto de ${unidad.nombre}`}
-              subida={subida}
-              onElegida={(foto) => void subida.elegir(foto)}
-              alFallarUrl={() => void refetch({ cancelRefetch: false })}
-            />
+                {/* R2-A: una unidad parecida se crea copiando esta (todo menos el nombre y la foto). */}
+                <Boton
+                  titulo="Duplicar unidad"
+                  icono="anadir"
+                  variante="secundario"
+                  ancho="completo"
+                  onPress={() =>
+                    router.push({
+                      pathname: '/inmueble/[id]/unidad/nueva',
+                      params: { id, desde: unidad.id },
+                    })
+                  }
+                />
 
-            <View style={estilos.eliminar}>
-              {errorEliminar ? (
-                <>
-                  <Aviso mensaje={errorEliminar.mensaje} />
-                  <DetalleTecnico detalle={errorEliminar.detalle} />
-                </>
-              ) : null}
-              <Boton
-                titulo="Eliminar unidad"
-                variante="destructivo"
-                ancho="completo"
-                onPress={confirmarEliminar}
-              />
-            </View>
-          </PantallaPila>
+                <View style={estilos.eliminar}>
+                  {errorEliminar ? (
+                    <>
+                      <Aviso mensaje={errorEliminar.mensaje} />
+                      <DetalleTecnico detalle={errorEliminar.detalle} />
+                    </>
+                  ) : null}
+                  <Boton
+                    titulo="Eliminar unidad"
+                    variante="destructivo"
+                    ancho="completo"
+                    onPress={confirmarEliminar}
+                  />
+                </View>
+              </>
+            }
+          />
         );
       }}
     </ConInmueble>

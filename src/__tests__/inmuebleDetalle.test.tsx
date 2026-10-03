@@ -1,13 +1,16 @@
 // Detalle del inmueble: datos, unidades en solo lectura ("Por completar"), 404, portada expirada
 // y cambio de foto (picker simulado).
 import { Image } from 'expo-image';
-import { Alert, Linking } from 'react-native';
+import { Alert, Linking, StyleSheet } from 'react-native';
 import { act } from 'react-test-renderer';
 
 import Detalle from '../../app/(arrendador)/inmueble/[id]/index';
 import { ErrorApi, ErrorSinConexion } from '../api/cliente';
+import { Icono } from '../componentes/iconos/Icono';
 import { inmuebleEjemplo, unidadEjemplo, unidadPrincipalNueva } from '../pruebas/datosInmuebles';
+import { panelEjemplo, unidadOcupacion } from '../pruebas/datosPanel';
 import { botonDe, hayBoton, renderizarPantalla, textosDe } from '../pruebas/pantallas';
+import { coloresEstado } from '../tema';
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
@@ -42,6 +45,12 @@ jest.mock('../api/inmuebles', () => ({
   subirFotoPortada: (...a: unknown[]) => mockSubirFoto(...a),
   eliminarInmueble: (...a: unknown[]) => mockEliminar(...a),
 }));
+// R2-A: el detalle lee el Panel (estado de cada unidad). Por defecto, un Panel sin unidades.
+const mockPanel = jest.fn();
+jest.mock('../api/panel', () => ({
+  ...jest.requireActual('../api/panel'),
+  obtenerPanelArrendador: (...a: unknown[]) => mockPanel(...a),
+}));
 jest.mock('../utilidades/foto', () => ({
   ...jest.requireActual('../utilidades/foto'),
   elegirFoto: (...a: unknown[]) => mockElegir(...a),
@@ -75,6 +84,8 @@ beforeEach(() => {
   }
   mockParams = { id: 'i1' };
   mockObtener.mockResolvedValue(inmuebleEjemplo());
+  mockPanel.mockReset();
+  mockPanel.mockResolvedValue(panelEjemplo());
 });
 
 describe('Detalle del inmueble', () => {
@@ -85,8 +96,10 @@ describe('Detalle del inmueble', () => {
     expect(mockObtener).toHaveBeenCalledWith('i1');
     expect(textos).toContain('Calle 45 # 12-30');
     expect(textos).toContain('Bogotá');
-    expect(textos).toContain('Estrato 4');
-    expect(textos).toContain('Matrícula inmobiliaria 50C-1234567');
+    // R2-A: los datos van en una grilla de etiqueta y valor.
+    expect(textos).toEqual(
+      expect.arrayContaining(['Estrato', '4', 'Matrícula inmobiliaria', '50C-1234567']),
+    );
     expect(hayBoton(raiz, 'Editar')).toBe(true);
     expect(hayBoton(raiz, 'Cambiar foto')).toBe(true);
   });
@@ -134,9 +147,19 @@ describe('Detalle del inmueble', () => {
     expect(textosDe(raiz)).toContain('Por completar');
   });
 
-  it('"Agregar unidad" abre el formulario de nueva unidad', async () => {
+  it('"Agregar" (unidad) del encabezado de la sección abre el formulario de nueva unidad', async () => {
     const { raiz } = await renderizarPantalla(<Detalle />);
-    await pulsar(raiz, 'Agregar unidad');
+    // R2-A: es el enlace "Agregar" del encabezado de la sección (se anuncia "Agregar unidad").
+    await act(async () =>
+      raiz.root
+        .find(
+          (n) =>
+            n.props.accessibilityRole === 'link' &&
+            n.props.accessibilityLabel === 'Agregar unidad' &&
+            !!n.props.onPress,
+        )
+        .props.onPress(),
+    );
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/inmueble/[id]/unidad/nueva',
       params: { id: 'i1' },
@@ -220,6 +243,74 @@ describe('Detalle del inmueble', () => {
   it('sin ese parámetro no hay aviso', async () => {
     const { raiz } = await renderizarPantalla(<Detalle />);
     expect(textosDe(raiz).join('|')).not.toContain('la foto no se pudo subir');
+  });
+});
+
+describe('Detalle: unidades con foto y estado de ocupación (R2-A)', () => {
+  const conDos = () =>
+    inmuebleEjemplo({
+      unidades: [
+        unidadEjemplo({ id: 'u1', nombre: 'Apto 101', foto_principal_url: 'https://f/u1' }),
+        unidadEjemplo({ id: 'u2', nombre: 'Apto 102', foto_principal_url: null }),
+      ],
+    });
+  const fila = (raiz: Raiz, nombre: string) =>
+    raiz.root.find(
+      (n) =>
+        n.props.accessibilityRole === 'button' &&
+        !!n.props.onPress &&
+        n.findAll((h) => h.props.children === nombre).length > 0,
+    );
+
+  it('cada fila lleva la miniatura de la foto de la unidad o, sin foto, el icono', async () => {
+    mockObtener.mockResolvedValue(conDos());
+    const { raiz } = await renderizarPantalla(<Detalle />);
+    const conFoto = fila(raiz, 'Apto 101').findAllByType(Image);
+    expect(conFoto).toHaveLength(1);
+    expect(conFoto[0].props.source).toMatchObject({ uri: 'https://f/u1' });
+    expect(fila(raiz, 'Apto 102').findAllByType(Image)).toHaveLength(0);
+    expect(fila(raiz, 'Apto 102').findAllByType(Icono).length).toBeGreaterThan(0);
+  });
+
+  it('si la foto de la unidad no carga: queda el icono y se vuelve a pedir el inmueble', async () => {
+    mockObtener.mockResolvedValue(conDos());
+    const { raiz } = await renderizarPantalla(<Detalle />);
+    await act(async () => fila(raiz, 'Apto 101').findAllByType(Image)[0].props.onError({}));
+    await esperar();
+    expect(fila(raiz, 'Apto 101').findAllByType(Image)).toHaveLength(0);
+    expect(mockObtener).toHaveBeenCalledTimes(2);
+  });
+
+  it('el estado de ocupación de cada unidad sale del Panel, con su tono', async () => {
+    mockObtener.mockResolvedValue(conDos());
+    mockPanel.mockResolvedValue(
+      panelEjemplo({
+        ocupacion: {
+          ...panelEjemplo().ocupacion,
+          unidades_detalle: [
+            unidadOcupacion('u1', 'i1', 'EN_MORA'),
+            unidadOcupacion('u2', 'i1', 'PROGRAMADA'),
+          ],
+        },
+      }),
+    );
+    const { raiz } = await renderizarPantalla(<Detalle />);
+    const texto = (nombre: string, estado: string) =>
+      fila(raiz, nombre).findAll(
+        (n) => typeof n.type === 'string' && n.props.children === estado,
+      )[0];
+    expect(texto('Apto 101', 'En mora')).toBeDefined();
+    expect(texto('Apto 102', 'Programada')).toBeDefined();
+    expect(StyleSheet.flatten(texto('Apto 101', 'En mora').props.style).color).toBe(
+      coloresEstado.peligro.texto,
+    );
+  });
+
+  it('sin Panel (o sin la unidad en él) no se inventa un estado', async () => {
+    mockObtener.mockResolvedValue(conDos());
+    mockPanel.mockReturnValue(new Promise(() => undefined));
+    const { raiz } = await renderizarPantalla(<Detalle />);
+    expect(textosDe(raiz).join(' ')).not.toMatch(/En mora|Al día|Programada|Libre/);
   });
 });
 
