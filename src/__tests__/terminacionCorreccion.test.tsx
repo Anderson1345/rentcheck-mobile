@@ -4,6 +4,7 @@ import { act } from 'react-test-renderer';
 
 import Corregir from '../../app/(arrendador)/contrato/[id]/corregir';
 import CorregirInquilino from '../../app/(arrendador)/contrato/[id]/corregir-inquilino';
+import Documentos from '../../app/(arrendador)/contrato/[id]/documentos';
 import Detalle from '../../app/(arrendador)/contrato/[id]/index';
 import Terminacion from '../../app/(arrendador)/contrato/[id]/terminacion';
 import { ErrorApi, ErrorSinConexion, ErrorTimeout } from '../api/cliente';
@@ -850,9 +851,10 @@ describe('Corregir datos del inquilino', () => {
   });
 });
 
+// R2-B: "¿Falta un documento? Generar" está ahora en la pantalla de documentos del contrato.
 describe('Documentos: "¿Falta un documento? Generar"', () => {
   const montar = async () => {
-    const r = await renderizarPantalla(<Detalle />);
+    const r = await renderizarPantalla(<Documentos />);
     await esperar();
     return r.raiz;
   };

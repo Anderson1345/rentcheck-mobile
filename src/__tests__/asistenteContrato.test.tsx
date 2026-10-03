@@ -6,6 +6,7 @@ import Creado from '../../app/(arrendador)/contrato/[id]/creado';
 import Nuevo from '../../app/(arrendador)/contrato/nuevo';
 import { ErrorApi, ErrorSinConexion, ErrorTimeout } from '../api/cliente';
 import type { ContratoDetalle, ContratoResumen } from '../api/contratos';
+import { contratoListaEjemplo } from '../pruebas/datosContratos';
 import { formatearFechaLarga } from '../utilidades/fechas';
 import { inmuebleEjemplo, unidadEjemplo } from '../pruebas/datosInmuebles';
 import { fijarReloj, HOY_PRUEBAS, restaurarReloj } from '../pruebas/reloj';
@@ -140,20 +141,22 @@ const resumenDesdeCuerpo = (cuerpo: {
   canon_centavos: number;
   inquilino_nuevo?: { nombre: string };
   inquilino_id?: string;
-}): ContratoResumen => ({
-  id: 'nuevo1',
-  estado: 'ACTIVO',
-  fecha_inicio: `${cuerpo.fecha_inicio}T00:00:00.000Z`,
-  fecha_fin: `${cuerpo.fecha_fin}T00:00:00.000Z`,
-  canon_centavos: cuerpo.canon_centavos,
-  vinculado: false,
-  unidad: { id: cuerpo.unidad_id, nombre: 'x', tipo: 'APARTAMENTO' },
-  inquilino: {
-    id: cuerpo.inquilino_id ?? 'q9',
-    nombre: cuerpo.inquilino_nuevo?.nombre ?? 'x',
-  },
-  codigo_acceso: null,
-});
+}): ContratoResumen =>
+  // R2-B: el elemento de GET /contratos es el tipo generado; se parte del ejemplo completo.
+  contratoListaEjemplo({
+    id: 'nuevo1',
+    estado: 'ACTIVO',
+    fecha_inicio: `${cuerpo.fecha_inicio}T00:00:00.000Z`,
+    fecha_fin: `${cuerpo.fecha_fin}T00:00:00.000Z`,
+    canon_centavos: cuerpo.canon_centavos,
+    vinculado: false,
+    unidad: { id: cuerpo.unidad_id, nombre: 'x', tipo: 'APARTAMENTO' },
+    inquilino: {
+      id: cuerpo.inquilino_id ?? 'q9',
+      nombre: cuerpo.inquilino_nuevo?.nombre ?? 'x',
+    },
+    codigo_acceso: null,
+  });
 
 const esperar = () =>
   act(async () => {

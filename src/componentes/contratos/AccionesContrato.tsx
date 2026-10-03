@@ -1,22 +1,15 @@
+// Piezas compartidas de las acciones sobre un contrato: confirmación, mensajes de una acción en curso,
+// opciones excluyentes y la carga del contrato para las pantallas de formulario. Las acciones del detalle
+// del arrendador viven en GestionarContrato (R2-B).
 import type { UseQueryResult } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
-import { type ReactNode, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
-import {
-  cancelarAvisoNoRenovacion,
-  cancelarProgramado as cancelarProgramadoApi,
-  type ContratoDetalle,
-} from '../../api/contratos';
+import type { ContratoDetalle } from '../../api/contratos';
 import { ErrorApi } from '../../api/cliente';
 import { mensajeDeError } from '../../api/errores';
 import { useContrato } from '../../consultas/contratos';
-import { accionesDisponibles } from '../../contratos/acciones';
-import {
-  type FaseAccion,
-  MENSAJE_VERIFICANDO,
-  useAccionContrato,
-} from '../../contratos/useAccionContrato';
+import { type FaseAccion, MENSAJE_VERIFICANDO } from '../../contratos/useAccionContrato';
 import { colores, espaciado, radios, tintaAlfa } from '../../tema';
 import { Aviso } from '../Aviso';
 import { Boton } from '../Boton';
@@ -150,126 +143,6 @@ export function CargaContrato<D = ContratoDetalle>({
     );
   }
   return <PantallaPila>{children(data)}</PantallaPila>;
-}
-
-/**
- * Sección "Acciones" del detalle. Los botones salen del estado del contrato y de los booleanos
- * puede_dar / puede_cancelar del servidor (la app no calcula el plazo). Cada acción con formulario
- * tiene su pantalla; cancelar aviso y cancelar programado se confirman aquí mismo.
- */
-export function AccionesContrato({ contrato }: { contrato: ContratoDetalle }) {
-  const router = useRouter();
-  const a = accionesDisponibles(contrato);
-  const cancelarAviso = useAccionContrato(contrato.id, 'cancelarAviso');
-  const cancelarProgramado = useAccionContrato(contrato.id, 'cancelarProgramado');
-  const ir = (
-    pathname:
-      | '/contrato/[id]/estado-cuenta'
-      | '/contrato/[id]/incremento'
-      | '/contrato/[id]/prorroga'
-      | '/contrato/[id]/aviso',
-  ) => router.push({ pathname, params: { id: contrato.id } });
-
-  // Cancelado el programado, se vuelve a la lista con el estado ya actualizado.
-  useEffect(() => {
-    if (cancelarProgramado.fase === 'exito') router.replace('/contratos-arrendador');
-  }, [cancelarProgramado.fase, router]);
-
-  return (
-    <View style={estilos.grupo}>
-      <Texto variante="tituloSeccion" accessibilityRole="header">
-        Acciones
-      </Texto>
-      <Boton
-        titulo="Estado de cuenta"
-        variante="secundario"
-        ancho="completo"
-        onPress={() => ir('/contrato/[id]/estado-cuenta')}
-      />
-      {a.incremento ? (
-        <Boton
-          titulo="Aplicar incremento"
-          variante="secundario"
-          ancho="completo"
-          onPress={() => ir('/contrato/[id]/incremento')}
-        />
-      ) : null}
-      {a.prorroga ? (
-        <Boton
-          titulo="Prorrogar contrato"
-          variante="secundario"
-          ancho="completo"
-          onPress={() => ir('/contrato/[id]/prorroga')}
-        />
-      ) : null}
-      {a.darAviso ? (
-        <Boton
-          titulo="Dar aviso de no renovación"
-          variante="secundario"
-          ancho="completo"
-          onPress={() => ir('/contrato/[id]/aviso')}
-        />
-      ) : null}
-
-      {a.cancelarAviso ? (
-        <>
-          <Boton
-            titulo="Cancelar aviso"
-            tituloCargando="Cancelando aviso…"
-            cargando={cancelarAviso.fase === 'enviando' || cancelarAviso.fase === 'verificando'}
-            variante="secundario"
-            ancho="completo"
-            onPress={() =>
-              confirmarAccion(
-                'Cancelar aviso',
-                'El contrato seguirá su curso: sin aviso, se prorroga automáticamente por el mismo término.',
-                'Cancelar aviso',
-                () => void cancelarAviso.iniciar(() => cancelarAvisoNoRenovacion(contrato.id)),
-              )
-            }
-          />
-          <MensajeAccion
-            fase={cancelarAviso.fase}
-            error={cancelarAviso.error}
-            onVerificar={() => void cancelarAviso.verificar()}
-            recargable={cancelarAviso.recargable}
-            onRecargar={() => void cancelarAviso.recargar()}
-          />
-        </>
-      ) : null}
-      {cancelarAviso.fase === 'exito' ? <Aviso tono="exito" mensaje="Aviso cancelado." /> : null}
-
-      {a.cancelarProgramado ? (
-        <>
-          <Boton
-            titulo="Cancelar contrato programado"
-            tituloCargando="Cancelando…"
-            cargando={
-              cancelarProgramado.fase === 'enviando' || cancelarProgramado.fase === 'verificando'
-            }
-            variante="destructivo"
-            ancho="completo"
-            onPress={() =>
-              confirmarAccion(
-                'Cancelar contrato programado',
-                'El contrato quedará Cancelado, no se borra nada, el código de acceso dejará de servir y las fechas quedan libres para otro contrato.',
-                'Cancelar contrato',
-                () => void cancelarProgramado.iniciar(() => cancelarProgramadoApi(contrato.id)),
-                true,
-              )
-            }
-          />
-          <MensajeAccion
-            fase={cancelarProgramado.fase}
-            error={cancelarProgramado.error}
-            onVerificar={() => void cancelarProgramado.verificar()}
-            recargable={cancelarProgramado.recargable}
-            onRecargar={() => void cancelarProgramado.recargar()}
-          />
-        </>
-      ) : null}
-    </View>
-  );
 }
 
 const estilos = StyleSheet.create({

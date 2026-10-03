@@ -1,5 +1,6 @@
 // Excepción documentada: faltan esquemas en OpenAPI (B-57). El CUERPO de POST /contratos sale del DTO
-// generado (tipos.gen.ts); las RESPUESTAS no tienen esquema y se escriben a mano según
+// generado (tipos.gen.ts) y, desde B0.7-C, también la LISTA (GET /contratos = ContratoListaDto). El resto
+// de las RESPUESTAS (detalle, documentos…) no tienen esquema y se escriben a mano según
 // rentcheck-backend (contrato.service.ts), SOLO con los campos que usa la app.
 
 import { api } from './cliente';
@@ -7,23 +8,18 @@ import type { TipoUnidad } from './inmuebles';
 import type { TipoPlantilla } from '../contratos/plantilla';
 import type { CuerpoCorregirContrato, CuerpoCorregirInquilino } from '../contratos/correccion';
 import type { CuerpoCrearContrato } from '../contratos/cuerpo';
+import type { components } from './tipos.gen';
 
 export type EstadoContratoApi =
   'PROGRAMADO' | 'ACTIVO' | 'VENCIDO' | 'TERMINADO_ANTICIPADAMENTE' | 'CANCELADO';
 
-/** Elemento de GET /contratos. Las fechas llegan como medianoche UTC (día calendario). */
-export interface ContratoResumen {
-  id: string;
-  estado: EstadoContratoApi;
-  fecha_inicio: string;
-  fecha_fin: string;
-  canon_centavos: number;
-  tipo_plantilla?: TipoPlantilla;
-  vinculado: boolean;
-  unidad: { id: string; nombre: string; tipo: TipoUnidad };
-  inquilino: { id: string; nombre: string };
-  codigo_acceso: { codigo: string; expira_en: string } | null;
-}
+/**
+ * Elemento de GET /contratos: el tipo GENERADO (ContratoListaDto, B0.7-C) con un nombre corto. Trae todo
+ * lo que usaba la app y además `estado_pago` (el guardado). Las fechas llegan como medianoche UTC.
+ */
+export type ContratoResumen = components['schemas']['ContratoListaDto'];
+/** Estado de pago guardado del contrato (AL_DIA, EN_MORA o PENDIENTE). */
+export type EstadoPagoContratoApi = components['schemas']['EstadoPagoContrato'];
 
 export type TipoDocumentoContrato = 'CONTRATO_ORIGINAL' | 'OTROSI_INCREMENTO' | 'OTROSI_PRORROGA';
 export type RolContrato = 'ARRENDADOR' | 'INQUILINO';
@@ -79,6 +75,8 @@ export interface ContratoDetalle {
   canon_centavos: number;
   tipo_plantilla: TipoPlantilla;
   vinculado: boolean;
+  /** Estado de pago guardado (el detalle lo trae con todas las columnas del contrato). */
+  estado_pago?: EstadoPagoContratoApi;
   dia_pago?: number;
   forma_pago?: string;
   /** Para el arrendador llega con valor; se tolera null (regla 11 del Contexto aplica al inquilino). */
@@ -94,7 +92,8 @@ export interface ContratoDetalle {
     /** Solo si el servidor lo envía (la copia del contrato no lo trae hoy). */
     correo?: string | null;
   };
-  unidad: { id: string; nombre: string; tipo: TipoUnidad };
+  /** La unidad completa; la app usa estos campos (inmueble_id para leer la dirección de la caché). */
+  unidad: { id: string; nombre: string; tipo: TipoUnidad; inmueble_id?: string };
   codigo_acceso: { codigo: string; expira_en: string } | null;
   incrementos_ipc?: IncrementoIpc[];
   aviso_no_renovacion?: ResumenAviso;

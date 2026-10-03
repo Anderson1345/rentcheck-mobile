@@ -1,12 +1,24 @@
-// Contratos del arrendador (E5-A): lista con filtros, detalle de solo lectura, documentos y código.
-import { Alert, RefreshControl, ScrollView, Share } from 'react-native';
+// Contratos del arrendador (E5-A, R2-B): lista compacta con búsqueda y filtros, detalle con cabecera,
+// accesos y "Gestionar contrato", y las pantallas de documentos y de código de acceso.
+import { Alert, Linking, RefreshControl, ScrollView, Share, StyleSheet } from 'react-native';
 import { act } from 'react-test-renderer';
 
 import ContratosTab from '../../app/(arrendador)/(pestanas)/contratos-arrendador';
+import Acceso from '../../app/(arrendador)/contrato/[id]/acceso';
+import Documentos from '../../app/(arrendador)/contrato/[id]/documentos';
 import Detalle from '../../app/(arrendador)/contrato/[id]/index';
 import { ErrorApi, ErrorSinConexion } from '../api/cliente';
-import type { ContratoDetalle, ContratoResumen, DocumentoContrato } from '../api/contratos';
+import type {
+  ContratoDetalle,
+  ContratoResumen,
+  DocumentoContrato,
+  EstadoCuenta,
+  PeriodoCuenta,
+} from '../api/contratos';
+import { contratoListaEjemplo } from '../pruebas/datosContratos';
 import { botonDe, hayBoton, renderizarPantalla, textosDe } from '../pruebas/pantallas';
+import { fijarReloj, restaurarReloj } from '../pruebas/reloj';
+import { coloresEstado } from '../tema';
 
 jest.setTimeout(60_000);
 
@@ -66,17 +78,8 @@ jest.mock('../api/cliente', () => ({
 
 type Raiz = Awaited<ReturnType<typeof renderizarPantalla>>['raiz'];
 
-const resumen = (extra: Partial<ContratoResumen> & { id: string }): ContratoResumen => ({
-  estado: 'ACTIVO',
-  fecha_inicio: '2026-10-01T00:00:00.000Z',
-  fecha_fin: '2027-09-30T00:00:00.000Z',
-  canon_centavos: 250_000_000,
-  vinculado: false,
-  unidad: { id: 'u1', nombre: 'Apto 302', tipo: 'APARTAMENTO' },
-  inquilino: { id: 'q1', nombre: 'Camilo Pardo' },
-  codigo_acceso: null,
-  ...extra,
-});
+const resumen = (extra: Partial<ContratoResumen> & { id: string }): ContratoResumen =>
+  contratoListaEjemplo(extra);
 const DETALLE: ContratoDetalle = {
   id: 'c1',
   estado: 'ACTIVO',
@@ -86,6 +89,8 @@ const DETALLE: ContratoDetalle = {
   tipo_plantilla: 'VIVIENDA_URBANA_LEY_820',
   dia_pago: 5,
   deposito_centavos: null,
+  datos_recaudo: 'Cuenta de ahorros 123',
+  estado_pago: 'AL_DIA',
   vinculado: false,
   inquilino: { id: 'q1', nombre: 'Camilo Pardo', cedula: '1020304050', telefono: '3001234567' },
   unidad: { id: 'u1', nombre: 'Apto 302', tipo: 'APARTAMENTO' },
@@ -109,10 +114,26 @@ const DOC: DocumentoContrato = {
   url_firmada: 'https://b.test/s/doc1.pdf?token=SECRETO1',
 };
 
-const datos: { lista: ContratoResumen[]; detalle: ContratoDetalle; docs: DocumentoContrato[] } = {
+/** Un período del estado de cuenta (fecha límite el día 5 del mes). */
+const periodo = (mes: string, estado: PeriodoCuenta['estado']): PeriodoCuenta => ({
+  periodo: `${mes}T00:00:00.000Z`,
+  fechaLimite: `${mes.slice(0, 8)}05T00:00:00.000Z`,
+  canonVigenteCentavos: 250_000_000,
+  montoAprobadoCentavos: estado === 'PARCIAL' ? 100_000_000 : 0,
+  estado,
+});
+
+const datos: {
+  lista: ContratoResumen[];
+  detalle: ContratoDetalle;
+  docs: DocumentoContrato[];
+  /** null: el estado de cuenta responde con error. */
+  cuenta: EstadoCuenta | null;
+} = {
   lista: [],
   detalle: DETALLE,
   docs: [DOC],
+  cuenta: { estadoPago: 'al_dia', periodos: [] },
 };
 
 const esperar = () =>
@@ -125,8 +146,6 @@ const pulsar = async (raiz: Raiz, titulo: string) => {
   });
   await esperar();
 };
-const porEtiqueta = (raiz: Raiz, etiqueta: string) =>
-  raiz.root.find((n) => n.props.accessibilityLabel === etiqueta && !!n.props.onPress);
 const qr = (raiz: Raiz) => raiz.root.findAll((n) => n.props.testID === 'codigo-qr')[0];
 
 beforeEach(() => {
@@ -145,11 +164,20 @@ beforeEach(() => {
     m.mockReset();
   }
   mockParams = { id: 'c1' };
-  Object.assign(datos, { lista: [], detalle: DETALLE, docs: [DOC] });
+  Object.assign(datos, {
+    lista: [],
+    detalle: DETALLE,
+    docs: [DOC],
+    cuenta: { estadoPago: 'al_dia', periodos: [] },
+  });
   mockGet.mockImplementation(async (ruta: string) => {
     if (ruta === '/contratos') return datos.lista;
     if (ruta === '/contratos/c1') return datos.detalle;
     if (ruta === '/contratos/c1/documentos') return datos.docs;
+    if (ruta === '/contratos/c1/estado-cuenta') {
+      if (!datos.cuenta) throw new ErrorSinConexion();
+      return datos.cuenta;
+    }
     throw new Error(`GET inesperado ${ruta}`);
   });
   mockDescargar.mockResolvedValue({ status: 200, uri: 'file:///cache/contrato-c1-v1.pdf' });
@@ -158,12 +186,79 @@ beforeEach(() => {
   mockCopiar.mockResolvedValue(true);
 });
 
-describe('Pestaña Contratos', () => {
+describe('Pestaña Contratos (R2-B)', () => {
   const montar = async () => {
     const r = await renderizarPantalla(<ContratosTab />);
     await esperar();
     return r;
   };
+  const filtro = (raiz: Raiz, etiqueta: string) =>
+    raiz.root.find(
+      (n) =>
+        n.props.accessibilityRole === 'tab' &&
+        typeof n.props.accessibilityLabel === 'string' &&
+        n.props.accessibilityLabel.startsWith(etiqueta) &&
+        !!n.props.onPress,
+    );
+  const elegir = async (raiz: Raiz, etiqueta: string) => {
+    await act(async () => filtro(raiz, etiqueta).props.onPress());
+  };
+  const buscar = async (raiz: Raiz, texto: string) => {
+    await act(async () =>
+      raiz.root
+        .find((n) => n.props.accessibilityLabel === 'Buscar contrato' && !!n.props.onChangeText)
+        .props.onChangeText(texto),
+    );
+  };
+  const fila = (raiz: Raiz, nombre: string) =>
+    raiz.root.find(
+      (n) =>
+        n.props.testID === 'fila-contrato' &&
+        typeof n.type !== 'string' &&
+        n.findAll((h) => h.props.children === nombre).length > 0,
+    );
+  const textosDeFila = (raiz: Raiz, nombre: string) =>
+    fila(raiz, nombre)
+      .findAll((n) => typeof n.type === 'string' && typeof n.props.children === 'string')
+      .map((n) => n.props.children as string);
+
+  // Al día, en mora, sin vincular, programado y dos cerrados (uno con deuda).
+  const LISTA = [
+    resumen({ id: 'a', vinculado: true, inquilino: { id: 'q1', nombre: 'José Peña' } }),
+    resumen({
+      id: 'm',
+      vinculado: true,
+      estado_pago: 'EN_MORA',
+      unidad: { id: 'u2', nombre: 'Local 5', tipo: 'LOCAL' },
+      inquilino: { id: 'q2', nombre: 'Laura Mejía' },
+    }),
+    resumen({
+      id: 's',
+      unidad: { id: 'u3', nombre: 'Casa Laureles', tipo: 'CASA' },
+      inquilino: { id: 'q3', nombre: 'Andrés Velásquez' },
+    }),
+    resumen({
+      id: 'p',
+      estado: 'PROGRAMADO',
+      estado_pago: 'PENDIENTE',
+      unidad: { id: 'u4', nombre: 'Apto 601', tipo: 'APARTAMENTO' },
+      inquilino: { id: 'q4', nombre: 'Paula Herrera' },
+    }),
+    resumen({
+      id: 'v',
+      estado: 'VENCIDO',
+      estado_pago: 'EN_MORA',
+      unidad: { id: 'u5', nombre: 'Apto 101', tipo: 'APARTAMENTO' },
+      inquilino: { id: 'q5', nombre: 'Marta Ríos' },
+    }),
+    resumen({
+      id: 'x',
+      estado: 'CANCELADO',
+      estado_pago: 'PENDIENTE',
+      unidad: { id: 'u6', nombre: 'Bodega', tipo: 'LOCAL' },
+      inquilino: { id: 'q6', nombre: 'Comercial Norte' },
+    }),
+  ];
 
   it('sin contratos: mensaje propio y botón "Nuevo contrato"', async () => {
     const { raiz } = await montar();
@@ -190,72 +285,109 @@ describe('Pestaña Contratos', () => {
     expect(textosDe(raiz)).toContain('Aún no tienes contratos');
   });
 
-  it('con contratos: unidad, inquilino, estado, fechas, canon y vínculo; toca para abrir el detalle', async () => {
-    datos.lista = [
-      resumen({ id: 'a', vinculado: true }),
-      resumen({
-        id: 'b',
-        estado: 'PROGRAMADO',
-        unidad: { id: 'u2', nombre: 'Local 1', tipo: 'LOCAL' },
-        inquilino: { id: 'q2', nombre: 'Laura Mejía' },
-      }),
-    ];
+  it('cabecera: "N contratos · M activos" y "Nuevo"', async () => {
+    datos.lista = LISTA;
     const { raiz } = await montar();
-    const textos = textosDe(raiz);
-    expect(textos).toContain('Apto 302');
-    expect(textos).toContain('Camilo Pardo');
-    expect(textos).toContain('Activo');
-    expect(textos).toContain('Programado');
-    expect(textos).toContain('Vinculado');
-    expect(textos).toContain('Sin vincular');
-    expect(textos).toContain('01/10/2026 – 30/09/2027');
-    expect(textos).toContain('$ 2.500.000');
-    await pulsar(raiz, 'Local 1');
-    expect(mockPush).toHaveBeenCalledWith({ pathname: '/contrato/[id]', params: { id: 'b' } });
-    // Con contratos, el botón "Nuevo contrato" sigue a la vista.
-    expect(hayBoton(raiz, 'Nuevo contrato')).toBe(true);
+    expect(textosDe(raiz)).toContain('6 contratos · 3 activos');
+    await pulsar(raiz, 'Nuevo');
+    expect(mockPush).toHaveBeenCalledWith('/contrato/nuevo');
   });
 
-  it('filtros: Activos, Programados, Finalizados y Todos; el vacío del filtro es otro mensaje', async () => {
-    datos.lista = [
-      resumen({ id: 'a', unidad: { id: 'u1', nombre: 'Unidad A', tipo: 'CASA' } }),
-      resumen({
-        id: 'p',
-        estado: 'PROGRAMADO',
-        unidad: { id: 'u2', nombre: 'Unidad P', tipo: 'CASA' },
-      }),
-      resumen({
-        id: 'v',
-        estado: 'VENCIDO',
-        unidad: { id: 'u3', nombre: 'Unidad V', tipo: 'CASA' },
-      }),
-      resumen({
-        id: 'x',
-        estado: 'CANCELADO',
-        unidad: { id: 'u4', nombre: 'Unidad X', tipo: 'CASA' },
-      }),
-    ];
+  it('fila: iniciales, inquilino, "unidad · hasta …", canon y estado con tono; abre el detalle', async () => {
+    datos.lista = LISTA;
     const { raiz } = await montar();
-    const filtrar = async (e: string) => act(async () => porEtiqueta(raiz, e).props.onPress());
+    expect(textosDeFila(raiz, 'José Peña')).toEqual(
+      expect.arrayContaining(['JP', 'Apto 302 · hasta 30/09/2027', '$ 2.500.000', 'Al día']),
+    );
+    expect(textosDeFila(raiz, 'Laura Mejía')).toContain('En mora');
+    expect(textosDeFila(raiz, 'Andrés Velásquez')).toContain('Sin vincular');
+    expect(textosDeFila(raiz, 'Paula Herrera')).toEqual(
+      expect.arrayContaining(['Apto 601 · desde 01/10/2026', 'Programado']),
+    );
+    await act(async () => fila(raiz, 'Laura Mejía').props.onPress());
+    expect(mockPush).toHaveBeenCalledWith({ pathname: '/contrato/[id]', params: { id: 'm' } });
+  });
 
-    await filtrar('Activos');
-    expect(textosDe(raiz)).toEqual(expect.arrayContaining(['Unidad A']));
-    expect(textosDe(raiz)).not.toContain('Unidad P');
-    await filtrar('Programados');
-    expect(textosDe(raiz)).toContain('Unidad P');
-    expect(textosDe(raiz)).not.toContain('Unidad A');
-    await filtrar('Finalizados');
-    expect(textosDe(raiz)).toContain('Unidad V');
-    expect(textosDe(raiz)).toContain('Unidad X');
-    expect(textosDe(raiz)).not.toContain('Unidad A');
-    await filtrar('Todos');
-    expect(textosDe(raiz)).toContain('Unidad A');
+  it('el punto y el texto de estado usan el tono: éxito, peligro, neutro y programado', async () => {
+    datos.lista = LISTA;
+    const { raiz } = await montar();
+    const punto = (nombre: string) =>
+      StyleSheet.flatten(
+        fila(raiz, nombre).findAll(
+          (n) => typeof n.type === 'string' && n.props.testID === 'punto-estado',
+        )[0].props.style,
+      ).backgroundColor;
+    expect(punto('José Peña')).toBe(coloresEstado.exito.senal);
+    expect(punto('Laura Mejía')).toBe(coloresEstado.peligro.senal);
+    expect(punto('Andrés Velásquez')).toBe(coloresEstado.neutro.senal);
+    expect(punto('Paula Herrera')).toBe(coloresEstado.programado.senal);
+  });
+
+  it('con "Todos", los cerrados van aparte en "Cerrados" (con su texto)', async () => {
+    datos.lista = LISTA;
+    const { raiz } = await montar();
+    const seccion = raiz.root.find(
+      (n) => n.props.testID === 'seccion-cerrados' && typeof n.type !== 'string',
+    );
+    const nombres = seccion
+      .findAll((n) => n.props.testID === 'fila-contrato' && !!n.props.onPress)
+      .map((n) => n.findAll((h) => typeof h.props.children === 'string')[0]);
+    expect(nombres).toHaveLength(2);
+    expect(textosDeFila(raiz, 'Marta Ríos')).toEqual(
+      expect.arrayContaining(['Apto 101 · finalizó el 30/09/2027', 'En mora']),
+    );
+    expect(textosDeFila(raiz, 'Comercial Norte')).toEqual(
+      expect.arrayContaining(['Bodega · cancelado', 'Cerrado']),
+    );
+    expect(textosDe(raiz)).toContain('Cerrados');
+  });
+
+  it('filtros con conteo: Todos 6, Activos 3, En mora 2, Cerrados 2; cada uno muestra lo suyo', async () => {
+    datos.lista = LISTA;
+    const { raiz } = await montar();
+    for (const [etiqueta, n] of [
+      ['Todos', 6],
+      ['Activos', 3],
+      ['En mora', 2],
+      ['Cerrados', 2],
+    ] as const) {
+      expect(filtro(raiz, etiqueta).props.accessibilityLabel).toBe(`${etiqueta}, ${n}`);
+    }
+    const visibles = () =>
+      raiz.root
+        .findAll((n) => n.props.testID === 'fila-contrato' && !!n.props.onPress)
+        .map((n) => n.props.accessibilityLabel as string);
+    await elegir(raiz, 'Activos');
+    expect(visibles()).toEqual(['José Peña', 'Laura Mejía', 'Andrés Velásquez']);
+    await elegir(raiz, 'En mora');
+    expect(visibles()).toEqual(['Laura Mejía', 'Marta Ríos']);
+    await elegir(raiz, 'Cerrados');
+    expect(visibles()).toEqual(['Marta Ríos', 'Comercial Norte']);
+    await elegir(raiz, 'Todos');
+    expect(visibles()).toHaveLength(6);
+  });
+
+  it('búsqueda por unidad o inquilino sin tildes; vacío con búsqueda tiene su propio mensaje', async () => {
+    datos.lista = LISTA;
+    const { raiz } = await montar();
+    await buscar(raiz, 'jose pena');
+    const visibles = () =>
+      raiz.root
+        .findAll((n) => n.props.testID === 'fila-contrato' && !!n.props.onPress)
+        .map((n) => n.props.accessibilityLabel as string);
+    expect(visibles()).toEqual(['José Peña']);
+    await buscar(raiz, 'LOCAL');
+    expect(visibles()).toEqual(['Laura Mejía']);
+    await buscar(raiz, 'zzz');
+    expect(visibles()).toEqual([]);
+    expect(textosDe(raiz).join(' ')).toContain('Ningún contrato coincide con «zzz»');
+    expect(textosDe(raiz)).not.toContain('Aún no tienes contratos');
   });
 
   it('ningún contrato en el filtro: mensaje distinto de "no tienes contratos"', async () => {
     datos.lista = [resumen({ id: 'a' })];
     const { raiz } = await montar();
-    await act(async () => porEtiqueta(raiz, 'Finalizados').props.onPress());
+    await elegir(raiz, 'Cerrados');
     expect(textosDe(raiz)).toContain('Ningún contrato en este filtro');
     expect(textosDe(raiz)).not.toContain('Aún no tienes contratos');
   });
@@ -272,26 +404,138 @@ describe('Pestaña Contratos', () => {
   });
 });
 
-describe('Detalle del contrato', () => {
+describe('Detalle del contrato (R2-B)', () => {
+  beforeEach(() => fijarReloj());
+  afterEach(() => restaurarReloj());
   const montar = async () => {
     const r = await renderizarPantalla(<Detalle />);
     await esperar();
     return r;
   };
+  const enGrilla = (raiz: Raiz, etiqueta: string) =>
+    raiz.root.find(
+      (n) =>
+        n.props.accessibilityRole === 'button' &&
+        n.props.accessibilityLabel === etiqueta &&
+        !!n.props.onPress,
+    );
 
-  it('datos: estado, unidad, plantilla, fechas, canon, día de pago e inquilino; vivienda sin depósito', async () => {
+  it('cabecera: chip combinado, plantilla, unidad, canon "/ mes · día N" y avance con días restantes', async () => {
+    const { raiz } = await montar();
+    const textos = textosDe(raiz);
+    expect(textos).toContain('Activo · Al día');
+    expect(textos).toContain('Vivienda urbana (Ley 820 de 2003)');
+    expect(textos).toContain('Apto 302');
+    expect(textos).toContain('$ 2.500.000');
+    expect(textos).toContain('/ mes · día 5');
+    expect(textos).toEqual(expect.arrayContaining(['01/10/2026', '30/09/2027']));
+    // Hoy (simulado) es 02/10/2026: faltan 363 días.
+    expect(textos).toContain('363 días restantes');
+  });
+
+  it('en mora: el chip lo dice; si no está activo, el estado reemplaza a los días restantes', async () => {
+    datos.detalle = { ...DETALLE, estado_pago: 'EN_MORA' };
+    let { raiz } = await montar();
+    expect(textosDe(raiz)).toContain('Activo · En mora');
+    datos.detalle = { ...DETALLE, estado: 'PROGRAMADO', estado_pago: 'PENDIENTE' };
+    ({ raiz } = await montar());
+    expect(textosDe(raiz)).toContain('Programado');
+    expect(textosDe(raiz).join(' ')).not.toContain('días restantes');
+    expect(textosDe(raiz).join(' ')).toContain('Empieza el 01/10/2026');
+  });
+
+  it('la flecha de atrás vuelve', async () => {
+    const { raiz } = await montar();
+    await act(async () => enGrilla(raiz, 'Volver').props.onPress());
+    expect(mockBack).toHaveBeenCalled();
+  });
+
+  it('tarjeta del inquilino: iniciales, nombre, cédula, vínculo y "Llamar" (tel:) solo con teléfono', async () => {
+    const abrir = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    const { raiz } = await montar();
+    const textos = textosDe(raiz);
+    expect(textos).toEqual(
+      expect.arrayContaining(['CP', 'Camilo Pardo', 'Cédula 1020304050', 'Sin vincular']),
+    );
+    await pulsar(raiz, 'Llamar');
+    expect(abrir).toHaveBeenCalledWith('tel:3001234567');
+
+    datos.detalle = {
+      ...DETALLE,
+      vinculado: true,
+      inquilino: { id: 'q1', nombre: 'Camilo Pardo', cedula: '1020304050' },
+    };
+    const sin = await montar();
+    expect(hayBoton(sin.raiz, 'Llamar')).toBe(false);
+    expect(textosDe(sin.raiz)).toContain('Vinculado');
+  });
+
+  it('accesos: Estado de cuenta, Documentos, Código de acceso e Inventario llevan a su pantalla', async () => {
+    const { raiz } = await montar();
+    for (const [etiqueta, pathname] of [
+      ['Estado de cuenta', '/contrato/[id]/estado-cuenta'],
+      ['Documentos', '/contrato/[id]/documentos'],
+      ['Código de acceso', '/contrato/[id]/acceso'],
+      ['Inventario', '/contrato/[id]/inventario'],
+    ] as const) {
+      await act(async () => enGrilla(raiz, etiqueta).props.onPress());
+      expect(mockPush).toHaveBeenLastCalledWith({ pathname, params: { id: 'c1' } });
+    }
+  });
+
+  it('próximos pagos: hasta 3 períodos sin pagar con su estado y fecha límite (del estado de cuenta)', async () => {
+    datos.cuenta = {
+      estadoPago: 'en_mora',
+      periodos: [
+        periodo('2026-10-01', 'PAGADO'),
+        periodo('2026-11-01', 'VENCIDO'),
+        periodo('2026-12-01', 'PARCIAL'),
+        periodo('2027-01-01', 'EN_REVISION'),
+        periodo('2027-02-01', 'PENDIENTE'),
+      ],
+    };
+    const { raiz } = await montar();
+    const seccion = raiz.root.find(
+      (n) => n.props.testID === 'proximos-pagos' && typeof n.type !== 'string',
+    );
+    const textos = seccion
+      .findAll((n) => typeof n.type === 'string' && typeof n.props.children === 'string')
+      .map((n) => n.props.children as string);
+    expect(textos).toEqual(
+      expect.arrayContaining(['Noviembre de 2026', 'Diciembre de 2026', 'Enero de 2027']),
+    );
+    expect(textos).not.toContain('Octubre de 2026');
+    expect(textos).not.toContain('Febrero de 2027');
+    expect(textos).toEqual(expect.arrayContaining(['Vencido', 'Parcial', 'En revisión']));
+    expect(textos).toContain('Fecha límite 05/11/2026');
+  });
+
+  it('próximos pagos sin pendientes: lo dice; si el estado de cuenta falla, no inventa nada', async () => {
+    datos.cuenta = { estadoPago: 'al_dia', periodos: [periodo('2026-10-01', 'PAGADO')] };
+    const { raiz } = await montar();
+    expect(textosDe(raiz)).toContain('No hay pagos pendientes.');
+    datos.cuenta = null;
+    const otro = await montar();
+    expect(textosDe(otro.raiz)).toContain('Camilo Pardo');
+    expect(textosDe(otro.raiz)).not.toContain('No hay pagos pendientes.');
+  });
+
+  it('condiciones: plantilla, día de pago, teléfono y datos de recaudo; vivienda sin depósito', async () => {
     datos.detalle = { ...DETALLE, deposito_centavos: 500_000_000 };
     const { raiz } = await montar();
     const textos = textosDe(raiz);
-    expect(textos).toContain('Activo');
-    expect(textos).toContain('Apto 302');
-    expect(textos).toContain('Vivienda urbana (Ley 820 de 2003)');
-    expect(textos).toContain('1 de octubre de 2026 al 30 de septiembre de 2027');
-    expect(textos).toContain('Canon: $ 2.500.000');
-    expect(textos).toContain('Día de pago: 5');
-    expect(textos).toContain('Camilo Pardo');
-    expect(textos).toContain('Cédula 1020304050');
-    expect(textos).toContain('Teléfono 3001234567');
+    expect(textos).toEqual(
+      expect.arrayContaining([
+        'Condiciones',
+        'Plantilla',
+        'Día de pago',
+        'Día 5 de cada mes',
+        'Teléfono del inquilino',
+        '3001234567',
+        'Datos de recaudo',
+        'Cuenta de ahorros 123',
+      ]),
+    );
     expect(textos.join('|')).not.toContain('Depósito');
   });
 
@@ -303,10 +547,8 @@ describe('Detalle del contrato', () => {
       inquilino: { ...DETALLE.inquilino, correo: 'camilo@x.co' },
     };
     const { raiz } = await montar();
-    expect(textosDe(raiz)).toContain('Depósito: $ 5.000.000');
-    expect(textosDe(raiz)).toContain('Correo camilo@x.co');
-    const sin = await montar();
-    expect(sin.raiz).toBeDefined();
+    expect(textosDe(raiz)).toEqual(expect.arrayContaining(['Depósito', '$ 5.000.000']));
+    expect(textosDe(raiz)).toContain('camilo@x.co');
   });
 
   it('historial de incrementos de IPC en solo lectura', async () => {
@@ -334,7 +576,7 @@ describe('Detalle del contrato', () => {
     expect(textosDe(raiz).join('|')).not.toContain('Incrementos de IPC');
   });
 
-  it('aviso de no renovación y terminación anticipada: solo información, sin botones de aviso ni de terminación', async () => {
+  it('aviso de no renovación y terminación anticipada: solo información, sin acciones de aviso ni de terminación', async () => {
     datos.detalle = {
       ...DETALLE,
       aviso_no_renovacion: {
@@ -357,24 +599,85 @@ describe('Detalle del contrato', () => {
     expect(todo).toContain('Me mudo');
     expect(todo).toContain('Terminación anticipada solicitada por el arrendador');
     expect(todo).toContain('31/01/2027');
-    // Sin los booleanos puede_dar / puede_cancelar del servidor no hay botones de aviso; la
-    // terminación anticipada llega en E5-C.
     for (const accion of [
       'Cancelar aviso',
       'Dar aviso de no renovación',
       'Confirmar terminación',
-      'Solicitar terminación',
+      'Solicitar terminación anticipada',
     ]) {
       expect(hayBoton(raiz, accion)).toBe(false);
     }
   });
 
-  it('"Fotos de inventario" abre la pantalla de inventario (entrega)', async () => {
-    const { raiz } = await montar();
-    await pulsar(raiz, 'Fotos de inventario');
-    expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/contrato/[id]/inventario',
-      params: { id: 'c1' },
+  describe('Gestionar contrato: filas según la disponibilidad existente', () => {
+    const FILAS = [
+      'Aplicar incremento',
+      'Prorrogar contrato',
+      'Dar aviso de no renovación',
+      'Cancelar aviso',
+      'Solicitar terminación anticipada',
+      'Corregir datos',
+      'Corregir datos del inquilino',
+      'Cancelar contrato programado',
+    ];
+    const filas = async (detalle: ContratoDetalle) => {
+      datos.detalle = detalle;
+      const { raiz } = await montar();
+      return FILAS.filter((t) => hayBoton(raiz, t));
+    };
+    const conAviso = (extra: Partial<ContratoDetalle>): ContratoDetalle => ({
+      ...DETALLE,
+      aviso_no_renovacion: {
+        estado: 'NINGUNO',
+        dado_por: null,
+        dado_en: null,
+        motivo: null,
+        puede_dar: true,
+        puede_cancelar: false,
+      },
+      ...extra,
+    });
+
+    it('activo vinculado: incremento, prórroga, aviso y terminación (sin corregir)', async () => {
+      expect(await filas(conAviso({ vinculado: true, codigo_acceso: null }))).toEqual([
+        'Aplicar incremento',
+        'Prorrogar contrato',
+        'Dar aviso de no renovación',
+        'Solicitar terminación anticipada',
+      ]);
+    });
+
+    it('activo sin vincular: además, corregir datos y datos del inquilino', async () => {
+      expect(await filas(conAviso({}))).toEqual([
+        'Aplicar incremento',
+        'Prorrogar contrato',
+        'Dar aviso de no renovación',
+        'Solicitar terminación anticipada',
+        'Corregir datos',
+        'Corregir datos del inquilino',
+      ]);
+    });
+
+    it('programado: corregir y cancelar el contrato programado', async () => {
+      expect(await filas({ ...DETALLE, estado: 'PROGRAMADO' })).toEqual([
+        'Corregir datos',
+        'Corregir datos del inquilino',
+        'Cancelar contrato programado',
+      ]);
+    });
+
+    it('cerrado: ninguna fila (y sin la sección)', async () => {
+      expect(await filas({ ...DETALLE, estado: 'VENCIDO' })).toEqual([]);
+      expect(textosDe((await montar()).raiz)).not.toContain('Gestionar contrato');
+    });
+
+    it('cada fila explica la acción en una línea', async () => {
+      datos.detalle = conAviso({});
+      const { raiz } = await montar();
+      const textos = textosDe(raiz);
+      expect(textos).toContain('Gestionar contrato');
+      expect(textos).toContain('Sube el canon con el IPC del año anterior.');
+      expect(textos).toContain('Mientras el inquilino no vincule el contrato.');
     });
   });
 
@@ -401,9 +704,10 @@ describe('Detalle del contrato', () => {
   });
 });
 
-describe('Detalle: documentos', () => {
+// R2-B: la sección de documentos pasó a su propia pantalla (contrato/[id]/documentos): mismas pruebas.
+describe('Documentos del contrato (pantalla)', () => {
   const montar = async () => {
-    const r = await renderizarPantalla(<Detalle />);
+    const r = await renderizarPantalla(<Documentos />);
     await esperar();
     return r;
   };
@@ -480,7 +784,8 @@ describe('Detalle: documentos', () => {
     const { raiz } = await montar();
     expect(textosDe(raiz)).toContain('Archivo no disponible');
     expect(hayBoton(raiz, 'Ver y compartir')).toBe(false);
-    expect(textosDe(raiz)).toContain('Camilo Pardo');
+    // La pantalla sigue en pie (antes se comprobaba con el nombre del inquilino del detalle).
+    expect(textosDe(raiz)).toContain('Contrato original');
   });
 
   it('la lista fresca trae el archivo sin URL: avisa "Archivo no disponible"', async () => {
@@ -523,9 +828,10 @@ describe('Detalle: documentos', () => {
   });
 });
 
-describe('Detalle: código de acceso', () => {
+// R2-B: el código de acceso pasó a su propia pantalla (contrato/[id]/acceso): mismas pruebas.
+describe('Código de acceso (pantalla)', () => {
   const montar = async () => {
-    const r = await renderizarPantalla(<Detalle />);
+    const r = await renderizarPantalla(<Acceso />);
     await esperar();
     return r;
   };
