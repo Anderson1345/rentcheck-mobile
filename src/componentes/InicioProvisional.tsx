@@ -12,14 +12,16 @@ import { Texto } from './Texto';
 interface Props {
   /** "Arrendador" o "Inquilino". */
   rol: string;
-  /** Entrega en la que llega la pantalla real ("E3"). */
+  /** Entrega en la que llega la pantalla real ("E9"). */
   entrega: string;
+  /** Ranura derecha de la cabecera (la campana de alertas). */
+  accion?: ReactNode;
   /** Avisos bajo el saludo (p. ej. el resultado de agregar un contrato). */
   children?: ReactNode;
 }
 
 /** Pantalla provisional de cada rol: saludo y "Cerrar sesión". Las reales llegan en E3 y E4. */
-export function InicioProvisional({ rol, entrega, children }: Props) {
+export function InicioProvisional({ rol, entrega, accion, children }: Props) {
   const { usuario, cerrarSesion } = useSesion();
   const nombre = usuario?.nombre ?? '';
 
@@ -36,6 +38,7 @@ export function InicioProvisional({ rol, entrega, children }: Props) {
               Hola, {nombre}
             </Texto>
           </View>
+          {accion}
         </View>
       </CabeceraTinta>
 

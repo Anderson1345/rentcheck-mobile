@@ -189,7 +189,7 @@ export const FRASE_ESTADO_ARRENDADOR: Record<EstadoSolicitud, string> = {
 
 /**
  * Lo que dice la confirmación. No se promete ninguna notificación: el inquilino ve el cambio al abrir
- * o refrescar sus solicitudes (no hay alertas, B-18).
+ * o refrescar sus solicitudes (la alerta de la campana, B-18, no es una promesa de entrega; el push es E10).
  */
 export function textoConfirmacion(accion: AccionEstado): {
   titulo: string;

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { colores, espaciado, tintaAlfa } from '../tema';
+import { colores, coloresEstado, conAlfa, espaciado, type TonoEstado, tintaAlfa } from '../tema';
 import { AvatarRelieve } from './avatar/AvatarRelieve';
 import { Icono, type NombreIcono } from './iconos/Icono';
 import { Texto } from './Texto';
@@ -17,6 +17,8 @@ interface Props {
   avatar?: string;
   /** …o un icono en mosaico… */
   icono?: NombreIcono;
+  /** Tono del mosaico del icono (fondo tenue y trazo del color del estado); sin tono, el neutro de siempre. */
+  tonoIcono?: TonoEstado;
   /** …o una miniatura de 56 dp (la foto de un inmueble). */
   miniatura?: ReactNode;
   /** Chevron a la derecha cuando la fila abre un detalle. */
@@ -34,6 +36,7 @@ export function FilaLista({
   valor,
   avatar,
   icono,
+  tonoIcono,
   miniatura,
   conChevron = false,
   separador = false,
@@ -46,8 +49,18 @@ export function FilaLista({
       ) : avatar ? (
         <AvatarRelieve nombre={avatar} tamano={40} />
       ) : icono ? (
-        <View style={estilos.mosaico}>
-          <Icono nombre={icono} tamano={22} grosor={1.7} />
+        <View
+          style={[
+            estilos.mosaico,
+            tonoIcono && { backgroundColor: conAlfa(coloresEstado[tonoIcono].senal, 0.14) },
+          ]}
+        >
+          <Icono
+            nombre={icono}
+            tamano={22}
+            grosor={1.7}
+            color={tonoIcono ? coloresEstado[tonoIcono].texto : undefined}
+          />
         </View>
       ) : null}
       <View style={estilos.textos}>

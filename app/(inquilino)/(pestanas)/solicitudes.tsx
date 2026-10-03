@@ -16,8 +16,8 @@ import { useContratoSeleccionado } from '@/inquilino/ContratoSeleccionado';
 import { colores, espaciado } from '@/tema';
 
 // Solicitudes de mantenimiento del inquilino, del contrato seleccionado: lista por "Abiertas" y
-// "Resueltas", y "Nueva solicitud" solo con contrato ACTIVO. No hay alertas del cambio de estado
-// (B-18): la lista se vuelve a pedir al abrir, al volver a enfocar y al arrastrar.
+// "Resueltas", y "Nueva solicitud" solo con contrato ACTIVO. El cambio de estado avisa por la campana
+// (B-18), pero la lista no se actualiza sola: se vuelve a pedir al abrir, al volver a enfocar y al arrastrar.
 export default function SolicitudesInquilino() {
   const router = useRouter();
   const cliente = useQueryClient();

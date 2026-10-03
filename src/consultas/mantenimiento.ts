@@ -27,7 +27,10 @@ export const clavesMantenimiento = {
   detalle: (id: string) => [...clavesInquilino.todos, 'solicitudes', 'detalle', id] as const,
 };
 
-/** Las solicitudes del contrato. El estado cambia desde el arrendador y no hay alertas (B-18): se refresca al abrir. */
+/**
+ * Las solicitudes del contrato. El estado cambia desde el arrendador: la alerta de B0.6-B2 avisa (campana),
+ * pero la lista no se actualiza sola; se refresca al abrir.
+ */
 export function useMisSolicitudes(contratoId: string | null) {
   return useQuery({
     queryKey: clavesMantenimiento.lista(contratoId ?? ''),
@@ -80,7 +83,8 @@ export const clavesSolicitudes = {
 
 /**
  * UNA lista sin filtro de estado: los segmentos y sus contadores se calculan en la app. Sin
- * paginación (B-72). El estado cambia desde otros dispositivos y no hay alertas: se refresca al abrir.
+ * paginación (B-72). El estado cambia desde otros dispositivos (y las alertas nuevas llegan por la
+ * campana): la lista se refresca al abrir.
  */
 export function useSolicitudes(filtros: FiltrosSolicitudes) {
   return useQuery({

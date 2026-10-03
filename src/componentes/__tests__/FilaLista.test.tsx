@@ -1,7 +1,9 @@
 import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
+import { coloresEstado, conAlfa } from '../../tema';
 import { FilaLista } from '../FilaLista';
+import { Icono } from '../iconos/Icono';
 
 function renderizar(elemento: React.ReactElement): ReactTestRenderer {
   let raiz!: ReactTestRenderer;
@@ -63,6 +65,27 @@ describe('FilaLista', () => {
     ).toBe(74);
     expect(margenSeparador(renderizar(<FilaLista titulo="A" separador icono="pagos" />))).toBe(74);
     expect(margenSeparador(renderizar(<FilaLista titulo="A" separador />))).toBe(16);
+  });
+});
+
+describe('FilaLista con tono del icono (alertas)', () => {
+  it('con tonoIcono el mosaico y el trazo toman el color del estado', () => {
+    const raiz = renderizar(
+      <FilaLista titulo="Pago rechazado" icono="rechazar" tonoIcono="peligro" />,
+    );
+    const icono = raiz.root.findByType(Icono);
+    expect(icono.props.color).toBe(coloresEstado.peligro.texto);
+    const mosaico = raiz.root.findAll(
+      (n) =>
+        n.type === View &&
+        estiloDe(n).backgroundColor === conAlfa(coloresEstado.peligro.senal, 0.14),
+    );
+    expect(mosaico).toHaveLength(1);
+  });
+
+  it('sin tonoIcono el icono conserva su color por defecto', () => {
+    const raiz = renderizar(<FilaLista titulo="Algo" icono="pagos" />);
+    expect(raiz.root.findByType(Icono).props.color).toBeUndefined();
   });
 });
 
