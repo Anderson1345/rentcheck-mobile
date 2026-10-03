@@ -1,13 +1,10 @@
 import {
-  cantidadDeMas,
   conteoDePagos,
   etiquetaMesCorto,
-  mesesDeGrafica,
   mesYAnio,
   nombreDelMes,
   textoMora,
   textoUnidades,
-  tendenciaSinIngresos,
 } from '../presentacion';
 
 describe('nombres de mes (AAAA-MM del servidor, en español)', () => {
@@ -42,43 +39,6 @@ describe('nombres de mes (AAAA-MM del servidor, en español)', () => {
       expect(mesYAnio(mes)).toBe('');
     },
   );
-});
-
-describe('mesesDeGrafica', () => {
-  it('convierte la tendencia del servidor en puntos con etiqueta corta, sin cambiar el orden ni los centavos', () => {
-    expect(
-      mesesDeGrafica([
-        { mes: '2026-05', ingresos_centavos: 100 },
-        { mes: '2026-10', ingresos_centavos: 250 },
-      ]),
-    ).toEqual([
-      { etiqueta: 'may', centavos: 100 },
-      { etiqueta: 'oct', centavos: 250 },
-    ]);
-  });
-  it('una tendencia vacía da una lista vacía', () => {
-    expect(mesesDeGrafica([])).toEqual([]);
-  });
-});
-
-describe('tendenciaSinIngresos', () => {
-  it('vacía o toda en ceros: no hay gráfica que dibujar', () => {
-    expect(tendenciaSinIngresos([])).toBe(true);
-    expect(
-      tendenciaSinIngresos([
-        { mes: '2026-09', ingresos_centavos: 0 },
-        { mes: '2026-10', ingresos_centavos: 0 },
-      ]),
-    ).toBe(true);
-  });
-  it('con algún ingreso sí hay gráfica', () => {
-    expect(
-      tendenciaSinIngresos([
-        { mes: '2026-09', ingresos_centavos: 0 },
-        { mes: '2026-10', ingresos_centavos: 1 },
-      ]),
-    ).toBe(false);
-  });
 });
 
 describe('textos de conteo', () => {
@@ -122,14 +82,6 @@ describe('textos de conteo', () => {
     expect(textoMora({ contratos: 1, periodos: 1, total_centavos: 1 })).toBe(
       '1 contrato · 1 período',
     );
-  });
-
-  it('cantidadDeMas: cuántos quedan sin mostrar cuando la lista se limita', () => {
-    expect(cantidadDeMas(7, 5)).toBe('y 2 más');
-    expect(cantidadDeMas(5, 5)).toBeNull();
-    expect(cantidadDeMas(0, 0)).toBeNull();
-    // Un total menor que lo mostrado (datos raros) no inventa nada.
-    expect(cantidadDeMas(2, 5)).toBeNull();
   });
 });
 

@@ -10,6 +10,8 @@ interface Props {
   aprobadoCentavos: number;
   enRevisionCentavos: number;
   sinReportarCentavos: number;
+  /** Sin leyenda (R3-A: la cabecera del Panel pone la suya, abreviada). Por defecto, con leyenda. */
+  conLeyenda?: boolean;
 }
 
 const LADO = 116;
@@ -24,6 +26,7 @@ export function AnilloRecaudo({
   aprobadoCentavos,
   enRevisionCentavos,
   sinReportarCentavos,
+  conLeyenda = true,
 }: Props) {
   const total = aprobadoCentavos + enRevisionCentavos + sinReportarCentavos;
   const porcentaje = porcentajeEntero(aprobadoCentavos, total);
@@ -102,21 +105,32 @@ export function AnilloRecaudo({
         </View>
       </View>
 
-      <View style={estilos.leyenda}>
-        {leyenda.map((item) => (
-          <View key={item.etiqueta} style={estilos.itemLeyenda}>
-            <View style={estilos.filaEtiqueta}>
-              <View style={[estilos.muestra, item.muestra]} />
-              <Texto variante="secundario" color={blancoAlfa(0.68)} style={estilos.etiquetaLeyenda}>
-                {item.etiqueta}
+      {conLeyenda ? (
+        <View style={estilos.leyenda}>
+          {leyenda.map((item) => (
+            <View key={item.etiqueta} style={estilos.itemLeyenda}>
+              <View style={estilos.filaEtiqueta}>
+                <View style={[estilos.muestra, item.muestra]} />
+                <Texto
+                  variante="secundario"
+                  color={blancoAlfa(0.68)}
+                  style={estilos.etiquetaLeyenda}
+                >
+                  {item.etiqueta}
+                </Texto>
+              </View>
+              <Texto
+                variante="cuerpoFuerte"
+                color={colores.sobreTinta}
+                cifras
+                style={estilos.valor}
+              >
+                {centavosAPesosTexto(item.centavos)}
               </Texto>
             </View>
-            <Texto variante="cuerpoFuerte" color={colores.sobreTinta} cifras style={estilos.valor}>
-              {centavosAPesosTexto(item.centavos)}
-            </Texto>
-          </View>
-        ))}
-      </View>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
