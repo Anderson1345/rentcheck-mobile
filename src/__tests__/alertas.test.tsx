@@ -422,9 +422,37 @@ describe('CampanaAlertas', () => {
   });
 });
 
+const PANEL_VACIO = {
+  mes: '2026-10',
+  calculado_para: '2026-10-02',
+  ingresos_mes_centavos: 0,
+  recaudo: {
+    esperado_centavos: 0,
+    aprobado_centavos: 0,
+    en_revision_centavos: 0,
+    sin_reportar_centavos: 0,
+    contratos: 0,
+  },
+  ocupacion: { unidades: 0, ocupadas: 0, libres: 0, con_contrato_programado: 0 },
+  mora: { contratos: 0, periodos: 0, total_centavos: 0 },
+  tendencia: [],
+  pendientes: {
+    comprobantes_por_validar: 0,
+    mantenimientos_pendientes: 0,
+    contratos_por_vencer: { cantidad: 0, contratos: [] },
+    incrementos_disponibles: { cantidad: 0, contratos: [] },
+    terminaciones_por_confirmar: { cantidad: 0, contratos: [] },
+  },
+};
+
 describe('la campana está en la cabecera de cada rol', () => {
   it('Panel del arrendador: campana con el punto del conteo de alertas del arrendador', async () => {
-    programar({ conteo: 2 });
+    // El Panel real pide también /arrendadores/panel: un Panel vacío basta para esta prueba.
+    mockGet.mockImplementation(async (url: string) => {
+      if (url === '/alertas/conteo') return { no_leidas: 2 };
+      if (url === '/arrendadores/panel') return PANEL_VACIO;
+      throw new Error(`ruta inesperada ${url}`);
+    });
     const { raiz } = await renderizarPantalla(<PanelArrendador />, sesionArrendador);
     expect(mockGet).toHaveBeenCalledWith('/alertas/conteo');
     const campana = raiz.root.findByType(BotonIcono);
