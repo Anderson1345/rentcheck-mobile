@@ -19,7 +19,10 @@ export default function LayoutArrendador() {
       <Stack.Screen name="pago/[id]" options={{ title: 'Pago' }} />
       <Stack.Screen name="mantenimiento/index" options={{ title: 'Mantenimiento' }} />
       <Stack.Screen name="mantenimiento/[id]" options={{ title: 'Solicitud' }} />
-      <Stack.Screen name="contrato/[id]/index" options={{ title: 'Contrato' }} />
+      {/* R2-B: el detalle dibuja su propia cabecera de tinta (con atrás). */}
+      <Stack.Screen name="contrato/[id]/index" options={{ headerShown: false }} />
+      <Stack.Screen name="contrato/[id]/documentos" options={{ title: 'Documentos' }} />
+      <Stack.Screen name="contrato/[id]/acceso" options={{ title: 'Código de acceso' }} />
       <Stack.Screen name="contrato/[id]/estado-cuenta" options={{ title: 'Estado de cuenta' }} />
       <Stack.Screen name="contrato/[id]/incremento" options={{ title: 'Incremento anual' }} />
       <Stack.Screen name="contrato/[id]/prorroga" options={{ title: 'Prórroga' }} />

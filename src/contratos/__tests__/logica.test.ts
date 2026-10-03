@@ -1,4 +1,5 @@
 import type { ContratoResumen } from '../../api/contratos';
+import { contratoListaEjemplo } from '../../pruebas/datosContratos';
 import { borradorInicial } from '../esquemas';
 import { fechaFinPorMeses, sumarDias, sumarMeses } from '../fechasContrato';
 import { ocupacionPorUnidad, textoOcupacion } from '../ocupacion';
@@ -92,19 +93,18 @@ describe('fechasContrato', () => {
   );
 });
 
-const contrato = (extra: Partial<ContratoResumen> & { unidadId?: string }): ContratoResumen => ({
-  id: 'c1',
-  estado: 'ACTIVO',
-  fecha_inicio: '2026-01-01T00:00:00.000Z',
-  fecha_fin: '2026-12-31T00:00:00.000Z',
-  canon_centavos: 100_000_000,
-  tipo_plantilla: 'VIVIENDA_URBANA_LEY_820',
-  vinculado: false,
-  unidad: { id: extra.unidadId ?? 'u1', nombre: 'Apto', tipo: 'APARTAMENTO' },
-  inquilino: { id: 'q1', nombre: 'Camilo Pardo' },
-  codigo_acceso: null,
-  ...extra,
-});
+// R2-B: el elemento de GET /contratos es el tipo generado (ContratoListaDto); se parte del ejemplo completo.
+const contrato = ({
+  unidadId,
+  ...extra
+}: Partial<ContratoResumen> & { unidadId?: string }): ContratoResumen =>
+  contratoListaEjemplo({
+    fecha_inicio: '2026-01-01T00:00:00.000Z',
+    fecha_fin: '2026-12-31T00:00:00.000Z',
+    canon_centavos: 100_000_000,
+    unidad: { id: unidadId ?? 'u1', nombre: 'Apto', tipo: 'APARTAMENTO' },
+    ...extra,
+  });
 
 describe('ocupacionPorUnidad', () => {
   it('solo cuenta ACTIVO y PROGRAMADO; sugiere el día siguiente al último fin', () => {
