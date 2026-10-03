@@ -33,6 +33,8 @@ export function ControlSegmentado<T extends string>({ opciones, valor, onCambio 
                 : opcion.etiqueta
             }
             onPress={() => onCambio(opcion.valor)}
+            // La opción mide 40 dp (48 menos el relleno): 2 dp más por arriba y por abajo llegan a 44.
+            hitSlop={{ top: 2, bottom: 2 }}
             style={[estilos.opcion, activa && estilos.activa]}
           >
             <Texto

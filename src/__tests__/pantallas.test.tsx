@@ -135,24 +135,55 @@ const Proveedor = ({ children }: { children: ReactElement }) => (
   <ContratoSeleccionadoProvider>{children}</ContratoSeleccionadoProvider>
 );
 
-describe.each([
-  ['Bienvenida', () => <Bienvenida />],
-  ['Diagnóstico', () => <Diagnostico />],
-  ['Galería', () => <Galeria />],
-  ['Login del arrendador', () => <LoginArrendador />],
-  ['Registro del arrendador', () => <RegistroArrendador />],
-  ['Login del inquilino', () => <LoginInquilino />],
-  ['Revisa tu correo', () => <VerificaCorreo />],
-  ['Activar (paso 1)', () => <Activar />],
-  ['Activar con enlace', () => <ActivarConEnlace />],
-  ['Recuperar contraseña', () => <RecuperarContrasena />],
-  ['Restablecer contraseña', () => <RestablecerContrasena />],
-  ['Página no disponible', () => <NoEncontrada />],
-  ['Panel del arrendador', () => <PanelArrendador />, true],
-  ['Contratos del arrendador', () => <ContratosArrendador />, true],
-  ['Pagos del arrendador', () => <PagosArrendador />, true],
-  ['Más del arrendador', () => <MasArrendador />, true],
-  ['Nuevo inmueble', () => <NuevoInmueble />, true],
+/**
+ * Algo propio de cada pantalla que ya existe al cargar (sin datos del servidor): un texto visible o una
+ * etiqueta accesible (campo, indicador de carga). Así "renderiza" no pasa con una pantalla en blanco.
+ */
+type Esperado = { texto: string } | { etiqueta: string };
+
+const hayEsperado = (raiz: ReactTestRenderer, esperado: Esperado) =>
+  'texto' in esperado
+    ? textos(raiz).includes(esperado.texto)
+    : raiz.root.findAll((n) => n.props.accessibilityLabel === esperado.etiqueta).length > 0;
+
+describe.each<[string, () => ReactElement, boolean, Esperado]>([
+  ['Bienvenida', () => <Bienvenida />, false, { texto: '¿Cómo vas a usar RentCheck?' }],
+  ['Diagnóstico', () => <Diagnostico />, false, { texto: 'Conectando con el servidor…' }],
+  ['Galería', () => <Galeria />, false, { texto: 'Sistema visual Medianoche' }],
+  ['Login del arrendador', () => <LoginArrendador />, false, { texto: 'Iniciar sesión' }],
+  ['Registro del arrendador', () => <RegistroArrendador />, false, { etiqueta: 'Teléfono' }],
+  [
+    'Login del inquilino',
+    () => <LoginInquilino />,
+    false,
+    { texto: 'Tengo un código de activación' },
+  ],
+  ['Revisa tu correo', () => <VerificaCorreo />, false, { etiqueta: 'Código de verificación' }],
+  ['Activar (paso 1)', () => <Activar />, false, { etiqueta: 'Código de activación' }],
+  [
+    'Activar con enlace',
+    () => <ActivarConEnlace />,
+    false,
+    { texto: 'El enlace no es válido. Escribe tu código.' },
+  ],
+  ['Recuperar contraseña', () => <RecuperarContrasena />, false, { texto: 'Enviar código' }],
+  [
+    'Restablecer contraseña',
+    () => <RestablecerContrasena />,
+    false,
+    { texto: 'Cambiar contraseña' },
+  ],
+  [
+    'Página no disponible',
+    () => <NoEncontrada />,
+    false,
+    { texto: 'Esta pantalla no está disponible' },
+  ],
+  ['Panel del arrendador', () => <PanelArrendador />, true, { texto: 'Hola, Marta Ríos' }],
+  ['Contratos del arrendador', () => <ContratosArrendador />, true, { texto: 'Contratos' }],
+  ['Pagos del arrendador', () => <PagosArrendador />, true, { texto: 'Aprobados' }],
+  ['Más del arrendador', () => <MasArrendador />, true, { texto: 'Cerrar sesión' }],
+  ['Nuevo inmueble', () => <NuevoInmueble />, true, { etiqueta: 'Matrícula inmobiliaria' }],
   [
     'Mi panel del inquilino',
     () => (
@@ -161,6 +192,7 @@ describe.each([
       </Proveedor>
     ),
     true,
+    { texto: 'Mi panel' },
   ],
   [
     'Pagos del inquilino',
@@ -170,8 +202,11 @@ describe.each([
       </Proveedor>
     ),
     true,
+    { texto: 'Pagos' },
   ],
   [
+    // El formulario ("Monto pagado", "Enviar") aparece cuando llegan los datos (se prueba en
+    // pagosInquilino.test); al cargar solo existe el indicador, que es lo que se exige aquí.
     'Reportar pago del inquilino',
     () => (
       <Proveedor>
@@ -179,6 +214,7 @@ describe.each([
       </Proveedor>
     ),
     true,
+    { etiqueta: 'Cargando' },
   ],
   [
     'Solicitudes del inquilino',
@@ -188,6 +224,7 @@ describe.each([
       </Proveedor>
     ),
     true,
+    { texto: 'Solicitudes' },
   ],
   [
     'Más del inquilino',
@@ -197,6 +234,7 @@ describe.each([
       </Proveedor>
     ),
     true,
+    { texto: 'Mi perfil' },
   ],
   [
     'Mis contratos del inquilino (cargando)',
@@ -206,6 +244,7 @@ describe.each([
       </Proveedor>
     ),
     true,
+    { texto: 'Cargando tus contratos…' },
   ],
   [
     'Agregar contrato con código',
@@ -215,12 +254,18 @@ describe.each([
       </Proveedor>
     ),
     true,
+    { etiqueta: 'Código de acceso' },
   ],
-])('%s', (_nombre, pantalla, conArrendador = false) => {
+])('%s', (_nombre, pantalla, conArrendador, esperado) => {
+  it('muestra su contenido propio al cargar', async () => {
+    const raiz = await renderizar(pantalla(), conArrendador);
+    expect(hayEsperado(raiz, esperado)).toBe(true);
+    act(() => raiz.unmount());
+  });
+
   it('renderiza; todo texto usa Manrope y respeta el tamaño mínimo', async () => {
     const raiz = await renderizar(pantalla(), conArrendador);
     const lista = estilosDeTexto(raiz);
-    // U8: Reportar pago ya no repite el título en el cuerpo; mientras carga solo hay esqueleto (sin texto).
     expect(raiz.toJSON()).not.toBeNull();
     for (const { estilo } of lista) {
       expect(FAMILIAS.has(String(estilo.fontFamily))).toBe(true);
@@ -241,6 +286,15 @@ describe.each([
 });
 
 describe('Galería', () => {
+  it('muestra la cabecera de acceso en sus dos variantes', async () => {
+    const raiz = await renderizar(<Galeria />);
+    const visibles = new Set(textos(raiz));
+    expect(visibles).toContain('Cabecera de acceso');
+    expect(visibles).toContain('Tus arriendos, claros y al día.');
+    expect(visibles).toContain('Crea tu cuenta');
+    act(() => raiz.unmount());
+  });
+
   it('muestra todos los estados, la urgencia y "Vence en N días"', async () => {
     const raiz = await renderizar(<Galeria />);
     const visibles = new Set(textos(raiz));

@@ -11,7 +11,7 @@ import { useCapacidades } from '../consultas/capacidades';
 import { type DatosLogin, esquemaLogin } from '../sesion/esquemas';
 import { useSesion } from '../sesion/SesionProvider';
 import type { RolSesion } from '../sesion/tipos';
-import { colores, espaciado } from '../tema';
+import { colores } from '../tema';
 import { Aviso } from './Aviso';
 import { Boton } from './Boton';
 import { CampoTexto } from './CampoTexto';
@@ -74,6 +74,21 @@ export function FormularioLogin({ rol, enviar, correoInicial = '' }: Props) {
     });
   }
 
+  // "¿La olvidaste?" va a la derecha de la etiqueta Contraseña (maqueta); si la recuperación está apagada
+  // en el servidor no se muestra.
+  const enlaceOlvido = hayRecuperacion ? (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel="¿Olvidaste tu contraseña?"
+      onPress={irARecuperar}
+      hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
+    >
+      <Texto variante="etiqueta" color={colores.tintaCapa}>
+        ¿La olvidaste?
+      </Texto>
+    </Pressable>
+  ) : undefined;
+
   return (
     <>
       {aviso === 'SESION_VENCIDA' ? (
@@ -119,6 +134,7 @@ export function FormularioLogin({ rol, enviar, correoInicial = '' }: Props) {
             onBlur={field.onBlur}
             error={errors.contrasena?.message}
             contrasena
+            etiquetaDerecha={enlaceOlvido}
             inputRef={contrasena}
             autoCapitalize="none"
             autoComplete="current-password"
@@ -128,18 +144,6 @@ export function FormularioLogin({ rol, enviar, correoInicial = '' }: Props) {
           />
         )}
       />
-      {hayRecuperacion ? (
-        <Pressable
-          accessibilityRole="link"
-          onPress={irARecuperar}
-          hitSlop={8}
-          style={{ alignSelf: 'flex-start', paddingVertical: espaciado.xs }}
-        >
-          <Texto variante="etiqueta" color={colores.tintaCapa}>
-            ¿Olvidaste tu contraseña?
-          </Texto>
-        </Pressable>
-      ) : null}
       <Boton
         titulo="Iniciar sesión"
         tituloCargando="Entrando…"

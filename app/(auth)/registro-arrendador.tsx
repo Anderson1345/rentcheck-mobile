@@ -48,7 +48,19 @@ export default function RegistroArrendador() {
   });
 
   return (
-    <PantallaFormulario titulo="Crea tu cuenta" subtitulo="Para arrendadores">
+    <PantallaFormulario
+      titulo="Crea tu cuenta"
+      subtitulo="Para arrendadores"
+      accionFija={
+        <Boton
+          titulo="Crear cuenta"
+          tituloCargando="Creando cuenta…"
+          cargando={isSubmitting}
+          ancho="completo"
+          onPress={() => void alEnviar()}
+        />
+      }
+    >
       {errorServidor ? <Aviso mensaje={errorServidor} /> : null}
 
       <Controller
@@ -128,13 +140,6 @@ export default function RegistroArrendador() {
             onSubmitEditing={() => void alEnviar()}
           />
         )}
-      />
-      <Boton
-        titulo="Crear cuenta"
-        tituloCargando="Creando cuenta…"
-        cargando={isSubmitting}
-        ancho="completo"
-        onPress={() => void alEnviar()}
       />
     </PantallaFormulario>
   );

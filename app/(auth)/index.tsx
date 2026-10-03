@@ -1,15 +1,14 @@
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MENSAJE_SESION_VENCIDA } from '@/api/errores';
 import { Aviso } from '@/componentes/Aviso';
 import { Boton } from '@/componentes/Boton';
-import { CabeceraTinta, ContenidoBajoCabecera } from '@/componentes/CabeceraTinta';
-import { Marca } from '@/componentes/Marca';
+import { CabeceraAcceso } from '@/componentes/CabeceraAcceso';
 import { Texto } from '@/componentes/Texto';
 import { useSesion } from '@/sesion/SesionProvider';
-import { blancoAlfa, colores, espaciado } from '@/tema';
+import { colores, espaciado } from '@/tema';
 
 export default function Bienvenida() {
   const router = useRouter();
@@ -18,63 +17,71 @@ export default function Bienvenida() {
 
   return (
     <View style={estilos.pantalla}>
-      <CabeceraTinta conSolapa style={estilos.cabecera}>
-        <Marca />
-        <Texto variante="cuerpo" color={blancoAlfa(0.68)} style={estilos.lema}>
-          Tus arriendos, claros y al día.
-        </Texto>
-      </CabeceraTinta>
+      <CabeceraAcceso />
 
-      <ContenidoBajoCabecera style={[estilos.cuerpo, { paddingBottom: bottom + espaciado.xs }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[estilos.cuerpo, { paddingBottom: bottom + espaciado.md }]}
+      >
         {aviso === 'SESION_VENCIDA' ? (
           <Aviso tono="advertencia" mensaje={MENSAJE_SESION_VENCIDA} />
         ) : null}
-        <Texto variante="tituloSeccion">¿Cómo vas a usar RentCheck?</Texto>
-        <View style={estilos.acciones}>
-          <Boton
-            titulo="Soy arrendador"
-            icono="inmuebles"
-            ancho="completo"
-            onPress={() => router.push('/login-arrendador')}
-          />
-          <Boton
-            titulo="Soy inquilino"
-            icono="perfil"
-            variante="secundario"
-            ancho="completo"
-            onPress={() => router.push('/login-inquilino')}
-          />
+        {/* El grupo ocupa el centro del espacio libre: nada de media pantalla vacía debajo. */}
+        <View style={estilos.grupo}>
+          <Texto variante="tituloSeccion">¿Cómo vas a usar RentCheck?</Texto>
+          <View style={estilos.acciones}>
+            <Boton
+              titulo="Soy arrendador"
+              icono="inmuebles"
+              ancho="completo"
+              onPress={() => router.push('/login-arrendador')}
+            />
+            <Boton
+              titulo="Soy inquilino"
+              icono="perfil"
+              variante="secundario"
+              ancho="completo"
+              onPress={() => router.push('/login-inquilino')}
+            />
+          </View>
         </View>
 
-        <View style={estilos.pie}>
-          <Pressable
-            accessibilityRole="link"
-            onPress={() => router.push('/diagnostico')}
-            hitSlop={8}
-          >
-            <Texto variante="secundario" color={colores.textoSecundario} style={estilos.enlace}>
-              Diagnóstico
+        {/* Solo para pruebas: en la app de producción estos enlaces no existen. */}
+        {__DEV__ ? (
+          <View style={estilos.pie}>
+            <Pressable
+              accessibilityRole="link"
+              onPress={() => router.push('/diagnostico')}
+              hitSlop={8}
+            >
+              <Texto variante="secundario" color={colores.textoSecundario} style={estilos.enlace}>
+                Diagnóstico
+              </Texto>
+            </Pressable>
+            <Texto variante="secundario" color={colores.textoSecundario}>
+              ·
             </Texto>
-          </Pressable>
-          <Texto variante="secundario" color={colores.textoSecundario}>
-            ·
-          </Texto>
-          <Pressable accessibilityRole="link" onPress={() => router.push('/galeria')} hitSlop={8}>
-            <Texto variante="secundario" color={colores.textoSecundario} style={estilos.enlace}>
-              Galería
-            </Texto>
-          </Pressable>
-        </View>
-      </ContenidoBajoCabecera>
+            <Pressable accessibilityRole="link" onPress={() => router.push('/galeria')} hitSlop={8}>
+              <Texto variante="secundario" color={colores.textoSecundario} style={estilos.enlace}>
+                Galería
+              </Texto>
+            </Pressable>
+          </View>
+        ) : null}
+      </ScrollView>
     </View>
   );
 }
 
 const estilos = StyleSheet.create({
   pantalla: { flex: 1, backgroundColor: colores.fondo },
-  cabecera: { flex: 1, justifyContent: 'flex-end' },
-  lema: { marginTop: espaciado.sm },
-  cuerpo: { gap: espaciado.lg, paddingTop: espaciado.xl },
+  cuerpo: {
+    flexGrow: 1,
+    gap: espaciado.lg,
+    paddingHorizontal: espaciado.xl,
+    paddingTop: 28,
+  },
+  grupo: { flexGrow: 1, justifyContent: 'center', gap: espaciado.lg },
   acciones: { gap: espaciado.sm },
   pie: {
     flexDirection: 'row',

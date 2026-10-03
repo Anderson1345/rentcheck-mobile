@@ -209,9 +209,10 @@ describe('formulario de login', () => {
 
   it('el login del inquilino llama a su endpoint y trae la nota de activación', async () => {
     const { raiz } = await renderizar(<LoginInquilino />);
-    expect(textos(raiz).join(' ')).toContain(
-      '¿Aún no tienes cuenta? Tu arrendador te dará un código de activación.',
-    );
+    // R1-B: la pregunta y el enlace "Tengo un código de activación" van juntos; la nota queda debajo.
+    const visibles = textos(raiz).join(' ');
+    expect(visibles).toContain('¿Aún no tienes cuenta?');
+    expect(visibles).toContain('Tu arrendador te dará un código de activación.');
     mockIniciarInquilino.mockResolvedValueOnce({
       access_token: crearToken({ inquilinoId: 'i1', exp: EXP_LEJANO }),
       inquilino: { id: 'i1', nombre: 'Camilo', correo: 'c@x.co', telefono: '3', creado_en: 'x' },

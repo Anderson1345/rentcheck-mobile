@@ -185,6 +185,17 @@ describe('activar: paso 2 (crear la cuenta)', () => {
     expect(visibles).toContain('Calle 45 # 12-30');
   });
 
+  it('R1-B: "Crear mi cuenta" queda en la barra de acción fija, fuera del contenido que se desplaza', async () => {
+    const { raiz } = await renderizarPantalla(<Activar />);
+    await irAlPaso2(raiz);
+    const barra = raiz.root.findByProps({ testID: 'accion-fija' });
+    expect(barra.findAll((n) => n.props.children === 'Crear mi cuenta').length).toBeGreaterThan(0);
+    const desplazable = raiz.root.findAll(
+      (n) => n.props.keyboardShouldPersistTaps === 'handled',
+    )[0];
+    expect(desplazable.findAll((n) => n.props.children === 'Crear mi cuenta')).toHaveLength(0);
+  });
+
   it('campos con autofill: correo, contraseña nueva y confirmación nueva', async () => {
     const { raiz } = await renderizarPantalla(<Activar />);
     await irAlPaso2(raiz);
