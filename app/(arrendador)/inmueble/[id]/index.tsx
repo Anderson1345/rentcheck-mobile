@@ -167,6 +167,7 @@ export default function DetalleInmueble() {
         variante="grande"
         descripcion={`Foto de portada de ${inmueble.direccion}`}
         alFallarUrl={() => void refetch({ cancelRefetch: false })}
+        ampliable
       />
       {subiendo ? (
         <Texto variante="secundario" color={colores.textoSecundario}>

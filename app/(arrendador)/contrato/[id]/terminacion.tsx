@@ -37,9 +37,6 @@ export default function TerminacionAnticipada() {
         if (accion.fase === 'exito') {
           return (
             <View style={estilos.grupo}>
-              <Texto variante="titulo" accessibilityRole="header">
-                Terminación anticipada
-              </Texto>
               <Aviso tono="exito" mensaje="Solicitud enviada. La otra parte debe confirmarla." />
               <Boton titulo="Listo" ancho="completo" onPress={() => router.back()} />
             </View>

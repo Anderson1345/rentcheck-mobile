@@ -16,6 +16,8 @@ interface Apariencia {
   icono: string;
   sombra?: string;
   brillo?: number;
+  /** Borde fino (variante secundaria). */
+  borde?: string;
 }
 
 /** Normal y presionado de cada variante, tomados de la hoja de componentes. */
@@ -50,9 +52,20 @@ const APARIENCIAS: Record<VarianteBoton, { normal: Apariencia; presionado: Apari
       brillo: 0.3,
     },
   },
+  // R1: botón con borde fino y fondo superficie (antes, una píldora gris). Texto en tinta: contraste AA.
   secundario: {
-    normal: { fondo: tintaAlfa(0.07), texto: colores.tinta, icono: colores.tinta },
-    presionado: { fondo: tintaAlfa(0.13), texto: colores.tinta, icono: colores.tinta },
+    normal: {
+      fondo: colores.superficie,
+      texto: colores.tinta,
+      icono: colores.tinta,
+      borde: tintaAlfa(0.14),
+    },
+    presionado: {
+      fondo: colores.fondo,
+      texto: colores.tinta,
+      icono: colores.tinta,
+      borde: tintaAlfa(0.24),
+    },
   },
   destructivo: {
     normal: {
@@ -152,6 +165,7 @@ export function Boton({
           estilos.base,
           ancho === 'completo' && estilos.completo,
           apariencia.sombra ? { boxShadow: apariencia.sombra } : null,
+          apariencia.borde ? { borderWidth: 1, borderColor: apariencia.borde } : null,
           pressed && !inactivo && estilos.presionado,
           style,
         ];

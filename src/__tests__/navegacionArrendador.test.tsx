@@ -546,7 +546,8 @@ describe('asistente de contrato con los layouts reales', () => {
     await creado.rt.act(async () => {
       await new Promise<void>((r) => setTimeout(r, 20));
     });
-    expect(creado.textos()).toContain('Contrato creado');
+    // U8: el título lo pone el encabezado de la pila; el cuerpo no lo repite.
+    expect(creado.textos()).not.toContain('Contrato creado');
     expect(creado.textos()).toContain('RC-AB3D-9KPX');
   });
 

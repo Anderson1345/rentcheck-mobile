@@ -59,6 +59,7 @@ export default function Inmuebles() {
 
       <ContenidoBajoCabecera style={estilos.cuerpo}>
         <ScrollView
+          showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           refreshControl={<RefreshControl refreshing={refrescando} onRefresh={arrastrar} />}
           contentContainerStyle={[estilos.contenido, { paddingBottom: bottom + espaciado.xl }]}

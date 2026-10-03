@@ -294,7 +294,9 @@ export default function InventarioContrato() {
                     url={foto.foto_url}
                     variante="miniatura"
                     inmuebleId={`inventario:${foto.id}`}
+                    descripcion={`Foto de inventario: ${foto.zona}`}
                     alFallarUrl={() => void lista.refetch({ cancelRefetch: false })}
+                    ampliable
                   />
                 }
                 titulo={foto.zona}

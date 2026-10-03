@@ -140,7 +140,8 @@ export const alturas = {
   boton: 54,
   botonIcono: 48,
   botonIconoCompacto: 44,
-  campo: 64,
+  /** Caja de los campos de formulario (R1: etiqueta fuera, ya no flotante). */
+  campo: 56,
   segmentado: 48,
   barraInferior: 80,
 } as const;

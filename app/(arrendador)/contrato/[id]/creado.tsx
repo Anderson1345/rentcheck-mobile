@@ -57,9 +57,6 @@ export default function ContratoCreado() {
 
   return (
     <PantallaPila>
-      <Texto variante="titulo" accessibilityRole="header">
-        Contrato creado
-      </Texto>
       <Superficie style={estilos.tarjeta}>
         {contrato.estado === 'ACTIVO' || programado ? (
           <ChipEstado tipo="contrato" estado={contrato.estado} />

@@ -51,6 +51,7 @@ export default function Diagnostico() {
 
       <ContenidoBajoCabecera style={estilos.cuerpo}>
         <ScrollView
+          showsVerticalScrollIndicator={false}
           contentContainerStyle={[estilos.contenido, { paddingBottom: bottom + espaciado.xl }]}
         >
           {consulta.isFetching ? (

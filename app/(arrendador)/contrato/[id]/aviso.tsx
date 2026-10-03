@@ -31,9 +31,6 @@ export default function AvisoNoRenovacion() {
         if (accion.fase === 'exito') {
           return (
             <View style={estilos.grupo}>
-              <Texto variante="titulo" accessibilityRole="header">
-                Aviso de no renovación
-              </Texto>
               <Aviso tono="exito" mensaje="Aviso de no renovación dado." />
               <Boton titulo="Listo" ancho="completo" onPress={() => router.back()} />
             </View>

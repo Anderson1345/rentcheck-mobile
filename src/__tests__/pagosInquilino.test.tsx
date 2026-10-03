@@ -414,6 +414,19 @@ describe('pestaña Pagos del inquilino', () => {
 // ---------------------------------------------------------------------------------------------
 
 describe('formulario de reporte de pago', () => {
+  it('U8: el título lo pone solo el encabezado de la pila y "Enviar" queda en la barra fija', async () => {
+    const { raiz } = await montar(<ReportarPago />);
+    // El cuerpo no repite "Reportar pago" (lo muestra el encabezado nativo).
+    expect(textosDe(raiz)).not.toContain('Reportar pago');
+    // El botón principal vive en la barra fija, no dentro del contenido que se desplaza.
+    const barra = raiz.root.findByProps({ testID: 'accion-fija' });
+    expect(barra.findAll((n) => n.props.children === 'Enviar').length).toBeGreaterThan(0);
+    const desplazable = raiz.root.findAll(
+      (n) => n.props.keyboardShouldPersistTaps === 'handled',
+    )[0];
+    expect(desplazable.findAll((n) => n.props.children === 'Enviar').length).toBe(0);
+  });
+
   it('preselecciona el período del parámetro y precarga el monto con el saldo del período', async () => {
     const { raiz } = await montar(<ReportarPago />);
     expect(todo(raiz)).toContain('Octubre de 2026');

@@ -13,6 +13,9 @@ interface Props {
   detalle?: ReactNode;
   /** Valor a la derecha: texto (monto ya formateado) o cualquier nodo (contador, chip). */
   valor?: ReactNode;
+  /** Texto de estado debajo del valor ("Pagado", "Vence en 3 días"), con el color de `tonoValorSecundario`. */
+  valorSecundario?: string;
+  tonoValorSecundario?: TonoEstado;
   /** Avatar de relieve de la persona (por nombre)… */
   avatar?: string;
   /** …o un icono en mosaico… */
@@ -34,6 +37,8 @@ export function FilaLista({
   subtitulo,
   detalle,
   valor,
+  valorSecundario,
+  tonoValorSecundario,
   avatar,
   icono,
   tonoIcono,
@@ -75,7 +80,28 @@ export function FilaLista({
           </Texto>
         ) : null}
       </View>
-      {typeof valor === 'string' ? (
+      {valorSecundario !== undefined && valor ? (
+        <View style={estilos.columnaValor}>
+          {typeof valor === 'string' ? (
+            <Texto variante="valor" cifras style={estilos.valorEnColumna}>
+              {valor}
+            </Texto>
+          ) : (
+            valor
+          )}
+          <Texto
+            variante="secundario"
+            color={
+              tonoValorSecundario
+                ? coloresEstado[tonoValorSecundario].texto
+                : colores.textoSecundario
+            }
+            style={estilos.valorEnColumna}
+          >
+            {valorSecundario}
+          </Texto>
+        </View>
+      ) : typeof valor === 'string' ? (
         <Texto variante="valor" cifras style={estilos.valor}>
           {valor}
         </Texto>
@@ -140,5 +166,7 @@ const estilos = StyleSheet.create({
   },
   // El valor no cede espacio; si es muy largo (una fecha), salta de línea antes que aplastar el texto.
   valor: { flexShrink: 0, maxWidth: '55%', textAlign: 'right' },
+  columnaValor: { flexShrink: 0, maxWidth: '55%', alignItems: 'flex-end', gap: 2 },
+  valorEnColumna: { textAlign: 'right' },
   separador: { height: 1, backgroundColor: tintaAlfa(0.07) },
 });

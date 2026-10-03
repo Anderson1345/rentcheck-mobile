@@ -2,7 +2,7 @@
 // ejemplo de la hoja de componentes del diseño y todos sus estados. No usa la API.
 import { useRouter } from 'expo-router';
 import { type ReactNode, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AvatarRelieve, type TamanoAvatar } from '@/componentes/avatar/AvatarRelieve';
@@ -11,11 +11,14 @@ import { Boton } from '@/componentes/Boton';
 import { BotonIcono } from '@/componentes/BotonIcono';
 import { CabeceraTinta, ContenidoBajoCabecera, TituloCabecera } from '@/componentes/CabeceraTinta';
 import { CampoDinero } from '@/componentes/CampoDinero';
+import { CampoTexto } from '@/componentes/CampoTexto';
 import { ChipEstado, type PropsChipEstado } from '@/componentes/ChipEstado';
 import { ControlSegmentado } from '@/componentes/ControlSegmentado';
 import { EsqueletoCarga } from '@/componentes/EsqueletoCarga';
 import { MAPAS_ESTADO, type TipoEstado, URGENCIAS, type Urgencia } from '@/componentes/estados';
+import { EncabezadoSeccion } from '@/componentes/EncabezadoSeccion';
 import { FilaLista } from '@/componentes/FilaLista';
+import { GrillaAccesos } from '@/componentes/GrillaAccesos';
 import { AnilloRecaudo } from '@/componentes/graficas/AnilloRecaudo';
 import { GraficaAreaIngresos } from '@/componentes/graficas/GraficaAreaIngresos';
 import { LineaTiempoPeriodos, type PeriodoLinea } from '@/componentes/graficas/LineaTiempoPeriodos';
@@ -30,10 +33,14 @@ import { NavInferior } from '@/componentes/navegacion/NavInferior';
 import { PantallaConectando } from '@/componentes/PantallaConectando';
 import { Superficie } from '@/componentes/Superficie';
 import { Texto, type VarianteTexto } from '@/componentes/Texto';
+import { ImagenAmpliable } from '@/componentes/VisorImagen';
 import { blancoAlfa, colores, coloresEstado, espaciado, radios, sombras, tintaAlfa } from '@/tema';
 import { centavosAPesosTexto } from '@/utilidades/dinero';
 
 // ---------- Datos de ejemplo (hoja de componentes y pantallas del diseño) ----------
+
+/** Imagen local del proyecto (sin red) para probar el visor. */
+const IMAGEN_EJEMPLO = Image.resolveAssetSource(require('../../assets/images/icon.png')).uri;
 
 const MESES_INGRESOS = [
   { etiqueta: 'mar', centavos: 1_680_000_000 },
@@ -203,6 +210,9 @@ export default function Galeria() {
   const [filtro, setFiltro] = useState<'validar' | 'vencidos' | 'historial'>('validar');
   const [monto, setMonto] = useState<number | null>(185_000_000);
   const [montoVacio, setMontoVacio] = useState<number | null>(null);
+  const [correo, setCorreo] = useState('');
+  const [clave, setClave] = useState('');
+  const [nombre, setNombre] = useState('Paula Herrera');
   const [pestanaArrendador, setPestanaArrendador] = useState('pagos-arrendador');
   const [pestanaInquilino, setPestanaInquilino] = useState('mi-panel');
   const [cargando, setCargando] = useState(false);
@@ -224,6 +234,7 @@ export default function Galeria() {
 
       <ContenidoBajoCabecera style={estilos.cuerpo}>
         <ScrollView
+          showsVerticalScrollIndicator={false}
           contentContainerStyle={[estilos.contenido, { paddingBottom: bottom + espaciado.xxl }]}
         >
           {/* ---------- Cabecera de tinta ---------- */}
@@ -523,7 +534,7 @@ export default function Galeria() {
 
           <Seccion
             titulo="Campo de dinero"
-            descripcion="Etiqueta flotante, prefijo $ y teclado numérico. Guarda centavos."
+            descripcion="Etiqueta arriba, prefijo $ dentro de la caja y teclado numérico. Guarda centavos."
           >
             <CampoDinero
               etiqueta="Monto pagado"
@@ -545,10 +556,121 @@ export default function Galeria() {
             />
           </Seccion>
 
+          <Seccion
+            titulo="Campo de texto"
+            descripcion="Etiqueta fuera y arriba, caja de 56 dp con borde fino; el foco sube a 2 dp con anillo lima; ayuda y error debajo."
+          >
+            <CampoTexto
+              etiqueta="Correo electrónico"
+              valor={correo}
+              onCambio={setCorreo}
+              ayuda="Con él entras a RentCheck."
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <CampoTexto
+              etiqueta="Contraseña"
+              valor={clave}
+              onCambio={setClave}
+              contrasena
+              etiquetaDerecha={
+                <Texto variante="etiqueta" color={colores.textoFuerte}>
+                  ¿La olvidaste?
+                </Texto>
+              }
+            />
+            <CampoTexto
+              etiqueta="Celular"
+              valor={nombre}
+              onCambio={setNombre}
+              prefijo="+57"
+              keyboardType="phone-pad"
+            />
+            <CampoTexto
+              etiqueta="Nombre completo"
+              valor=""
+              onCambio={() => undefined}
+              error="Escribe tu nombre completo."
+            />
+          </Seccion>
+
+          {/* ---------- Encabezado de sección y accesos ---------- */}
+          <Seccion
+            titulo="Accesos y encabezado de sección"
+            descripcion="Grilla de 4 (o 3) accesos con mosaico de 56 dp; el destacado va en tinta con icono lima."
+          >
+            <EncabezadoSeccion
+              titulo="Acciones del contrato"
+              enlace={{ etiqueta: 'Ver todas', onPress: () => undefined }}
+            />
+            <GrillaAccesos
+              accesos={[
+                {
+                  clave: 'pagos',
+                  etiqueta: 'Pagos',
+                  icono: 'pagos',
+                  onPress: () => undefined,
+                  destacado: true,
+                },
+                {
+                  clave: 'inventario',
+                  etiqueta: 'Inventario',
+                  icono: 'inmuebles',
+                  onPress: () => undefined,
+                },
+                {
+                  clave: 'mantenimiento',
+                  etiqueta: 'Mantenimiento',
+                  icono: 'mantenimiento',
+                  onPress: () => undefined,
+                },
+                {
+                  clave: 'documentos',
+                  etiqueta: 'Documentos',
+                  icono: 'documento',
+                  onPress: () => undefined,
+                },
+              ]}
+            />
+            <EncabezadoSeccion titulo="Sin enlace" />
+            <GrillaAccesos
+              columnas={3}
+              accesos={[
+                {
+                  clave: 'a',
+                  etiqueta: 'Calendario',
+                  icono: 'calendario',
+                  onPress: () => undefined,
+                },
+                { clave: 'b', etiqueta: 'Alertas', icono: 'alerta', onPress: () => undefined },
+                {
+                  clave: 'c',
+                  etiqueta: 'Sin permiso',
+                  icono: 'compartir',
+                  onPress: () => undefined,
+                  deshabilitado: true,
+                },
+              ]}
+            />
+          </Seccion>
+
+          <Seccion
+            titulo="Visor de imagen"
+            descripcion="Toca la imagen: pantalla completa con zoom por pellizco, doble toque y cierre por arrastre o botón."
+          >
+            <ImagenAmpliable uri={IMAGEN_EJEMPLO} descripcion="foto de ejemplo">
+              <View style={estilos.fotoEjemplo}>
+                <Texto variante="secundario" color={blancoAlfa(0.8)}>
+                  Toca para ampliar
+                </Texto>
+              </View>
+            </ImagenAmpliable>
+          </Seccion>
+
           {/* ---------- Filas ---------- */}
           <Seccion
             titulo="Filas de lista"
-            descripcion="Título, subtítulo, valor a la derecha; avatar o icono opcional."
+            descripcion="Título, descripción de hasta 2 líneas, valor con su estado debajo; avatar o mosaico de icono (con tono) opcional."
           >
             <Superficie relleno="ninguno">
               <FilaLista
@@ -570,6 +692,16 @@ export default function Galeria() {
                   </>
                 }
                 valor={centavosAPesosTexto(320_000_000)}
+              />
+              <FilaLista
+                separador
+                icono="pagos"
+                tonoIcono="exito"
+                titulo="Pago de septiembre"
+                subtitulo="Transferencia reportada por el inquilino; falta confirmar el comprobante adjunto"
+                valor={centavosAPesosTexto(185_000_000)}
+                valorSecundario="Pagado"
+                tonoValorSecundario="exito"
               />
               <FilaLista
                 separador
@@ -718,6 +850,13 @@ const estilos = StyleSheet.create({
   flex: { flex: 1 },
   flexMayor: { flex: 1.4 },
   margenArriba: { marginTop: espaciado.sm },
+  fotoEjemplo: {
+    height: 140,
+    borderRadius: radios.medio,
+    backgroundColor: colores.tinta,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   bloqueTinta: {
     backgroundColor: colores.tinta,
     borderRadius: radios.grande,
