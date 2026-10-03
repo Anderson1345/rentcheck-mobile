@@ -60,7 +60,9 @@ jest.mock('../api/auth', () => ({
   vincularContrato: (...a: unknown[]) => mockVincular(...a),
 }));
 
-const ENLACE = '¿Olvidaste tu contraseña?';
+// R1-B: el enlace va a la derecha de la etiqueta Contraseña con el texto de la maqueta; su etiqueta
+// accesible sigue siendo "¿Olvidaste tu contraseña?".
+const ENLACE = '¿La olvidaste?';
 const hayEnlace = (raiz: Parameters<typeof textosDe>[0], texto: string) =>
   raiz.root.findAll(
     (n) =>
@@ -235,10 +237,11 @@ describe('login: correo precargado y correo sin verificar', () => {
 });
 
 describe('login del inquilino: activación y código pendiente', () => {
-  it('trae el botón "Tengo un código de activación" y la nota', async () => {
+  it('trae el enlace "Tengo un código de activación" y la nota', async () => {
     const { raiz } = await renderizarPantalla(<LoginInquilino />);
     expect(textosDe(raiz).join(' ')).toContain('Tu arrendador te dará un código de activación');
-    await pulsar(raiz, 'Tengo un código de activación');
+    // R1-B: ahora es un enlace del pie (antes un botón secundario).
+    await act(async () => enlace(raiz, 'Tengo un código de activación').props.onPress());
     expect(mockPush).toHaveBeenCalledWith('/activar');
   });
 

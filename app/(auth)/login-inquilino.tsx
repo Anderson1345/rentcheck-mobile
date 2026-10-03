@@ -3,14 +3,12 @@ import { useEffect } from 'react';
 
 import { iniciarSesionInquilino } from '@/api/auth';
 import { Aviso } from '@/componentes/Aviso';
-import { Boton } from '@/componentes/Boton';
+import { PieAcceso, SelectorRolAcceso } from '@/componentes/ElementosAcceso';
 import { FormularioLogin } from '@/componentes/FormularioLogin';
 import { PantallaFormulario } from '@/componentes/PantallaFormulario';
-import { Texto } from '@/componentes/Texto';
 import { validarCodigo } from '@/sesion/codigo';
 import { guardarCodigoPendiente, limpiarCodigoPendiente } from '@/sesion/codigoPendiente';
 import { useSesion } from '@/sesion/SesionProvider';
-import { colores } from '@/tema';
 
 export default function LoginInquilino() {
   const router = useRouter();
@@ -34,26 +32,25 @@ export default function LoginInquilino() {
   }, [codigoPendiente, leerEstado]);
 
   return (
-    <PantallaFormulario titulo="Soy inquilino" subtitulo="Inicia sesión en tu cuenta">
+    <PantallaFormulario>
+      <SelectorRolAcceso rol="inquilino" />
       {codigoPendiente ? (
         <Aviso
           tono="informacion"
           mensaje={`Al iniciar sesión agregaremos tu código ${codigoPendiente}.`}
         />
       ) : null}
+      {/* G1: aquí irán "Continuar con Google" y el separador "o con tu correo" (aún no existen). */}
       <FormularioLogin
         rol="inquilino"
         correoInicial={typeof correo === 'string' ? correo : ''}
         enviar={(datos) => iniciarSesionInquilino(datos.correo, datos.contrasena)}
       />
       {/* La activación con el código del arrendador es la otra forma de entrar. */}
-      <Texto variante="secundario" color={colores.textoSecundario}>
-        ¿Aún no tienes cuenta? Tu arrendador te dará un código de activación.
-      </Texto>
-      <Boton
-        titulo="Tengo un código de activación"
-        variante="secundario"
-        ancho="completo"
+      <PieAcceso
+        pregunta="¿Aún no tienes cuenta?"
+        enlace="Tengo un código de activación"
+        nota="Tu arrendador te dará un código de activación."
         onPress={() => router.push('/activar')}
       />
     </PantallaFormulario>

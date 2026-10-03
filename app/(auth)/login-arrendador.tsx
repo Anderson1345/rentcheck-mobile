@@ -1,30 +1,26 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { iniciarSesionArrendador } from '@/api/auth';
-import { Boton } from '@/componentes/Boton';
+import { PieAcceso, SelectorRolAcceso } from '@/componentes/ElementosAcceso';
 import { FormularioLogin } from '@/componentes/FormularioLogin';
 import { PantallaFormulario } from '@/componentes/PantallaFormulario';
-import { Texto } from '@/componentes/Texto';
-import { colores } from '@/tema';
 
 export default function LoginArrendador() {
   const router = useRouter();
   const { correo } = useLocalSearchParams<{ correo?: string }>();
 
   return (
-    <PantallaFormulario titulo="Soy arrendador" subtitulo="Inicia sesión en tu cuenta">
+    <PantallaFormulario>
+      <SelectorRolAcceso rol="arrendador" />
+      {/* G1: aquí irán "Continuar con Google" y el separador "o con tu correo" (aún no existen). */}
       <FormularioLogin
         rol="arrendador"
         correoInicial={typeof correo === 'string' ? correo : ''}
         enviar={(datos) => iniciarSesionArrendador(datos.correo, datos.contrasena)}
       />
-      <Texto variante="secundario" color={colores.textoSecundario}>
-        ¿Aún no tienes cuenta?
-      </Texto>
-      <Boton
-        titulo="Crear cuenta de arrendador"
-        variante="secundario"
-        ancho="completo"
+      <PieAcceso
+        pregunta="¿No tienes cuenta?"
+        enlace="Crear cuenta"
         onPress={() => router.push('/registro-arrendador')}
       />
     </PantallaFormulario>

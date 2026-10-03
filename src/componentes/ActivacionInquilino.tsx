@@ -24,6 +24,8 @@ import { PantallaFormulario } from './PantallaFormulario';
 import { Superficie } from './Superficie';
 import { Texto } from './Texto';
 
+const TITULO = 'Activa tu cuenta';
+const SUBTITULO = 'Con el código de tu arrendador';
 const MENSAJE_FORMATO = 'Revisa el código: tiene el formato RC-XXXX-XXXX.';
 
 type Paso =
@@ -43,8 +45,29 @@ export function ActivacionInquilino({ codigoInicial = '', avisoInicial }: Props)
   const [paso, setPaso] = useState<Paso>({ tipo: 'codigo' });
   const [aviso, setAviso] = useState<string | null>(null);
 
+  // El paso de la cuenta (el formulario largo) lleva su propio marco para anclar el botón abajo.
+  if (paso.tipo === 'cuenta') {
+    return (
+      <PasoCuenta
+        codigo={paso.codigo}
+        datos={paso.datos}
+        onYaTieneCuenta={() =>
+          setPaso({
+            tipo: 'iniciarSesion',
+            codigo: paso.codigo,
+            mensaje: MENSAJES_ERROR.REQUIERE_INICIO_SESION,
+          })
+        }
+        onCodigoInvalido={(mensaje) => {
+          setAviso(mensaje);
+          setPaso({ tipo: 'codigo' });
+        }}
+      />
+    );
+  }
+
   return (
-    <PantallaFormulario titulo="Activa tu cuenta" subtitulo="Con el código de tu arrendador">
+    <PantallaFormulario titulo={TITULO} subtitulo={SUBTITULO}>
       {paso.tipo === 'codigo' ? (
         <PasoCodigo
           codigoInicial={codigoInicial}
@@ -56,22 +79,6 @@ export function ActivacionInquilino({ codigoInicial = '', avisoInicial }: Props)
                 : { tipo: 'cuenta', codigo, datos },
             )
           }
-        />
-      ) : paso.tipo === 'cuenta' ? (
-        <PasoCuenta
-          codigo={paso.codigo}
-          datos={paso.datos}
-          onYaTieneCuenta={() =>
-            setPaso({
-              tipo: 'iniciarSesion',
-              codigo: paso.codigo,
-              mensaje: MENSAJES_ERROR.REQUIERE_INICIO_SESION,
-            })
-          }
-          onCodigoInvalido={(mensaje) => {
-            setAviso(mensaje);
-            setPaso({ tipo: 'codigo' });
-          }}
         />
       ) : (
         <PasoYaTengoCuenta codigo={paso.codigo} mensaje={paso.mensaje} />
@@ -196,7 +203,19 @@ function PasoCuenta({
   });
 
   return (
-    <>
+    <PantallaFormulario
+      titulo={TITULO}
+      subtitulo={SUBTITULO}
+      accionFija={
+        <Boton
+          titulo="Crear mi cuenta"
+          tituloCargando="Creando cuenta…"
+          cargando={isSubmitting}
+          ancho="completo"
+          onPress={() => void alEnviar()}
+        />
+      }
+    >
       <Superficie style={estilos.tarjeta}>
         <Texto variante="tituloSeccion" accessibilityRole="header">
           Hola, {datos.nombreInquilino}
@@ -274,14 +293,7 @@ function PasoCuenta({
           />
         )}
       />
-      <Boton
-        titulo="Crear mi cuenta"
-        tituloCargando="Creando cuenta…"
-        cargando={isSubmitting}
-        ancho="completo"
-        onPress={() => void alEnviar()}
-      />
-    </>
+    </PantallaFormulario>
   );
 }
 

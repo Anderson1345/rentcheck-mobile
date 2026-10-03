@@ -9,6 +9,7 @@ import { AvatarRelieve, type TamanoAvatar } from '@/componentes/avatar/AvatarRel
 import { NUMERO_VARIANTES, seleccionarRelieve } from '@/componentes/avatar/seleccion';
 import { Boton } from '@/componentes/Boton';
 import { BotonIcono } from '@/componentes/BotonIcono';
+import { CabeceraAcceso } from '@/componentes/CabeceraAcceso';
 import { CabeceraTinta, ContenidoBajoCabecera, TituloCabecera } from '@/componentes/CabeceraTinta';
 import { CampoDinero } from '@/componentes/CampoDinero';
 import { CampoTexto } from '@/componentes/CampoTexto';
@@ -237,6 +238,24 @@ export default function Galeria() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[estilos.contenido, { paddingBottom: bottom + espaciado.xxl }]}
         >
+          {/* ---------- Cabecera de acceso ---------- */}
+          <Seccion
+            titulo="Cabecera de acceso"
+            descripcion="Grande (marca y frase: bienvenida y logins) y compacta (volver, título y subtítulo: registro, recuperar, activar)."
+          >
+            <View style={estilos.cabeceraAcceso}>
+              <CabeceraAcceso />
+            </View>
+            <View style={estilos.cabeceraAcceso}>
+              <CabeceraAcceso
+                variante="compacta"
+                titulo="Crea tu cuenta"
+                subtitulo="Para arrendadores"
+                onVolver={() => undefined}
+              />
+            </View>
+          </Seccion>
+
           {/* ---------- Cabecera de tinta ---------- */}
           <Seccion
             titulo="Cabecera de tinta"
@@ -850,6 +869,7 @@ const estilos = StyleSheet.create({
   flex: { flex: 1 },
   flexMayor: { flex: 1.4 },
   margenArriba: { marginTop: espaciado.sm },
+  cabeceraAcceso: { borderRadius: radios.grande, overflow: 'hidden' },
   fotoEjemplo: {
     height: 140,
     borderRadius: radios.medio,
