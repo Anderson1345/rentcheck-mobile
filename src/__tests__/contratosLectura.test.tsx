@@ -384,6 +384,28 @@ describe('Pestaña Contratos (R2-B)', () => {
     expect(textosDe(raiz)).not.toContain('Aún no tienes contratos');
   });
 
+  it('con ?filtro=EN_MORA ("Ver cartera" del Panel) llega con el filtro En mora activo', async () => {
+    datos.lista = LISTA;
+    mockParams = { filtro: 'EN_MORA' };
+    const { raiz } = await montar();
+    expect(filtro(raiz, 'En mora').props.accessibilityState).toMatchObject({ selected: true });
+    expect(
+      raiz.root
+        .findAll((n) => n.props.testID === 'fila-contrato' && !!n.props.onPress)
+        .map((n) => n.props.accessibilityLabel as string),
+    ).toEqual(['Laura Mejía', 'Marta Ríos']);
+    // Se puede cambiar de filtro como siempre.
+    await elegir(raiz, 'Todos');
+    expect(filtro(raiz, 'Todos').props.accessibilityState).toMatchObject({ selected: true });
+  });
+
+  it('un ?filtro desconocido se ignora (Todos)', async () => {
+    datos.lista = LISTA;
+    mockParams = { filtro: 'NO_EXISTE' };
+    const { raiz } = await montar();
+    expect(filtro(raiz, 'Todos').props.accessibilityState).toMatchObject({ selected: true });
+  });
+
   it('ningún contrato en el filtro: mensaje distinto de "no tienes contratos"', async () => {
     datos.lista = [resumen({ id: 'a' })];
     const { raiz } = await montar();

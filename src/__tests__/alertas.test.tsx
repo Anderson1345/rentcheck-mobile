@@ -17,6 +17,7 @@ import { BotonIcono } from '../componentes/BotonIcono';
 import { CampanaAlertas } from '../componentes/alertas/CampanaAlertas';
 import { crearToken } from '../pruebas/crearToken';
 import { botonDe, hayBoton, pulsar, renderizarPantalla, textosDe } from '../pruebas/pantallas';
+import { panelEjemplo } from '../pruebas/datosPanel';
 import { fijarReloj, restaurarReloj } from '../pruebas/reloj';
 import type { DatosSesion } from '../sesion/tipos';
 
@@ -422,28 +423,8 @@ describe('CampanaAlertas', () => {
   });
 });
 
-const PANEL_VACIO = {
-  mes: '2026-10',
-  calculado_para: '2026-10-02',
-  ingresos_mes_centavos: 0,
-  recaudo: {
-    esperado_centavos: 0,
-    aprobado_centavos: 0,
-    en_revision_centavos: 0,
-    sin_reportar_centavos: 0,
-    contratos: 0,
-  },
-  ocupacion: { unidades: 0, ocupadas: 0, libres: 0, con_contrato_programado: 0 },
-  mora: { contratos: 0, periodos: 0, total_centavos: 0 },
-  tendencia: [],
-  pendientes: {
-    comprobantes_por_validar: 0,
-    mantenimientos_pendientes: 0,
-    contratos_por_vencer: { cantidad: 0, contratos: [] },
-    incrementos_disponibles: { cantidad: 0, contratos: [] },
-    terminaciones_por_confirmar: { cantidad: 0, contratos: [] },
-  },
-};
+// R3-A: el Panel completo y en cero del helper de pruebas (con los campos de B0.7-B).
+const PANEL_VACIO = panelEjemplo();
 
 describe('la campana está en la cabecera de cada rol', () => {
   it('Panel del arrendador: campana con el punto del conteo de alertas del arrendador', async () => {

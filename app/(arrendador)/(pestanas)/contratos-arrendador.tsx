@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -35,7 +35,16 @@ export default function ContratosArrendador() {
   const { top, bottom } = useSafeAreaInsets();
   const consulta = useContratos();
   const { data, isPending, isError, error, refetch } = consulta;
-  const [filtro, setFiltro] = useState<FiltroContratos>('TODOS');
+  // R3-A: "Ver cartera" del Panel llega con ?filtro=EN_MORA. Un filtro que llega por la ruta manda
+  // sobre el elegido antes; luego se puede cambiar como siempre.
+  const { filtro: filtroRuta } = useLocalSearchParams<{ filtro?: string }>();
+  const deRuta = FILTROS.find((f) => f.valor === filtroRuta)?.valor;
+  const [eleccion, setEleccion] = useState<{ filtro: FiltroContratos; ruta?: string }>(() => ({
+    filtro: deRuta ?? 'TODOS',
+    ruta: filtroRuta,
+  }));
+  const filtro: FiltroContratos = deRuta && eleccion.ruta !== filtroRuta ? deRuta : eleccion.filtro;
+  const setFiltro = (nuevo: FiltroContratos) => setEleccion({ filtro: nuevo, ruta: filtroRuta });
   const [busqueda, setBusqueda] = useState('');
   const [refrescando, setRefrescando] = useState(false);
   useRefrescarAlEnfocar(consulta);

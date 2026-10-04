@@ -15,3 +15,24 @@ export const destinosPanel = {
   terminacion: (contratoId: string): Href | null =>
     contratoId ? { pathname: '/contrato/[id]/terminacion', params: { id: contratoId } } : null,
 };
+
+/**
+ * Destino de un pendiente que es una lista de contratos (R3-A): con un solo contrato (y su id), la
+ * pantalla de ese contrato; si no, la lista de contratos.
+ */
+export function destinoDeLista(
+  lista: { cantidad: number; contratos: readonly { contrato_id: string }[] },
+  deContrato: (contratoId: string) => Href | null,
+): Href {
+  const unico = lista.cantidad === 1 ? lista.contratos[0] : undefined;
+  // Un id vacío no navega a un contrato.
+  return (
+    (unico?.contrato_id && deContrato(unico.contrato_id)) || { pathname: '/contratos-arrendador' }
+  );
+}
+
+/** "Ver cartera": la lista de contratos con el filtro "En mora" ya puesto. */
+export const destinoCartera = (): Href => ({
+  pathname: '/contratos-arrendador',
+  params: { filtro: 'EN_MORA' },
+});
