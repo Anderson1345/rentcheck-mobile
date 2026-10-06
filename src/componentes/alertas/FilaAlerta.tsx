@@ -1,14 +1,15 @@
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import type { Alerta } from '../../api/alertas';
 import { presentacionDeAlerta } from '../../alertas/presentacion';
-import { colores } from '../../tema';
-import { formatearFechaCorta } from '../../utilidades/fechas';
-import { FilaLista } from '../FilaLista';
+import { colores, coloresEstado, conAlfa, espaciado, tintaAlfa } from '../../tema';
+import { Icono } from '../iconos/Icono';
 import { Texto } from '../Texto';
 
 interface Props {
   alerta: Alerta;
+  /** Hora (Hoy, Ayer), día abreviado (Esta semana) o fecha (Antes), ya en Bogotá. */
+  tiempo: string;
   separador: boolean;
   /** La alerta lleva a una pantalla (chevron). Sin destino es informativa. */
   conDestino: boolean;
@@ -17,44 +18,88 @@ interface Props {
 }
 
 /**
- * Fila de la lista de alertas: icono con el tono del tipo, título corto, mensaje del servidor, fecha
- * (día de Bogotá, sin "hace 2 h"), punto lima si no está leída y chevron si lleva a una pantalla.
+ * Fila de alertas (R3-B, maqueta Alertas): icono con el tono del tipo, título corto y su hora o fecha,
+ * el mensaje del servidor, punto lima si no está leída y chevron si lleva a una pantalla. Las leídas se
+ * ven más tenues.
  */
-export function FilaAlerta({ alerta, separador, conDestino, onPress }: Props) {
+export function FilaAlerta({ alerta, tiempo, separador, conDestino, onPress }: Props) {
   const presentacion = presentacionDeAlerta(alerta.tipo);
-  return (
-    <FilaLista
-      icono={presentacion.icono}
-      tonoIcono={presentacion.tono}
-      titulo={presentacion.titulo}
-      separador={separador}
-      conChevron={conDestino}
-      onPress={onPress}
-      detalle={
-        <View style={estilos.detalle}>
-          <Texto variante="secundario" color={colores.texto}>
-            {alerta.mensaje}
+  const tono = coloresEstado[presentacion.tono];
+  const contenido = (
+    <>
+      <View style={[estilos.icono, { backgroundColor: conAlfa(tono.senal, 0.14) }]}>
+        <Icono nombre={presentacion.icono} tamano={20} color={tono.texto} grosor={2} />
+      </View>
+      <View style={estilos.textos}>
+        <View style={estilos.encabezado}>
+          <Texto variante="filaTitulo" numberOfLines={1} style={estilos.titulo}>
+            {presentacion.titulo}
           </Texto>
-          <Texto variante="secundario" color={colores.textoSecundario}>
-            {formatearFechaCorta(alerta.creado_en)}
+          <Texto variante="secundario" color={colores.textoSecundario} cifras>
+            {tiempo}
           </Texto>
         </View>
-      }
-      valor={
-        alerta.leida ? undefined : <View accessibilityLabel="Sin leer" style={estilos.punto} />
-      }
-    />
+        <Texto variante="secundario" color={colores.textoFuerte}>
+          {alerta.mensaje}
+        </Texto>
+      </View>
+      {alerta.leida ? null : <View accessibilityLabel="Sin leer" style={estilos.punto} />}
+      {conDestino ? (
+        <Icono nombre="adelante" tamano={18} color={colores.iconoTenue} grosor={1.8} />
+      ) : null}
+    </>
+  );
+
+  return (
+    <View>
+      {separador ? <View style={estilos.separador} /> : null}
+      {onPress ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={onPress}
+          style={({ pressed }) => [
+            estilos.fila,
+            alerta.leida && estilos.leida,
+            pressed && estilos.presionada,
+          ]}
+        >
+          {contenido}
+        </Pressable>
+      ) : (
+        <View style={[estilos.fila, alerta.leida && estilos.leida]}>{contenido}</View>
+      )}
+    </View>
   );
 }
 
 const estilos = StyleSheet.create({
-  detalle: { width: '100%', gap: 2 },
+  fila: {
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    padding: 14,
+  },
+  leida: { opacity: 0.72 },
+  presionada: { backgroundColor: tintaAlfa(0.03) },
+  icono: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textos: { flex: 1, minWidth: 0, gap: 2 },
+  encabezado: { flexDirection: 'row', alignItems: 'baseline', gap: espaciado.xs },
+  titulo: { flex: 1 },
   // Lima sobre fondo claro casi no se ve: el aro de tinta lo asienta (igual que el punto de la campana).
   punto: {
     width: 10,
     height: 10,
+    marginTop: 6,
     borderRadius: 5,
     backgroundColor: colores.lima,
     boxShadow: `0 0 0 1.5px ${colores.tinta}`,
   },
+  separador: { height: 1, marginLeft: 66, backgroundColor: tintaAlfa(0.07) },
 });

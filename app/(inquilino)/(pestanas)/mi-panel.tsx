@@ -6,25 +6,29 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CampanaAlertas } from '@/componentes/alertas/CampanaAlertas';
 import { Boton } from '@/componentes/Boton';
-import { CabeceraTinta, ContenidoBajoCabecera, TituloCabecera } from '@/componentes/CabeceraTinta';
-import { EsqueletoCarga } from '@/componentes/EsqueletoCarga';
+import { CabeceraTinta, ContenidoBajoCabecera } from '@/componentes/CabeceraTinta';
 import { EstadoMensaje } from '@/componentes/EstadoMensaje';
 import {
   AvisoVinculacionPendiente,
   ErrorConReintento,
+  EsqueletoMiPanel,
   PanelDelContrato,
-  SelectorContrato,
+  PildoraContrato,
 } from '@/componentes/inquilino/PortalInquilino';
+import { Texto } from '@/componentes/Texto';
 import { useRefrescarAlEnfocar } from '@/consultas/enfoque';
 import { clavesInquilino } from '@/consultas/inquilino';
 import { useContratoSeleccionado } from '@/inquilino/ContratoSeleccionado';
+import { useSesion } from '@/sesion/SesionProvider';
 import { colores, espaciado } from '@/tema';
 
-// Entrada del inquilino: el panel del contrato seleccionado. Todo es de solo lectura.
+// Entrada del inquilino (R3-B, maqueta PanelInquilino): saludo, el contrato elegido (píldora que abre
+// "Mis contratos") y la campana; debajo, el panel del contrato. Todo es de solo lectura.
 export default function MiPanel() {
   const router = useRouter();
   const cliente = useQueryClient();
   const { bottom } = useSafeAreaInsets();
+  const { usuario } = useSesion();
   const { lista, contratoId, contrato } = useContratoSeleccionado();
   const [refrescando, setRefrescando] = useState(false);
   useRefrescarAlEnfocar(lista);
@@ -32,6 +36,7 @@ export default function MiPanel() {
   async function arrastrar() {
     setRefrescando(true);
     try {
+      // "inquilino" incluye panel, detalle, estado de cuenta, solicitudes y alertas del inquilino.
       await cliente.invalidateQueries({ queryKey: clavesInquilino.todos });
     } finally {
       setRefrescando(false);
@@ -41,8 +46,19 @@ export default function MiPanel() {
   return (
     <View style={estilos.pantalla}>
       <CabeceraTinta conSolapa>
-        <TituloCabecera titulo="Mi panel" accion={<CampanaAlertas rol="inquilino" />} />
-        {contrato ? <SelectorContrato contrato={contrato} /> : null}
+        <View style={estilos.saludo}>
+          <Texto
+            variante="titulo"
+            color={colores.sobreTinta}
+            accessibilityRole="header"
+            numberOfLines={1}
+            style={estilos.flex}
+          >
+            {`Hola, ${usuario?.nombre ?? ''}`}
+          </Texto>
+          <CampanaAlertas rol="inquilino" />
+        </View>
+        {contrato ? <PildoraContrato contrato={contrato} /> : null}
       </CabeceraTinta>
       <ContenidoBajoCabecera style={estilos.cuerpo}>
         <ScrollView
@@ -53,7 +69,7 @@ export default function MiPanel() {
         >
           <AvisoVinculacionPendiente />
           {lista.data === undefined && lista.isPending ? (
-            <EsqueletoCarga filas={3} />
+            <EsqueletoMiPanel />
           ) : lista.data === undefined ? (
             <ErrorConReintento error={lista.error} onReintentar={() => void lista.refetch()} />
           ) : contratoId === null || contrato === null ? (
@@ -69,7 +85,7 @@ export default function MiPanel() {
               />
             </EstadoMensaje>
           ) : (
-            <PanelDelContrato key={contratoId} contratoId={contratoId} estado={contrato.estado} />
+            <PanelDelContrato key={contratoId} contrato={contrato} />
           )}
         </ScrollView>
       </ContenidoBajoCabecera>
@@ -79,6 +95,8 @@ export default function MiPanel() {
 
 const estilos = StyleSheet.create({
   pantalla: { flex: 1, backgroundColor: colores.fondo },
+  saludo: { flexDirection: 'row', alignItems: 'center', gap: espaciado.sm },
+  flex: { flex: 1 },
   cuerpo: { flex: 1, paddingTop: espaciado.xl },
-  contenido: { gap: espaciado.md, flexGrow: 1 },
+  contenido: { gap: espaciado.lg, flexGrow: 1 },
 });

@@ -125,3 +125,40 @@ export function compararFechas(a: FechaNegocio, b: FechaNegocio): number {
   const diaB = aDiaNegocio(b);
   return diaA < diaB ? -1 : diaA > diaB ? 1 : 0;
 }
+
+// ---- R3-B: presentación (Mi panel del inquilino y Alertas) ----
+
+const DIA_MS = 24 * 60 * 60 * 1000;
+const DIAS_SEMANA = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+
+/** El día de negocio "AAAA-MM-DD" de una fecha (con las mismas reglas que el resto del módulo). */
+export function diaDeNegocio(fecha: FechaNegocio): string {
+  return aDiaNegocio(fecha);
+}
+
+const numeroDeDia = (fecha: FechaNegocio) => {
+  const [anio, mes, dia] = aDiaNegocio(fecha).split('-').map(Number);
+  return Date.UTC(anio, mes - 1, dia) / DIA_MS;
+};
+
+/** Días calendario de `desde` a `hasta` (negativo si `hasta` es anterior). */
+export function diasEntre(desde: FechaNegocio, hasta: FechaNegocio): number {
+  return numeroDeDia(hasta) - numeroDeDia(desde);
+}
+
+/** "2026-10-05" → "lunes". */
+export function diaDeLaSemana(fecha: FechaNegocio): string {
+  return DIAS_SEMANA[new Date(numeroDeDia(fecha) * DIA_MS).getUTCDay()];
+}
+
+/** "2026-06-01" → "1 jun. 2026". */
+export function formatearFechaAbreviada(fecha: FechaNegocio): string {
+  const [anio, mes, dia] = aDiaNegocio(fecha).split('-');
+  return `${Number(dia)} ${MESES[Number(mes) - 1].slice(0, 3)}. ${anio}`;
+}
+
+/** Hora de Bogotá de un instante ISO, "h:mm" de 24 horas ("2026-10-02T14:00:00Z" → "9:00"). */
+export function horaBogota(instante: string): string {
+  const hora = new Date(Date.parse(instante) + DESFASE_BOGOTA_MS).toISOString().slice(11, 16);
+  return `${Number(hora.slice(0, 2))}:${hora.slice(3)}`;
+}

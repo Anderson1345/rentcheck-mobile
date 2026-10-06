@@ -1,5 +1,6 @@
 // Portal del inquilino, lectura (E6-A): contrato seleccionado, selector, agregar con código, Mi panel
-// (ACTIVO / PROGRAMADO / finalizado), Mi contrato, estado de cuenta, aislamiento (404) y sin conexión.
+// (ACTIVO / PROGRAMADO / finalizado; rediseño R3-B, el detalle de sus bloques está en
+// miPanelInquilino.test), Mi contrato, estado de cuenta, aislamiento (404) y sin conexión.
 import type { ReactNode } from 'react';
 import { Text } from 'react-native';
 import { act } from 'react-test-renderer';
@@ -25,6 +26,7 @@ import {
 } from '../inquilino/ContratoSeleccionado';
 import { crearToken } from '../pruebas/crearToken';
 import { botonDe, hayBoton, renderizarPantalla, textosDe } from '../pruebas/pantallas';
+import { fijarReloj, restaurarReloj } from '../pruebas/reloj';
 import { guardarCodigoPendiente, limpiarCodigoPendiente } from '../sesion/codigoPendiente';
 import type { DatosSesion } from '../sesion/tipos';
 
@@ -331,9 +333,9 @@ describe('Mi panel: contrato seleccionado y selector', () => {
     expect(mockGet).not.toHaveBeenCalledWith(expect.stringContaining('/panel'));
   });
 
-  it('por defecto elige el primero de la lista: cabecera con unidad · dirección y su panel', async () => {
+  it('por defecto elige el primero de la lista: cabecera con inmueble · unidad y su panel', async () => {
     const { raiz } = await montar(<MiPanel />);
-    expect(todo(raiz)).toContain('Apto 302 · Calle 45 # 12-30');
+    expect(todo(raiz)).toContain('Calle 45 # 12-30 · Apto 302');
     expect(mockGet).toHaveBeenCalledWith('/inquilino/contratos/c1/panel');
     expect(mockGet).not.toHaveBeenCalledWith('/inquilino/contratos/c2/panel');
   });
@@ -355,7 +357,7 @@ describe('Mi panel: contrato seleccionado y selector', () => {
     expect(todo(raiz)).toMatch(/No hay conexión/);
     respuestas.lista = [resumen('c1')];
     await pulsar(raiz, 'Reintentar');
-    expect(todo(raiz)).toContain('Apto 302 · Calle 45 # 12-30');
+    expect(todo(raiz)).toContain('Calle 45 # 12-30 · Apto 302');
   });
 });
 
@@ -391,7 +393,7 @@ describe('Mis contratos', () => {
         <MisContratos />
       </>,
     );
-    expect(todo(raiz)).toContain('Canon vigente');
+    expect(todo(raiz)).toContain('Tu próximo pago · Noviembre');
     expect(todo(raiz)).toContain('$ 1.500.000');
 
     await pulsar(raiz, 'Apto 401');
@@ -401,36 +403,40 @@ describe('Mis contratos', () => {
     const t = todo(raiz);
     expect(t).toContain('Tu contrato empieza el 1 de febrero de 2027');
     // Nada del contrato anterior en el panel del programado.
-    expect(t).not.toContain('Canon vigente');
+    expect(t).not.toContain('Tu próximo pago');
     expect(t).not.toContain('Bancolombia ahorros 123-456');
   });
 });
 
 describe('Mi panel ACTIVO', () => {
-  it('estado de pago, canon vigente, días restantes y fecha de fin', async () => {
+  // "Faltan N días" y el avance del contrato dependen de hoy: reloj fijo (2 de octubre de 2026).
+  beforeEach(() => fijarReloj());
+  afterEach(() => restaurarReloj());
+
+  it('tu contrato: estado, días restantes del servidor y fechas de inicio y fin', async () => {
     const { raiz } = await montar(<MiPanel />);
     const t = todo(raiz);
-    expect(t).toContain('Al día');
-    expect(t).toContain('Canon vigente');
+    expect(t).toContain('Activo');
+    expect(t).toContain('45');
+    expect(t).toContain('días restantes');
+    expect(t).toContain('1 ene. 2026');
+    expect(t).toContain('31 dic. 2026');
+  });
+
+  it('próximo pago: mes del período, plazo, fecha límite y monto', async () => {
+    const { raiz } = await montar(<MiPanel />);
+    const t = todo(raiz);
+    expect(t).toContain('Tu próximo pago · Noviembre');
+    expect(t).toContain('Faltan 34 días');
+    expect(t).toContain('Fecha límite: jueves 5 de noviembre');
     expect(t).toContain('$ 1.500.000');
-    expect(t).toContain('Faltan 45 días para que termine tu contrato');
-    expect(t).toContain('31/12/2026');
   });
 
-  it('próximo período: período, fecha límite, monto y estado', async () => {
-    const { raiz } = await montar(<MiPanel />);
-    const t = todo(raiz);
-    expect(t).toContain('Próximo período');
-    expect(t).toContain('Noviembre de 2026');
-    expect(t).toContain('05/11/2026');
-    expect(t).toContain('Por vencer');
-  });
-
-  it('proximo_periodo null: "Sin períodos pendientes"', async () => {
+  it('proximo_periodo null: "Estás al día"', async () => {
     montarContrato('c1', { panel: { ...PANEL_ACTIVO, proximo_periodo: null }, detalle: DETALLE });
     const { raiz } = await montar(<MiPanel />);
-    expect(todo(raiz)).toContain('Sin períodos pendientes');
-    expect(todo(raiz)).not.toContain('Próximo período');
+    expect(todo(raiz)).toContain('Estás al día');
+    expect(todo(raiz)).not.toContain('Tu próximo pago');
   });
 
   it('períodos vencidos: cantidad y total pendiente; con 0 no se muestra la tarjeta', async () => {
@@ -443,38 +449,40 @@ describe('Mi panel ACTIVO', () => {
       detalle: DETALLE,
     });
     const con = await montar(<MiPanel />);
-    expect(todo(con.raiz)).toContain('En mora');
-    expect(todo(con.raiz)).toContain('Períodos vencidos');
-    expect(todo(con.raiz)).toContain('2 períodos · Total pendiente $ 3.000.000');
+    expect(todo(con.raiz)).toContain('2 períodos vencidos · Total pendiente $ 3.000.000');
 
     montarContrato('c1', { panel: PANEL_ACTIVO, detalle: DETALLE });
     const sin = await montar(<MiPanel />);
-    expect(todo(sin.raiz)).not.toContain('Períodos vencidos');
+    expect(todo(sin.raiz)).not.toContain('períodos vencidos');
   });
 
-  it('datos de recaudo (texto libre) con "Copiar"', async () => {
+  it('datos de recaudo (texto libre) en "Cómo pagar" con "Copiar"', async () => {
     const { raiz } = await montar(<MiPanel />);
-    expect(todo(raiz)).toContain('Datos de recaudo');
+    expect(todo(raiz)).toContain('Cómo pagar');
     expect(todo(raiz)).toContain('Bancolombia ahorros 123-456');
     await pulsar(raiz, 'Copiar');
     expect(mockCopiar).toHaveBeenCalledWith('Bancolombia ahorros 123-456');
   });
 
-  it('datos_recaudo null: no se muestra la tarjeta', async () => {
+  it('datos_recaudo null: no se muestra "Cómo pagar"', async () => {
     montarContrato('c1', { panel: PANEL_ACTIVO, detalle: { ...DETALLE, datos_recaudo: null } });
     const { raiz } = await montar(<MiPanel />);
-    expect(todo(raiz)).not.toContain('Datos de recaudo');
+    expect(todo(raiz)).not.toContain('Cómo pagar');
     expect(hayBoton(raiz, 'Copiar')).toBe(false);
   });
 
-  it('no ofrece reportar pagos (llega en E7)', async () => {
+  it('"Reportar pago" (E7 ya existe) lleva al reporte con el contrato', async () => {
     const { raiz } = await montar(<MiPanel />);
-    expect(todo(raiz)).not.toMatch(/reportar|Pagar/i);
+    await pulsar(raiz, 'Reportar pago');
+    expect(mockPush).toHaveBeenLastCalledWith({
+      pathname: '/reportar-pago',
+      params: { contratoId: 'c1' },
+    });
   });
 
-  it('accesos: Ver mi contrato, Estado de cuenta y Mis documentos', async () => {
+  it('accesos: Mi contrato, Estado de cuenta y Documentos', async () => {
     const { raiz } = await montar(<MiPanel />);
-    await pulsar(raiz, 'Ver mi contrato');
+    await pulsar(raiz, 'Mi contrato');
     expect(mockPush).toHaveBeenLastCalledWith({
       pathname: '/mi-contrato/[id]',
       params: { id: 'c1' },
@@ -484,7 +492,7 @@ describe('Mi panel ACTIVO', () => {
       pathname: '/mi-contrato/[id]/estado-cuenta',
       params: { id: 'c1' },
     });
-    await pulsar(raiz, 'Mis documentos');
+    await pulsar(raiz, 'Documentos');
     expect(mockPush).toHaveBeenLastCalledWith({
       pathname: '/mi-contrato/[id]',
       params: { id: 'c1', seccion: 'documentos' },
@@ -498,9 +506,9 @@ describe('Mi panel PROGRAMADO y finalizado', () => {
     const { raiz } = await montar(<MiPanel />);
     const t = todo(raiz);
     expect(t).toContain('Tu contrato empieza el 1 de febrero de 2027');
-    expect(t).not.toContain('Datos de recaudo');
-    expect(t).not.toContain('Próximo período');
-    expect(t).not.toContain('Períodos vencidos');
+    expect(t).not.toContain('Cómo pagar');
+    expect(t).not.toContain('Tu próximo pago');
+    expect(t).not.toContain('períodos vencidos');
     expect(mockGet).not.toHaveBeenCalledWith('/inquilino/contratos/c2');
   });
 
@@ -515,8 +523,8 @@ describe('Mi panel PROGRAMADO y finalizado', () => {
       const { raiz } = await montar(<MiPanel />);
       expect(todo(raiz)).toContain(msg);
       expect(todo(raiz)).not.toMatch(/acta|liquidaci/i);
-      expect(todo(raiz)).not.toContain('Datos de recaudo');
-      await pulsar(raiz, 'Ver mi contrato');
+      expect(todo(raiz)).not.toContain('Cómo pagar');
+      await pulsar(raiz, 'Mi contrato');
       expect(mockPush).toHaveBeenLastCalledWith({
         pathname: '/mi-contrato/[id]',
         params: { id: 'c1' },
@@ -531,7 +539,7 @@ describe('aislamiento y sin conexión', () => {
     const { raiz } = await montar(<MiPanel />);
     expect(todo(raiz)).toContain('No encontramos este contrato');
     expect(llamadasA('/inquilino/contratos')).toBeGreaterThanOrEqual(2);
-    expect(todo(raiz)).not.toContain('Canon vigente');
+    expect(todo(raiz)).not.toContain('Tu próximo pago');
     await pulsar(raiz, 'Ver mis contratos');
     expect(mockPush).toHaveBeenCalledWith('/mis-contratos');
   });
@@ -552,9 +560,9 @@ describe('aislamiento y sin conexión', () => {
     await esperar();
     await esperar();
     await esperar();
-    expect(todo(raiz)).toContain('Apto 401 · Carrera 7 # 80-10');
+    expect(todo(raiz)).toContain('Carrera 7 # 80-10 · Apto 401');
     expect(mockGet).toHaveBeenCalledWith('/inquilino/contratos/c2/panel');
-    expect(todo(raiz)).toContain('Canon vigente');
+    expect(todo(raiz)).toContain('Tu próximo pago');
   });
 
   it('el panel sin conexión: aviso y "Reintentar" (lectura: se puede repetir)', async () => {
@@ -563,7 +571,7 @@ describe('aislamiento y sin conexión', () => {
     expect(todo(raiz)).toMatch(/No hay conexión/);
     montarContrato('c1', { panel: PANEL_ACTIVO, detalle: DETALLE });
     await pulsar(raiz, 'Reintentar');
-    expect(todo(raiz)).toContain('Canon vigente');
+    expect(todo(raiz)).toContain('Tu próximo pago');
   });
 });
 

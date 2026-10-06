@@ -1,4 +1,13 @@
-import { compararFechas, formatearFechaCorta, formatearFechaLarga, hoyBogota } from '../fechas';
+import {
+  compararFechas,
+  diaDeLaSemana,
+  diasEntre,
+  formatearFechaAbreviada,
+  formatearFechaCorta,
+  formatearFechaLarga,
+  horaBogota,
+  hoyBogota,
+} from '../fechas';
 
 describe('hoyBogota', () => {
   it('devuelve AAAA-MM-DD de Bogotá a mediodía', () => {
@@ -119,5 +128,27 @@ describe('compararFechas', () => {
 describe('formatearFechaCorta con texto ISO con hora', () => {
   it('pasa el instante al día de Bogotá', () => {
     expect(formatearFechaCorta('2026-10-02T03:00:00Z')).toBe('01/10/2026');
+  });
+});
+
+describe('presentación de R3-B', () => {
+  it('diasEntre cuenta días calendario (negativo hacia atrás) sin correr las fechas @db.Date', () => {
+    expect(diasEntre('2026-10-02', '2026-10-05T00:00:00.000Z')).toBe(3);
+    expect(diasEntre('2026-10-02', '2026-09-05')).toBe(-27);
+    expect(diasEntre('2026-12-31', '2027-01-01')).toBe(1);
+  });
+
+  it('diaDeLaSemana y formatearFechaAbreviada', () => {
+    expect(diaDeLaSemana('2026-10-05T00:00:00.000Z')).toBe('lunes');
+    expect(diaDeLaSemana('2026-09-27')).toBe('domingo');
+    expect(formatearFechaAbreviada('2026-06-01T00:00:00.000Z')).toBe('1 jun. 2026');
+    expect(formatearFechaAbreviada('2027-05-31')).toBe('31 may. 2027');
+  });
+
+  it('horaBogota: h:mm de 24 horas del instante en Bogotá', () => {
+    expect(horaBogota('2026-10-02T14:00:00Z')).toBe('9:00');
+    expect(horaBogota('2026-10-02T23:40:00.000Z')).toBe('18:40');
+    expect(horaBogota('2026-10-02T05:00:00Z')).toBe('0:00');
+    expect(horaBogota('2026-10-02T04:59:00-05:00')).toBe('4:59');
   });
 });

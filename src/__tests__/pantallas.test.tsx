@@ -192,7 +192,8 @@ describe.each<[string, () => ReactElement, boolean, Esperado]>([
       </Proveedor>
     ),
     true,
-    { texto: 'Mi panel' },
+    // R3-B: la cabecera saluda (maqueta PanelInquilino) en lugar del título "Mi panel".
+    { texto: 'Hola, Marta Ríos' },
   ],
   [
     'Pagos del inquilino',

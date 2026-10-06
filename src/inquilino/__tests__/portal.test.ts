@@ -38,8 +38,6 @@ import {
   elegirContratoPorDefecto,
   mensajeFinalizado,
   resolverSeleccion,
-  textoDiasRestantes,
-  textoVencidos,
   variantePanel,
 } from '../seleccion';
 
@@ -274,20 +272,8 @@ describe('esNoEncontrado', () => {
   });
 });
 
-describe('textoDiasRestantes', () => {
-  it('plural, singular y el último día', () => {
-    expect(textoDiasRestantes(30)).toBe('Faltan 30 días para que termine tu contrato');
-    expect(textoDiasRestantes(1)).toBe('Falta 1 día para que termine tu contrato');
-    expect(textoDiasRestantes(0)).toBe('Tu contrato termina hoy');
-  });
-});
-
-describe('textoVencidos', () => {
-  it('cantidad y total pendiente, con singular y plural', () => {
-    expect(textoVencidos(2, 200_000_000)).toBe('2 períodos · Total pendiente $ 2.000.000');
-    expect(textoVencidos(1, 50_000_000)).toBe('1 período · Total pendiente $ 500.000');
-  });
-});
+// R3-B: textoDiasRestantes y textoVencidos se reemplazaron por la tarjeta "Tu contrato" (días del
+// servidor) y textoVencidosPanel (src/inquilino/__tests__/miPanel.test.ts).
 
 // ---------------------------------------------------------------------------------------------
 // E6-B: acciones de contrato y perfil
