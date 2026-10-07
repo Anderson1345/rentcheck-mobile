@@ -1,8 +1,7 @@
 // Piezas del portal del inquilino (E6-A, solo lectura; Mi panel rediseñado en R3-B): selector de
-// contrato, panel por variante, datos de recaudo, fotos de entrega y los estados de error. Todo valor
+// contrato, panel por variante, fotos de entrega y los estados de error. Todo valor
 // (estado de pago, plazos, montos) es el que responde el servidor: la app no calcula nada.
 
-import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -143,33 +142,6 @@ export function AvisoVinculacionPendiente() {
   }
   if (vinculacion.estado === 'error') return <Aviso mensaje={vinculacion.mensaje} />;
   return null;
-}
-
-/** Texto libre del arrendador (cuenta, banco, etc.). No se guarda ni se registra; solo se copia. */
-export function TarjetaRecaudo({ datos }: { datos: string | null | undefined }) {
-  const [copia, setCopia] = useState<'copiado' | 'error' | null>(null);
-  if (!datos) return null;
-
-  async function copiar() {
-    try {
-      await Clipboard.setStringAsync(datos as string);
-      setCopia('copiado');
-    } catch {
-      setCopia('error');
-    }
-  }
-
-  return (
-    <Superficie style={estilos.tarjeta}>
-      <Texto variante="etiqueta" color={colores.textoSecundario}>
-        Datos de recaudo
-      </Texto>
-      <Texto variante="cuerpo">{datos}</Texto>
-      {copia === 'copiado' ? <Aviso tono="exito" mensaje="Copiado" /> : null}
-      {copia === 'error' ? <Aviso mensaje="No pudimos copiar los datos." /> : null}
-      <Boton titulo="Copiar" variante="secundario" ancho="completo" onPress={() => void copiar()} />
-    </Superficie>
-  );
 }
 
 /** Mientras carga: un bloque por sección de Mi panel, con su forma (tarjeta, accesos y tarjetas). */

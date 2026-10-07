@@ -113,11 +113,14 @@ export function CargaContrato<D = ContratoDetalle>({
   children,
   usar = useContrato as unknown as (id: string) => UseQueryResult<D>,
   noEncontrado,
+  sinMarco = false,
 }: {
   id: string;
   children: (contrato: D) => ReactNode;
   usar?: (id: string) => UseQueryResult<D>;
   noEncontrado?: () => ReactNode;
+  /** Con el contrato cargado, el contenido pone su propia PantallaPila (p. ej. con barra fija, R4-B). */
+  sinMarco?: boolean;
 }) {
   const { data, isPending, error, refetch } = usar(id);
   if (noEncontrado && error instanceof ErrorApi && error.status === 404) {
@@ -142,6 +145,7 @@ export function CargaContrato<D = ContratoDetalle>({
       </PantallaPila>
     );
   }
+  if (sinMarco) return <>{children(data)}</>;
   return <PantallaPila>{children(data)}</PantallaPila>;
 }
 

@@ -22,6 +22,7 @@ const MENSAJE_FORMATO = 'Revisa el código: tiene el formato RC-XXXX-XXXX.';
 
 // Agregar un contrato con el código del arrendador. La ruta es idempotente para la misma cuenta,
 // así que tras un fallo sin respuesta se puede reintentar directo. No hay escáner QR en esta entrega.
+// R4-B: el campo con su etiqueta fuera y la acción ("Agregar contrato" o "Ver mi panel") en la barra fija.
 export default function AgregarContrato() {
   const router = useRouter();
   const { seleccionar } = useContratoSeleccionado();
@@ -61,7 +62,16 @@ export default function AgregarContrato() {
 
   if (agregado) {
     return (
-      <PantallaPila>
+      <PantallaPila
+        accionFija={
+          <Boton
+            titulo="Ver mi panel"
+            variante="acento"
+            ancho="completo"
+            onPress={() => router.dismissAll()}
+          />
+        }
+      >
         <Aviso tono="exito" mensaje="Contrato agregado." />
         <Superficie style={estilos.tarjeta}>
           <Texto variante="titulo" accessibilityRole="header">
@@ -81,18 +91,22 @@ export default function AgregarContrato() {
         {agregado.estado === 'PROGRAMADO' ? (
           <Aviso tono="informacion" mensaje="Verás los datos de pago cuando el contrato empiece." />
         ) : null}
-        <Boton
-          titulo="Ver mi panel"
-          variante="acento"
-          ancho="completo"
-          onPress={() => router.dismissAll()}
-        />
       </PantallaPila>
     );
   }
 
   return (
-    <PantallaPila>
+    <PantallaPila
+      accionFija={
+        <Boton
+          titulo="Agregar contrato"
+          tituloCargando="Agregando…"
+          cargando={enviando}
+          ancho="completo"
+          onPress={() => void agregar()}
+        />
+      }
+    >
       <Texto variante="cuerpo" color={colores.textoSecundario}>
         Escribe el código que te dio tu arrendador para agregar otro contrato a tu cuenta.
       </Texto>
@@ -109,13 +123,6 @@ export default function AgregarContrato() {
         autoCapitalize="characters"
         returnKeyType="go"
         onSubmitEditing={() => void agregar()}
-      />
-      <Boton
-        titulo="Agregar contrato"
-        tituloCargando="Agregando…"
-        cargando={enviando}
-        ancho="completo"
-        onPress={() => void agregar()}
       />
     </PantallaPila>
   );

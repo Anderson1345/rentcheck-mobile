@@ -15,6 +15,7 @@ import { AvisosContrato } from '@/componentes/contratos/LecturaContrato';
 import { SelectorFecha } from '@/componentes/contratos/PasoFechas';
 import { BotonesTerminacion } from '@/componentes/inquilino/AccionesInquilino';
 import { ContratoNoEncontrado } from '@/componentes/inquilino/PortalInquilino';
+import { PantallaPila } from '@/componentes/PantallaPila';
 import { Texto } from '@/componentes/Texto';
 import { FUENTE_INQUILINO, useDetalleInquilino } from '@/consultas/inquilino';
 import {
@@ -30,7 +31,8 @@ const MAXIMO_MOTIVO = 1000;
 
 // Terminación anticipada por mutuo acuerdo. Según el estado del contrato: solicitar (formulario),
 // o ver la solicitud y confirmarla / cancelarla, o solo información (confirmada: sin acta ni
-// liquidación, B-53).
+// liquidación, B-53). R4-B: "Solicitar terminación" en la barra fija; la advertencia obligatoria y los
+// textos de confirmación no cambian.
 export default function TerminacionInquilino() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -45,6 +47,7 @@ export default function TerminacionInquilino() {
       id={id}
       usar={useDetalleInquilino}
       noEncontrado={() => <ContratoNoEncontrado textoBoton="Volver" onPress={volver} />}
+      sinMarco
     >
       {(contrato) => <Contenido contrato={contrato} />}
     </CargaContrato>
@@ -59,17 +62,19 @@ function Contenido({ contrato }: { contrato: ContratoInquilinoDetalle }) {
 
   const t = contrato.terminacion_anticipada;
   return (
-    <View style={estilos.grupo}>
-      <AvisosContrato aviso={undefined} terminacion={t} />
-      {t.estado === 'NINGUNA' ? (
-        <Texto variante="cuerpo" color={colores.textoSecundario}>
-          {contrato.estado === 'ACTIVO'
-            ? 'Por ahora no hay una solicitud de terminación.'
-            : 'La terminación anticipada solo se puede solicitar con el contrato activo.'}
-        </Texto>
-      ) : null}
-      <BotonesTerminacion contrato={contrato} />
-    </View>
+    <PantallaPila>
+      <View style={estilos.grupo}>
+        <AvisosContrato aviso={undefined} terminacion={t} />
+        {t.estado === 'NINGUNA' ? (
+          <Texto variante="cuerpo" color={colores.textoSecundario}>
+            {contrato.estado === 'ACTIVO'
+              ? 'Por ahora no hay una solicitud de terminación.'
+              : 'La terminación anticipada solo se puede solicitar con el contrato activo.'}
+          </Texto>
+        ) : null}
+        <BotonesTerminacion contrato={contrato} />
+      </View>
+    </PantallaPila>
   );
 }
 
@@ -85,10 +90,12 @@ function FormularioSolicitud({ id }: { id: string }) {
 
   if (accion.fase === 'exito') {
     return (
-      <View style={estilos.grupo}>
-        <Aviso tono="exito" mensaje="Solicitud enviada. La otra parte debe confirmarla." />
-        <Boton titulo="Listo" ancho="completo" onPress={() => router.back()} />
-      </View>
+      <PantallaPila>
+        <View style={estilos.grupo}>
+          <Aviso tono="exito" mensaje="Solicitud enviada. La otra parte debe confirmarla." />
+          <Boton titulo="Listo" ancho="completo" onPress={() => router.back()} />
+        </View>
+      </PantallaPila>
     );
   }
 
@@ -107,26 +114,8 @@ function FormularioSolicitud({ id }: { id: string }) {
     );
   }
 
-  return (
+  const accionFija = (
     <View style={estilos.grupo}>
-      <Texto variante="titulo" accessibilityRole="header">
-        Solicitar terminación anticipada
-      </Texto>
-      <Aviso tono="advertencia" mensaje={ADVERTENCIA_TERMINACION} />
-      <CampoTexto
-        etiqueta="Motivo"
-        valor={motivo}
-        onCambio={setMotivo}
-        error={errorMotivo ?? undefined}
-        keyboardType="default"
-        autoCapitalize="sentences"
-        maxLength={MAXIMO_MOTIVO}
-        returnKeyType="done"
-      />
-      <Texto variante="secundario" color={colores.textoSecundario}>
-        {`${motivo.length} / ${MAXIMO_MOTIVO}`}
-      </Texto>
-      <SelectorFecha etiqueta="Fecha efectiva" valor={fecha} hoy={hoy} onCambio={setFecha} />
       <MensajeAccion
         fase={accion.fase}
         error={accion.error}
@@ -144,6 +133,31 @@ function FormularioSolicitud({ id }: { id: string }) {
         />
       )}
     </View>
+  );
+
+  return (
+    <PantallaPila accionFija={accionFija}>
+      <View style={estilos.grupo}>
+        <Texto variante="titulo" accessibilityRole="header">
+          Solicitar terminación anticipada
+        </Texto>
+        <Aviso tono="advertencia" mensaje={ADVERTENCIA_TERMINACION} />
+        <CampoTexto
+          etiqueta="Motivo"
+          valor={motivo}
+          onCambio={setMotivo}
+          error={errorMotivo ?? undefined}
+          keyboardType="default"
+          autoCapitalize="sentences"
+          maxLength={MAXIMO_MOTIVO}
+          returnKeyType="done"
+        />
+        <Texto variante="secundario" color={colores.textoSecundario}>
+          {`${motivo.length} / ${MAXIMO_MOTIVO}`}
+        </Texto>
+        <SelectorFecha etiqueta="Fecha efectiva" valor={fecha} hoy={hoy} onCambio={setFecha} />
+      </View>
+    </PantallaPila>
   );
 }
 
