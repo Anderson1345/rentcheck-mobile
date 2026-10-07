@@ -13,7 +13,7 @@ export default function LayoutInquilino() {
         <Stack.Screen name="(pestanas)" options={{ headerShown: false }} />
         <Stack.Screen name="mis-contratos" options={{ title: 'Mis contratos' }} />
         <Stack.Screen name="agregar-contrato" options={{ title: 'Agregar contrato' }} />
-        <Stack.Screen name="mi-contrato/[id]/index" options={{ title: 'Mi contrato' }} />
+        <Stack.Screen name="mi-contrato/[id]/index" options={{ headerShown: false }} />
         <Stack.Screen
           name="mi-contrato/[id]/estado-cuenta"
           options={{ title: 'Estado de cuenta' }}

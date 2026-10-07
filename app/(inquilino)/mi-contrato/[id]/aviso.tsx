@@ -13,6 +13,7 @@ import {
 } from '@/componentes/contratos/AccionesContrato';
 import { AvisosContrato } from '@/componentes/contratos/LecturaContrato';
 import { ContratoNoEncontrado } from '@/componentes/inquilino/PortalInquilino';
+import { PantallaPila } from '@/componentes/PantallaPila';
 import { Texto } from '@/componentes/Texto';
 import { FUENTE_INQUILINO, useDetalleInquilino } from '@/consultas/inquilino';
 import { accionesInquilino } from '@/contratos/acciones';
@@ -21,7 +22,8 @@ import { colores, espaciado } from '@/tema';
 
 const MAXIMO_MOTIVO = 1000;
 
-// Aviso de no renovación (D-1). La app no calcula plazos: si se pasó, responde el servidor.
+// Aviso de no renovación (D-1). La app no calcula plazos: si se pasó, responde el servidor. R4-B:
+// "Dar aviso" (y lo que pasó con el envío) en la barra fija; el campo lleva su etiqueta fuera.
 export default function AvisoInquilino() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -36,6 +38,7 @@ export default function AvisoInquilino() {
       id={id}
       usar={useDetalleInquilino}
       noEncontrado={() => <ContratoNoEncontrado textoBoton="Volver" onPress={volver} />}
+      sinMarco
     >
       {(contrato) => <Contenido contrato={contrato} />}
     </CargaContrato>
@@ -48,14 +51,16 @@ function Contenido({ contrato }: { contrato: ContratoInquilinoDetalle }) {
   const [dando] = useState(() => accionesInquilino(contrato).darAviso);
   if (dando) return <FormularioAviso id={contrato.contratoId} />;
   return (
-    <View style={estilos.grupo}>
-      <AvisosContrato aviso={contrato.aviso_no_renovacion} terminacion={undefined} />
-      {contrato.aviso_no_renovacion.estado !== 'DADO' ? (
-        <Texto variante="cuerpo" color={colores.textoSecundario}>
-          Por ahora no puedes dar el aviso de no renovación de este contrato.
-        </Texto>
-      ) : null}
-    </View>
+    <PantallaPila>
+      <View style={estilos.grupo}>
+        <AvisosContrato aviso={contrato.aviso_no_renovacion} terminacion={undefined} />
+        {contrato.aviso_no_renovacion.estado !== 'DADO' ? (
+          <Texto variante="cuerpo" color={colores.textoSecundario}>
+            Por ahora no puedes dar el aviso de no renovación de este contrato.
+          </Texto>
+        ) : null}
+      </View>
+    </PantallaPila>
   );
 }
 
@@ -68,33 +73,17 @@ function FormularioAviso({ id }: { id: string }) {
 
   if (accion.fase === 'exito') {
     return (
-      <View style={estilos.grupo}>
-        <Aviso tono="exito" mensaje="Aviso de no renovación dado." />
-        <Boton titulo="Listo" ancho="completo" onPress={() => router.back()} />
-      </View>
+      <PantallaPila>
+        <View style={estilos.grupo}>
+          <Aviso tono="exito" mensaje="Aviso de no renovación dado." />
+          <Boton titulo="Listo" ancho="completo" onPress={() => router.back()} />
+        </View>
+      </PantallaPila>
     );
   }
 
-  return (
+  const accionFija = (
     <View style={estilos.grupo}>
-      <Texto variante="titulo" accessibilityRole="header">
-        Dar aviso de no renovación
-      </Texto>
-      <Texto variante="cuerpo">
-        Sin aviso, el contrato se prorroga automáticamente por el mismo término.
-      </Texto>
-      <CampoTexto
-        etiqueta="Motivo (opcional)"
-        valor={motivo}
-        onCambio={setMotivo}
-        keyboardType="default"
-        autoCapitalize="sentences"
-        maxLength={MAXIMO_MOTIVO}
-        returnKeyType="done"
-      />
-      <Texto variante="secundario" color={colores.textoSecundario}>
-        {`${motivo.length} / ${MAXIMO_MOTIVO}`}
-      </Texto>
       <MensajeAccion
         fase={accion.fase}
         error={accion.error}
@@ -119,6 +108,31 @@ function FormularioAviso({ id }: { id: string }) {
         />
       )}
     </View>
+  );
+
+  return (
+    <PantallaPila accionFija={accionFija}>
+      <View style={estilos.grupo}>
+        <Texto variante="titulo" accessibilityRole="header">
+          Dar aviso de no renovación
+        </Texto>
+        <Texto variante="cuerpo">
+          Sin aviso, el contrato se prorroga automáticamente por el mismo término.
+        </Texto>
+        <CampoTexto
+          etiqueta="Motivo (opcional)"
+          valor={motivo}
+          onCambio={setMotivo}
+          keyboardType="default"
+          autoCapitalize="sentences"
+          maxLength={MAXIMO_MOTIVO}
+          returnKeyType="done"
+        />
+        <Texto variante="secundario" color={colores.textoSecundario}>
+          {`${motivo.length} / ${MAXIMO_MOTIVO}`}
+        </Texto>
+      </View>
+    </PantallaPila>
   );
 }
 

@@ -2,7 +2,7 @@
 // documentos con "Ver y compartir" y el estado de cuenta. Cada rol pasa su consulta y su ruta.
 
 import { type ReactNode, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import type {
   DocumentoContrato,
@@ -44,9 +44,20 @@ interface PropsDocumentos {
   pedirLista: (contratoId: string) => Promise<DocumentoContrato[]>;
   /** Debajo de la lista (el arrendador pone aquí "¿Falta un documento? Generar"). */
   pie?: ReactNode;
+  /**
+   * Inquilino (R4-B): todos los documentos como filas de un mismo contenedor, con "Ver y compartir" a la
+   * derecha. Sin esta opción (arrendador) se ve como siempre.
+   */
+  enFilas?: boolean;
 }
 
-export function SeccionDocumentos({ contratoId, consulta, pedirLista, pie }: PropsDocumentos) {
+export function SeccionDocumentos({
+  contratoId,
+  consulta,
+  pedirLista,
+  pie,
+  enFilas = false,
+}: PropsDocumentos) {
   const documentos = consulta;
   const [estados, setEstados] = useState<Record<string, EstadoDoc | undefined>>({});
   const [fallos, setFallos] = useState<Record<string, string | null>>({});
@@ -106,7 +117,56 @@ export function SeccionDocumentos({ contratoId, consulta, pedirLista, pie }: Pro
           Aún no hay documentos.
         </Texto>
       ) : null}
-      {(documentos.data ?? []).map((doc) => {
+      {enFilas && documentos.data && documentos.data.length > 0 ? (
+        <View testID="lista-documentos">
+          <Superficie relleno="ninguno">
+            {documentos.data.map((doc, indice) => {
+              const estado = estados[doc.id];
+              const noDisponible = doc.url_firmada === null || estado === 'noDisponible';
+              return (
+                <View key={doc.id}>
+                  <FilaLista
+                    icono="documento"
+                    titulo={ETIQUETA_DOCUMENTO[doc.tipo]}
+                    subtitulo={`Versión ${doc.version} · ${formatearFechaCorta(doc.generado_en)}`}
+                    separador={indice > 0}
+                    valor={
+                      noDisponible ? (
+                        <Texto variante="secundario" color={colores.textoSecundario}>
+                          Archivo no disponible
+                        </Texto>
+                      ) : (
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityState={{ busy: estado === 'descargando' }}
+                          disabled={estado === 'descargando'}
+                          onPress={() => void verYCompartir(doc)}
+                          style={estilos.abrir}
+                        >
+                          <Texto variante="etiqueta" color={colores.tintaCapa}>
+                            {estado === 'descargando'
+                              ? 'Descargando…'
+                              : estado === 'error'
+                                ? 'Reintentar'
+                                : 'Ver y compartir'}
+                          </Texto>
+                        </Pressable>
+                      )
+                    }
+                  />
+                  {estado === 'error' ? (
+                    <View style={estilos.errorFila}>
+                      <Aviso mensaje="No pudimos descargar el documento. Inténtalo de nuevo." />
+                      <DetalleTecnico detalle={fallos[doc.id] ?? null} />
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })}
+          </Superficie>
+        </View>
+      ) : null}
+      {(enFilas ? [] : (documentos.data ?? [])).map((doc) => {
         const estado = estados[doc.id];
         const noDisponible = doc.url_firmada === null || estado === 'noDisponible';
         return (
@@ -214,8 +274,17 @@ export function FilaPeriodo({
   );
 }
 
-/** Estado de cuenta ya cargado: título, estado de pago y períodos. Los valores son los del servidor. */
-export function VistaEstadoCuenta({ data }: { data: EstadoCuenta }) {
+/**
+ * Estado de cuenta ya cargado: título, estado de pago y períodos. Los valores son los del servidor.
+ * `accionDe` (inquilino, R4-B) pone una acción bajo los períodos que la tienen ("Reportar pago").
+ */
+export function VistaEstadoCuenta({
+  data,
+  accionDe,
+}: {
+  data: EstadoCuenta;
+  accionDe?: (periodo: PeriodoCuenta) => ReactNode;
+}) {
   return (
     <>
       <Superficie style={estilos.encabezado}>
@@ -231,7 +300,7 @@ export function VistaEstadoCuenta({ data }: { data: EstadoCuenta }) {
       ) : (
         <Superficie relleno="ninguno">
           {data.periodos.map((p, indice) => (
-            <FilaPeriodo key={p.periodo} p={p} separador={indice > 0} />
+            <FilaPeriodo key={p.periodo} p={p} separador={indice > 0} accion={accionDe?.(p)} />
           ))}
         </Superficie>
       )}
@@ -244,4 +313,6 @@ const estilos = StyleSheet.create({
   grupo: { gap: espaciado.xs },
   encabezado: { gap: espaciado.xs },
   detalle: { gap: 4, flexShrink: 1 },
+  abrir: { minHeight: 44, justifyContent: 'center' },
+  errorFila: { gap: espaciado.xs, paddingHorizontal: espaciado.md, paddingBottom: espaciado.sm },
 });

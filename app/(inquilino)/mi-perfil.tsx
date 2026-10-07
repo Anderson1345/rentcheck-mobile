@@ -27,10 +27,11 @@ import {
   esquemaPerfilInquilino,
   type ValoresPerfilInquilino,
 } from '@/perfil/esquemas';
-import { colores, espaciado } from '@/tema';
+import { colores, espaciado, tintaAlfa } from '@/tema';
 
 // Perfil del inquilino: nombre y teléfono se editan; cédula y correo son solo lectura. El cambio
-// NO modifica los contratos: conservan lo que escribió el arrendador.
+// NO modifica los contratos: conservan lo que escribió el arrendador. R4-B: campos con etiqueta fuera,
+// "Guardar cambios" (con sus avisos) en la barra fija y los datos de solo lectura en filas.
 export default function MiPerfilInquilino() {
   const { data: perfil, isPending, isError, error, refetch } = usePerfilInquilino();
 
@@ -58,12 +59,7 @@ export default function MiPerfilInquilino() {
     );
   }
 
-  return (
-    <PantallaPila>
-      <FormularioPerfil key={perfil.id} perfil={perfil} />
-      <FotoCedula perfil={perfil} />
-    </PantallaPila>
-  );
+  return <FormularioPerfil key={perfil.id} perfil={perfil} />;
 }
 
 const esquema = esquemaPerfilInquilino();
@@ -117,8 +113,9 @@ function FormularioPerfil({ perfil }: { perfil: PerfilInquilino }) {
     }
   }
 
-  return (
-    <View style={estilos.grupo}>
+  // La acción principal queda fija abajo; lo que pasó al guardar va justo encima.
+  const accionFija = (
+    <View style={estilos.barra}>
       {errorServidor ? (
         <>
           <Aviso mensaje={errorServidor.mensaje} />
@@ -127,44 +124,6 @@ function FormularioPerfil({ perfil }: { perfil: PerfilInquilino }) {
       ) : null}
       {guardado ? <Aviso mensaje="Cambios guardados." tono="exito" /> : null}
       {sinCambios ? <Aviso mensaje="No hiciste ningún cambio." tono="informacion" /> : null}
-
-      <Controller
-        control={control}
-        name="nombre"
-        render={({ field }) => (
-          <CampoTexto
-            etiqueta="Nombre completo"
-            valor={field.value}
-            onCambio={field.onChange}
-            onBlur={field.onBlur}
-            error={errors.nombre?.message}
-            keyboardType="default"
-            autoCapitalize="words"
-            returnKeyType="next"
-            onSubmitEditing={() => telefono.current?.focus()}
-          />
-        )}
-      />
-      <Controller
-        control={control}
-        name="telefono"
-        render={({ field }) => (
-          <CampoTexto
-            etiqueta="Teléfono"
-            valor={field.value}
-            onCambio={field.onChange}
-            onBlur={field.onBlur}
-            error={errors.telefono?.message}
-            inputRef={telefono}
-            keyboardType="phone-pad"
-            returnKeyType="done"
-            onSubmitEditing={() => void enviar()}
-          />
-        )}
-      />
-      <Texto variante="secundario" color={colores.textoSecundario}>
-        Tus contratos conservan los datos que tu arrendador escribió; este cambio no los modifica.
-      </Texto>
       <Boton
         titulo="Guardar cambios"
         tituloCargando="Guardando…"
@@ -172,20 +131,84 @@ function FormularioPerfil({ perfil }: { perfil: PerfilInquilino }) {
         ancho="completo"
         onPress={() => void enviar()}
       />
+    </View>
+  );
 
-      <Superficie style={estilos.soloLectura}>
-        <Texto variante="etiqueta" color={colores.textoFuerte}>
-          Cédula
-        </Texto>
-        <Texto variante="cuerpoFuerte">{perfil.cedula ?? 'No registrada'}</Texto>
-        <Texto variante="etiqueta" color={colores.textoFuerte} style={estilos.separado}>
-          Correo
-        </Texto>
-        <Texto variante="cuerpoFuerte">{perfil.correo ?? 'No registrado'}</Texto>
+  return (
+    <PantallaPila accionFija={accionFija}>
+      <View style={estilos.grupo}>
+        <Controller
+          control={control}
+          name="nombre"
+          render={({ field }) => (
+            <CampoTexto
+              etiqueta="Nombre completo"
+              valor={field.value}
+              onCambio={field.onChange}
+              onBlur={field.onBlur}
+              error={errors.nombre?.message}
+              keyboardType="default"
+              autoCapitalize="words"
+              returnKeyType="next"
+              onSubmitEditing={() => telefono.current?.focus()}
+            />
+          )}
+        />
+        <Controller
+          control={control}
+          name="telefono"
+          render={({ field }) => (
+            <CampoTexto
+              etiqueta="Teléfono"
+              valor={field.value}
+              onCambio={field.onChange}
+              onBlur={field.onBlur}
+              error={errors.telefono?.message}
+              inputRef={telefono}
+              keyboardType="phone-pad"
+              returnKeyType="done"
+              onSubmitEditing={() => void enviar()}
+            />
+          )}
+        />
         <Texto variante="secundario" color={colores.textoSecundario}>
-          La cédula y el correo no se pueden cambiar aquí.
+          Tus contratos conservan los datos que tu arrendador escribió; este cambio no los modifica.
         </Texto>
-      </Superficie>
+
+        <View style={estilos.soloLectura}>
+          <Superficie relleno="ninguno">
+            <DatoPerfil etiqueta="Cédula" valor={perfil.cedula ?? 'No registrada'} />
+            <DatoPerfil etiqueta="Correo" valor={perfil.correo ?? 'No registrado'} separador />
+          </Superficie>
+          <Texto variante="secundario" color={colores.textoSecundario}>
+            La cédula y el correo no se pueden cambiar aquí.
+          </Texto>
+        </View>
+      </View>
+      <FotoCedula perfil={perfil} />
+    </PantallaPila>
+  );
+}
+
+/** Un dato de solo lectura: etiqueta arriba (fuera) y valor debajo, como fila. */
+function DatoPerfil({
+  etiqueta,
+  valor,
+  separador = false,
+}: {
+  etiqueta: string;
+  valor: string;
+  separador?: boolean;
+}) {
+  return (
+    <View>
+      {separador ? <View style={estilos.separador} /> : null}
+      <View testID="dato-perfil" style={estilos.dato}>
+        <Texto variante="etiqueta" color={colores.textoFuerte}>
+          {etiqueta}
+        </Texto>
+        <Texto variante="cuerpoFuerte">{valor}</Texto>
+      </View>
     </View>
   );
 }
@@ -218,7 +241,15 @@ function FotoCedula({ perfil }: { perfil: PerfilInquilino }) {
 
 const estilos = StyleSheet.create({
   grupo: { gap: espaciado.md },
-  soloLectura: { gap: espaciado.xxs },
-  separado: { marginTop: espaciado.xs },
+  barra: { gap: espaciado.sm },
+  soloLectura: { gap: espaciado.xs, marginTop: espaciado.xs },
+  dato: {
+    minHeight: 64,
+    justifyContent: 'center',
+    gap: 2,
+    paddingHorizontal: espaciado.md,
+    paddingVertical: espaciado.sm,
+  },
+  separador: { height: 1, marginLeft: espaciado.md, backgroundColor: tintaAlfa(0.07) },
   foto: { marginTop: espaciado.lg },
 });

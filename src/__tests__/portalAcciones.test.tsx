@@ -1,9 +1,10 @@
-// Portal del inquilino, acciones y perfil (E6-B): terminación anticipada, aviso de no renovación,
-// verificación tras "sin respuesta", 409, y Mi perfil (nombre, teléfono y foto de cédula).
+// Portal del inquilino, acciones y perfil (E6-B, rediseño R4-B): "Gestionar contrato" en filas,
+// terminación anticipada, aviso de no renovación, verificación tras "sin respuesta", 409, y Mi perfil
+// (nombre, teléfono y foto de cédula). Las acciones principales van en la barra fija.
 import { Image } from 'expo-image';
 import { type ReactNode } from 'react';
 import { Alert, Text } from 'react-native';
-import { act } from 'react-test-renderer';
+import { act, type ReactTestInstance } from 'react-test-renderer';
 
 import MasInquilino from '../../app/(inquilino)/(pestanas)/mas';
 import AvisoInquilino from '../../app/(inquilino)/mi-contrato/[id]/aviso';
@@ -213,6 +214,13 @@ const pulsar = async (raiz: Raiz, titulo: string) => {
   await esperar();
 };
 const todo = (raiz: Raiz) => textosDe(raiz).join(' | ');
+/** El botón principal vive en la barra fija, no en el contenido que se desplaza (R4-B). */
+const enBarraFija = (raiz: Raiz, titulo: string) => {
+  const barra = raiz.root.findByProps({ testID: 'accion-fija' });
+  const desplazable = raiz.root.findAll((n) => n.props.keyboardShouldPersistTaps === 'handled')[0];
+  const tiene = (n: ReactTestInstance) => n.findAll((h) => h.props.children === titulo).length > 0;
+  return tiene(barra) && !tiene(desplazable);
+};
 let alerta: jest.SpyInstance;
 /** Confirma la última alerta pulsando su botón de confirmar (el segundo). */
 const confirmarAlerta = async (n = 0) => {
@@ -247,10 +255,10 @@ beforeEach(() => {
 
 // ---------------------------------------------------------------------------------------------
 
-describe('Mi contrato: sección Acciones según los booleanos del servidor', () => {
+describe('Mi contrato: "Gestionar contrato" según los booleanos del servidor', () => {
   it('ACTIVO sin solicitud: "Solicitar terminación" y "Dar aviso de no renovación"', async () => {
     const { raiz } = await montar(<MiContrato />);
-    expect(todo(raiz)).toContain('Acciones');
+    expect(todo(raiz)).toContain('Gestionar contrato');
     expect(hayBoton(raiz, 'Solicitar terminación')).toBe(true);
     expect(hayBoton(raiz, 'Dar aviso de no renovación')).toBe(true);
     for (const t of ['Confirmar terminación', 'Cancelar mi solicitud', 'Cancelar aviso']) {
@@ -274,6 +282,16 @@ describe('Mi contrato: sección Acciones según los booleanos del servidor', () 
     expect(hayBoton(raiz, 'Cancelar mi solicitud')).toBe(true);
     expect(hayBoton(raiz, 'Confirmar terminación')).toBe(false);
     expect(hayBoton(raiz, 'Solicitar terminación')).toBe(false);
+  });
+
+  it('R4-B: cada acción es una fila con su explicación', async () => {
+    const { raiz } = await montar(<MiContrato />);
+    const t = textosDe(raiz);
+    expect(t).toContain('Pide terminar antes de la fecha de fin, de mutuo acuerdo.');
+    expect(t).toContain('Avisa que el contrato no se renovará al terminar.');
+    datos.detalle = detalle({ terminacion_anticipada: SOLICITADA_POR_ARRENDADOR });
+    const otra = await montar(<MiContrato />);
+    expect(textosDe(otra.raiz)).toContain('Tu arrendador la pidió. Es irreversible.');
   });
 
   it('aviso propio vigente: "Cancelar aviso" y no "Dar aviso"', async () => {
@@ -310,7 +328,7 @@ describe('Mi contrato: sección Acciones según los booleanos del servidor', () 
         aviso_no_renovacion: { ...AVISO_PROPIO, puede_dar: true },
       });
       const { raiz } = await montar(<MiContrato />);
-      expect(textosDe(raiz)).not.toContain('Acciones');
+      expect(textosDe(raiz)).not.toContain('Gestionar contrato');
       for (const t of [
         'Solicitar terminación',
         'Confirmar terminación',
@@ -492,6 +510,12 @@ describe('Pantalla de terminación: solicitar', () => {
     );
   });
 
+  it('R4-B: "Solicitar terminación" en la barra fija; Motivo y Fecha efectiva con etiqueta fuera', async () => {
+    const { raiz } = await montar(<TerminacionInquilino />);
+    expect(enBarraFija(raiz, 'Solicitar terminación')).toBe(true);
+    expect(textosDe(raiz)).toEqual(expect.arrayContaining(['Motivo', 'Fecha efectiva']));
+  });
+
   it('sin motivo no se envía ni se pide confirmación', async () => {
     const { raiz } = await montar(<TerminacionInquilino />);
     await pulsar(raiz, 'Solicitar terminación');
@@ -620,6 +644,15 @@ describe('Pantalla de terminación: solicitar', () => {
 });
 
 describe('Pantalla de aviso de no renovación', () => {
+  it('R4-B: "Dar aviso" en la barra fija, con la explicación de la prórroga', async () => {
+    const { raiz } = await montar(<AvisoInquilino />);
+    expect(enBarraFija(raiz, 'Dar aviso')).toBe(true);
+    expect(textosDe(raiz)).toContain(
+      'Sin aviso, el contrato se prorroga automáticamente por el mismo término.',
+    );
+    expect(textosDe(raiz)).toContain('Motivo (opcional)');
+  });
+
   it('dar el aviso con motivo: confirmación, POST con el motivo recortado y mensaje', async () => {
     const { raiz } = await montar(<AvisoInquilino />);
     expect(campoDe(raiz, 'Motivo (opcional)')?.props.maxLength).toBe(1000);
@@ -726,6 +759,22 @@ describe('Mi perfil del inquilino', () => {
     await pulsar(raiz, 'Guardar cambios');
     await esperar();
   };
+
+  it('R4-B: "Guardar cambios" en la barra fija; cédula y correo como filas de solo lectura', async () => {
+    const { raiz } = await montar(<MiPerfilInquilino />);
+    expect(enBarraFija(raiz, 'Guardar cambios')).toBe(true);
+    const filas = raiz.root
+      .findAll((n) => typeof n.type === 'string' && n.props.testID === 'dato-perfil')
+      .map((f) =>
+        f
+          .findAll((n) => typeof n.type === 'string' && typeof n.props.children === 'string')
+          .map((n) => n.props.children),
+      );
+    expect(filas).toEqual([
+      ['Cédula', '1020304050'],
+      ['Correo', 'camilo@ejemplo.com'],
+    ]);
+  });
 
   it('muestra nombre y teléfono editables; cédula y correo solo lectura con su explicación', async () => {
     const { raiz } = await montar(<MiPerfilInquilino />);

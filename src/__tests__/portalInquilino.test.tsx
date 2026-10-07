@@ -1,6 +1,7 @@
 // Portal del inquilino, lectura (E6-A): contrato seleccionado, selector, agregar con código, Mi panel
 // (ACTIVO / PROGRAMADO / finalizado; rediseño R3-B, el detalle de sus bloques está en
-// miPanelInquilino.test), Mi contrato, estado de cuenta, aislamiento (404) y sin conexión.
+// miPanelInquilino.test), Mi contrato, estado de cuenta, Mis contratos y Más (rediseño R4-B),
+// aislamiento (404) y sin conexión.
 import type { ReactNode } from 'react';
 import { Text } from 'react-native';
 import { act } from 'react-test-renderer';
@@ -26,6 +27,7 @@ import {
 } from '../inquilino/ContratoSeleccionado';
 import { crearToken } from '../pruebas/crearToken';
 import { botonDe, hayBoton, renderizarPantalla, textosDe } from '../pruebas/pantallas';
+import type { ReactTestInstance } from 'react-test-renderer';
 import { fijarReloj, restaurarReloj } from '../pruebas/reloj';
 import { guardarCodigoPendiente, limpiarCodigoPendiente } from '../sesion/codigoPendiente';
 import type { DatosSesion } from '../sesion/tipos';
@@ -272,6 +274,18 @@ const pulsar = async (raiz: Raiz, titulo: string) => {
   await esperar();
 };
 const todo = (raiz: Raiz) => textosDe(raiz).join(' | ');
+/** El botón principal vive en la barra fija, no en el contenido que se desplaza (R4-B). */
+const enBarraFija = (raiz: Raiz, titulo: string) => {
+  const barra = raiz.root.findByProps({ testID: 'accion-fija' });
+  const desplazable = raiz.root.findAll((n) => n.props.keyboardShouldPersistTaps === 'handled')[0];
+  const tiene = (n: ReactTestInstance) => n.findAll((h) => h.props.children === titulo).length > 0;
+  return tiene(barra) && !tiene(desplazable);
+};
+/** Orden de las secciones con testID (solo nodos nativos). */
+const ordenDe = (raiz: Raiz, ids: string[]) =>
+  raiz.root
+    .findAll((n) => typeof n.type === 'string' && ids.includes(n.props.testID))
+    .map((n) => n.props.testID as string);
 const cabecera = (raiz: Raiz) =>
   raiz.root.find(
     (n) =>
@@ -362,11 +376,11 @@ describe('Mi panel: contrato seleccionado y selector', () => {
 });
 
 describe('Mis contratos', () => {
-  it('lista unidad, dirección, ciudad, fechas y chips; al final "Agregar contrato con código"', async () => {
+  it('filas con dirección · unidad, ciudad, fechas, estado y pago; "Agregar contrato con código" en la barra fija', async () => {
     const { raiz } = await montar(<MisContratos />);
     const t = todo(raiz);
-    expect(t).toContain('Apto 302');
-    expect(t).toContain('Calle 45 # 12-30');
+    expect(t).toContain('Calle 45 # 12-30 · Apto 302');
+    expect(t).toContain('Carrera 7 # 80-10 · Apto 401');
     expect(t).toContain('Bogotá');
     expect(t).toContain('01/01/2026');
     expect(t).toContain('31/12/2026');
@@ -374,9 +388,34 @@ describe('Mis contratos', () => {
     expect(t).toContain('Programado');
     // estado_pago solo del ACTIVO (el PROGRAMADO trae null)
     expect(textosDe(raiz).filter((x) => x === 'Al día')).toHaveLength(1);
-    expect(hayBoton(raiz, 'Agregar contrato con código')).toBe(true);
+    expect(enBarraFija(raiz, 'Agregar contrato con código')).toBe(true);
     await pulsar(raiz, 'Agregar contrato con código');
     expect(mockPush).toHaveBeenCalledWith('/agregar-contrato');
+  });
+
+  it('el contrato seleccionado va marcado (y lo anuncia el lector)', async () => {
+    const { raiz } = await montar(<MisContratos />);
+    const filas = raiz.root.findAll(
+      (n) => n.props.testID === 'fila-mi-contrato' && typeof n.props.onPress === 'function',
+    );
+    expect(filas.map((f) => f.props.accessibilityState?.selected)).toEqual([true, false]);
+    expect(textosDe(raiz).filter((x) => x === 'Seleccionado')).toHaveLength(1);
+  });
+
+  it('los contratos cerrados van en una sección aparte', async () => {
+    respuestas.lista = [resumen('c1'), resumen('c2', { estado: 'VENCIDO', estado_pago: null })];
+    const { raiz } = await montar(<MisContratos />);
+    expect(ordenDe(raiz, ['contratos-vigentes', 'contratos-cerrados'])).toEqual([
+      'contratos-vigentes',
+      'contratos-cerrados',
+    ]);
+    const [cerrados] = raiz.root.findAll(
+      (n) => typeof n.type === 'string' && n.props.testID === 'contratos-cerrados',
+    );
+    expect(
+      cerrados.findAll((n) => n.props.children === 'Carrera 7 # 80-10 · Apto 401').length,
+    ).toBeGreaterThan(0);
+    expect(todo(raiz)).toContain('Cerrados');
   });
 
   it('sin contratos: estado vacío con el botón de agregar', async () => {
@@ -396,7 +435,7 @@ describe('Mis contratos', () => {
     expect(todo(raiz)).toContain('Tu próximo pago · Noviembre');
     expect(todo(raiz)).toContain('$ 1.500.000');
 
-    await pulsar(raiz, 'Apto 401');
+    await pulsar(raiz, 'Carrera 7 # 80-10 · Apto 401');
 
     expect(mockBack).toHaveBeenCalled();
     expect(mockGet).toHaveBeenCalledWith('/inquilino/contratos/c2/panel');
@@ -595,6 +634,12 @@ describe('Agregar contrato con código', () => {
         .props.onChangeText(texto);
     });
 
+  it('R4-B: etiqueta fuera y "Agregar contrato" en la barra fija', async () => {
+    const { raiz } = await montar(<AgregarContrato />);
+    expect(textosDe(raiz)).toContain('Código de acceso');
+    expect(enBarraFija(raiz, 'Agregar contrato')).toBe(true);
+  });
+
   it('un código mal formado no se envía y avisa', async () => {
     const { raiz } = await montar(<AgregarContrato />);
     await escribir(raiz, 'abc');
@@ -717,20 +762,99 @@ describe('vinculación pendiente tras "ya tengo cuenta"', () => {
 });
 
 describe('Mi contrato', () => {
+  // El avance y los días restantes dependen de hoy: reloj fijo (2 de octubre de 2026).
   beforeEach(() => {
     mockParams = { id: 'c1' };
+    fijarReloj();
   });
+  afterEach(() => restaurarReloj());
 
-  it('condiciones: canon, día y forma de pago, depósito, fechas y estado', async () => {
+  /** Etiqueta → valor de las celdas de Condiciones (2 columnas). */
+  const celdas = (raiz: Raiz) =>
+    Object.fromEntries(
+      raiz.root
+        .findAll((n) => typeof n.type === 'string' && n.props.testID === 'celda-condicion')
+        .map((c) => {
+          const [etiqueta, valor] = c
+            .findAll((n) => typeof n.type === 'string' && typeof n.props.children === 'string')
+            .map((n) => n.props.children as string);
+          return [etiqueta, valor];
+        }),
+    );
+
+  it('R4-B: cabecera de tinta con estado y pago, dirección · unidad, canon por mes y día, avance y fechas', async () => {
     const { raiz } = await montar(<MiContrato />);
     const t = todo(raiz);
-    expect(t).toContain('Activo');
+    expect(t).toContain('Activo · Al día');
+    expect(t).toContain('Calle 45 # 12-30 · Apto 302');
     expect(t).toContain('$ 1.500.000');
-    expect(t).toContain('Día de pago: 5');
-    expect(t).toContain('Forma de pago: Transferencia');
-    expect(t).toContain('Depósito: $ 3.000.000');
-    expect(t).toContain('1 de enero de 2026');
-    expect(t).toContain('31 de diciembre de 2026');
+    expect(t).toContain('/ mes · día 5');
+    expect(t).toContain('01/01/2026');
+    expect(t).toContain('31/12/2026');
+    expect(t).toContain('90 días restantes');
+    const barra = raiz.root.find(
+      (n) => typeof n.type === 'string' && n.props.accessibilityLabel === 'Avance del contrato',
+    );
+    expect(barra.props.accessibilityValue.now).toBe(75);
+    const volver = raiz.root.findAll(
+      (n) => n.props.accessibilityLabel === 'Volver' && typeof n.props.onPress === 'function',
+    )[0];
+    await act(async () => volver.props.onPress());
+    expect(mockBack).toHaveBeenCalled();
+  });
+
+  it.each([
+    ['PROGRAMADO', 'Empieza el 01/01/2026'],
+    ['VENCIDO', 'Finalizó el 31/12/2026'],
+    ['TERMINADO_ANTICIPADAMENTE', 'Terminado anticipadamente'],
+  ] as const)(
+    'R4-B: %s en la cabecera: "%s" en lugar de los días restantes',
+    async (estado, texto) => {
+      montarContrato('c1', { detalle: { ...DETALLE, estado } });
+      const { raiz } = await montar(<MiContrato />);
+      expect(todo(raiz)).toContain(texto);
+      expect(todo(raiz)).not.toContain('días restantes');
+    },
+  );
+
+  it('R4-B: accesos: Estado de cuenta, Documentos, Fotos de entrega y Reportar pago (activo)', async () => {
+    const { raiz } = await montar(<MiContrato />);
+    await pulsar(raiz, 'Estado de cuenta');
+    expect(mockPush).toHaveBeenLastCalledWith({
+      pathname: '/mi-contrato/[id]/estado-cuenta',
+      params: { id: 'c1' },
+    });
+    await pulsar(raiz, 'Reportar pago');
+    expect(mockPush).toHaveBeenLastCalledWith({
+      pathname: '/reportar-pago',
+      params: { contratoId: 'c1' },
+    });
+    // Documentos y Fotos de entrega llevan a su sección de esta misma pantalla (no navegan).
+    const antes = mockPush.mock.calls.length;
+    await pulsar(raiz, 'Documentos');
+    await pulsar(raiz, 'Fotos de entrega');
+    expect(mockPush.mock.calls.length).toBe(antes);
+  });
+
+  it('R4-B: sin fotos de entrega no hay acceso; con el contrato no activo no hay "Reportar pago"', async () => {
+    montarContrato('c1', { detalle: { ...DETALLE, estado: 'VENCIDO', fotos_entrega: [] } });
+    const { raiz } = await montar(<MiContrato />);
+    expect(hayBoton(raiz, 'Fotos de entrega')).toBe(false);
+    expect(hayBoton(raiz, 'Reportar pago')).toBe(false);
+    expect(hayBoton(raiz, 'Estado de cuenta')).toBe(true);
+    expect(hayBoton(raiz, 'Documentos')).toBe(true);
+  });
+
+  it('condiciones en 2 columnas: canon, día y forma de pago, depósito y fechas', async () => {
+    const { raiz } = await montar(<MiContrato />);
+    expect(celdas(raiz)).toMatchObject({
+      Canon: '$ 1.500.000',
+      'Día de pago': 'Día 5 de cada mes',
+      'Forma de pago': 'Transferencia',
+      Depósito: '$ 3.000.000',
+      Inicio: '1 de enero de 2026',
+      Fin: '31 de diciembre de 2026',
+    });
     expect(mockGet).toHaveBeenCalledWith('/inquilino/contratos/c1');
   });
 
@@ -779,6 +903,20 @@ describe('Mi contrato', () => {
     const { raiz } = await montar(<MiContrato />);
     expect(todo(raiz)).toContain('Contrato original');
     expect(todo(raiz)).toContain('Archivo no disponible');
+    // R4-B: los documentos son filas de un mismo contenedor (tipo, versión y fecha).
+    const [lista] = raiz.root.findAll(
+      (n) => typeof n.type === 'string' && n.props.testID === 'lista-documentos',
+    );
+    const enLista = lista
+      .findAll((n) => typeof n.props.children === 'string')
+      .map((n) => n.props.children);
+    expect(enLista).toEqual(
+      expect.arrayContaining([
+        'Contrato original',
+        'Otrosí por incremento',
+        'Versión 2 · 01/01/2026',
+      ]),
+    );
 
     await pulsar(raiz, 'Ver y compartir');
 
@@ -838,12 +976,22 @@ describe('Mi contrato', () => {
     }
   });
 
-  it('seccion=documentos: los documentos van primero', async () => {
+  it('seccion=documentos: los documentos van primero (el acceso de Mi panel llega a ellos)', async () => {
+    const SECCIONES = ['seccion-documentos', 'seccion-condiciones', 'seccion-fotos'];
     mockParams = { id: 'c1', seccion: 'documentos' };
     const { raiz } = await montar(<MiContrato />);
-    const t = textosDe(raiz);
-    expect(t.indexOf('Documentos')).toBeGreaterThan(-1);
-    expect(t.indexOf('Documentos')).toBeLessThan(t.indexOf('Fotos de entrega'));
+    expect(ordenDe(raiz, SECCIONES)).toEqual([
+      'seccion-documentos',
+      'seccion-condiciones',
+      'seccion-fotos',
+    ]);
+    mockParams = { id: 'c1' };
+    const normal = await montar(<MiContrato />);
+    expect(ordenDe(normal.raiz, SECCIONES)).toEqual([
+      'seccion-condiciones',
+      'seccion-documentos',
+      'seccion-fotos',
+    ]);
   });
 
   it('404: "No encontramos este contrato", refresca la lista y "Volver"', async () => {
@@ -862,7 +1010,7 @@ describe('Mi contrato', () => {
     expect(todo(raiz)).toMatch(/No hay conexión/);
     montarContrato('c1', { detalle: DETALLE });
     await pulsar(raiz, 'Reintentar');
-    expect(todo(raiz)).toContain('Día de pago: 5');
+    expect(todo(raiz)).toContain('Día 5 de cada mes');
   });
 
   it('cada contrato pide solo lo suyo: c2 no muestra el recaudo de c1', async () => {
@@ -873,7 +1021,7 @@ describe('Mi contrato', () => {
     const { raiz } = await montar(<MiContrato />);
     expect(mockGet).toHaveBeenCalledWith('/inquilino/contratos/c2');
     expect(mockGet).not.toHaveBeenCalledWith('/inquilino/contratos/c1');
-    expect(todo(raiz)).toContain('Forma de pago: Efectivo');
+    expect(todo(raiz)).toContain('Efectivo');
     expect(todo(raiz)).not.toContain('Bancolombia');
   });
 });
@@ -892,6 +1040,39 @@ describe('Estado de cuenta del inquilino', () => {
     expect(t).toContain('En mora');
     expect(t).toContain('Octubre de 2026');
     expect(t).toContain('Vencido');
+  });
+
+  it('R4-B: "Reportar pago" en los períodos que hoy se pueden reportar (EN_REVISION: "Reemplazar comprobante")', async () => {
+    montarContrato('c1', {
+      'estado-cuenta': {
+        estadoPago: 'en_mora',
+        periodos: [
+          {
+            ...CUENTA.periodos[0],
+            periodo: '2026-09-01T00:00:00.000Z',
+            estado: 'PAGADO',
+            montoAprobadoCentavos: 150_000_000,
+          },
+          CUENTA.periodos[0],
+          { ...CUENTA.periodos[0], periodo: '2026-11-01T00:00:00.000Z', estado: 'EN_REVISION' },
+        ],
+      },
+    });
+    const { raiz } = await montar(<EstadoCuentaInquilino />);
+    expect(textosDe(raiz).filter((x) => x === 'Reportar pago')).toHaveLength(1);
+    expect(hayBoton(raiz, 'Reemplazar comprobante')).toBe(true);
+    await pulsar(raiz, 'Reportar pago');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/reportar-pago',
+      params: { contratoId: 'c1', periodo: '2026-10-01' },
+    });
+  });
+
+  it('R4-B: con el contrato PROGRAMADO no se ofrece reportar', async () => {
+    respuestas.lista = [resumen('c1', { estado: 'PROGRAMADO', estado_pago: null })];
+    const { raiz } = await montar(<EstadoCuentaInquilino />);
+    expect(todo(raiz)).toContain('Octubre de 2026');
+    expect(hayBoton(raiz, 'Reportar pago')).toBe(false);
   });
 
   it('404: "No encontramos este contrato" y refresca la lista', async () => {
@@ -921,6 +1102,21 @@ describe('Más y cierre de sesión', () => {
     const { raiz } = await montar(<MasInquilino />);
     expect(hayBoton(raiz, 'Cerrar sesión')).toBe(true);
     expect(hayBoton(raiz, 'Mi perfil')).toBe(true);
+  });
+
+  it('R4-B: filas agrupadas con icono: "Mis contratos" abre la lista y "Cerrar sesión" va al final', async () => {
+    const { raiz } = await montar(<MasInquilino />);
+    const t = textosDe(raiz);
+    expect(t.indexOf('Mis contratos')).toBeGreaterThan(-1);
+    expect(t.indexOf('Cerrar sesión')).toBe(
+      Math.max(...['Mi perfil', 'Mis contratos', 'Cerrar sesión'].map((x) => t.indexOf(x))),
+    );
+    expect(ordenDe(raiz, ['grupo-cuenta', 'grupo-sesion'])).toEqual([
+      'grupo-cuenta',
+      'grupo-sesion',
+    ]);
+    await pulsar(raiz, 'Mis contratos');
+    expect(mockPush).toHaveBeenCalledWith('/mis-contratos');
   });
 
   it('cerrar sesión limpia el contrato seleccionado', async () => {
