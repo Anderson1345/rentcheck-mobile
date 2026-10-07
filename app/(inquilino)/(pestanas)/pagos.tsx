@@ -8,15 +8,15 @@ import { Boton } from '@/componentes/Boton';
 import { CabeceraTinta, ContenidoBajoCabecera, TituloCabecera } from '@/componentes/CabeceraTinta';
 import { EsqueletoCarga } from '@/componentes/EsqueletoCarga';
 import { EstadoMensaje } from '@/componentes/EstadoMensaje';
-import { ErrorConReintento, SelectorContrato } from '@/componentes/inquilino/PortalInquilino';
+import { ErrorConReintento, PildoraContrato } from '@/componentes/inquilino/PortalInquilino';
 import { PagosContrato } from '@/componentes/pagos/PagosContrato';
 import { useRefrescarAlEnfocar } from '@/consultas/enfoque';
 import { clavesInquilino } from '@/consultas/inquilino';
 import { useContratoSeleccionado } from '@/inquilino/ContratoSeleccionado';
 import { colores, espaciado } from '@/tema';
 
-// Pagos del inquilino: datos para pagar (solo contrato ACTIVO), estado de los períodos con
-// "Reportar pago" e historial de pagos reportados, del contrato seleccionado.
+// Pagos del inquilino (rediseño R4-A): la píldora del contrato (la de Mi panel), el período protagonista
+// con su acción, el recaudo en una línea (solo contrato ACTIVO) y el historial de pagos reportados.
 export default function PagosInquilino() {
   const router = useRouter();
   const cliente = useQueryClient();
@@ -38,7 +38,7 @@ export default function PagosInquilino() {
     <View style={estilos.pantalla}>
       <CabeceraTinta conSolapa>
         <TituloCabecera titulo="Pagos" />
-        {contrato ? <SelectorContrato contrato={contrato} /> : null}
+        {contrato ? <PildoraContrato contrato={contrato} /> : null}
       </CabeceraTinta>
       <ContenidoBajoCabecera style={estilos.cuerpo}>
         <ScrollView

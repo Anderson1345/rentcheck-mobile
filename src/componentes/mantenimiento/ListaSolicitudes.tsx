@@ -1,11 +1,12 @@
 // Lista de solicitudes de mantenimiento del contrato seleccionado: "Abiertas" (pendientes y en proceso,
 // por defecto) y "Resueltas", cada una con su contador. El segmento es solo de la app: el servidor
 // devuelve todas, de la más reciente a la más antigua. Crear solo se ofrece con contrato ACTIVO; con
-// otro estado se explica por qué, pero la lista sigue a la vista.
+// otro estado se explica por qué, pero la lista sigue a la vista. R4-A: filas en un contenedor con la
+// miniatura (si hay foto), la descripción, "Urgencia X · hace N días" y el estado.
 
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import type { ContratoInquilinoResumen } from '../../api/inquilino';
 import type { SolicitudInquilino } from '../../api/mantenimiento';
@@ -18,16 +19,16 @@ import {
   type SegmentoSolicitudes,
   textoSinCrear,
 } from '../../mantenimiento/reglas';
-import { colores, espaciado } from '../../tema';
-import { formatearFechaCorta } from '../../utilidades/fechas';
+import { textoSolicitud } from '../../inquilino/miPanel';
+import { colores, espaciado, tintaAlfa } from '../../tema';
 import { Aviso } from '../Aviso';
 import { Boton } from '../Boton';
 import { ChipEstado } from '../ChipEstado';
 import { ControlSegmentado } from '../ControlSegmentado';
 import { EsqueletoCarga } from '../EsqueletoCarga';
+import { ESTADOS_MANTENIMIENTO } from '../estados';
 import { EstadoMensaje } from '../EstadoMensaje';
-import { FilaLista } from '../FilaLista';
-import { Icono } from '../iconos/Icono';
+import { MiniaturaSolicitud } from '../inquilino/BloquesMiPanel';
 import { ErrorConReintento } from '../inquilino/PortalInquilino';
 import { Superficie } from '../Superficie';
 import { Texto } from '../Texto';
@@ -51,32 +52,28 @@ function FilaSolicitud({
   separador: boolean;
 }) {
   const router = useRouter();
+  const detalle = textoSolicitud(solicitud.urgencia, solicitud.creado_en);
   return (
-    <FilaLista
-      titulo={solicitud.descripcion}
-      separador={separador}
-      conChevron
-      onPress={() => router.push({ pathname: '/solicitud/[id]', params: { id: solicitud.id } })}
-      detalle={
-        <View style={estilos.detalle}>
-          <View style={estilos.chips}>
-            <ChipEstado tipo="mantenimiento" estado={solicitud.estado} />
-            <ChipEstado tipo="urgencia" estado={solicitud.urgencia} />
-          </View>
-          <Texto variante="secundario" color={colores.textoSecundario}>
-            {`Creada el ${formatearFechaCorta(solicitud.creado_en)}`}
+    <View>
+      {separador ? <View style={estilos.separador} /> : null}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityHint={`${detalle}. ${ESTADOS_MANTENIMIENTO[solicitud.estado].etiqueta}`}
+        onPress={() => router.push({ pathname: '/solicitud/[id]', params: { id: solicitud.id } })}
+        style={({ pressed }) => [estilos.fila, pressed && estilos.presionada]}
+      >
+        <MiniaturaSolicitud solicitud={solicitud} />
+        <View style={estilos.textos}>
+          <Texto variante="filaTitulo" numberOfLines={2}>
+            {solicitud.descripcion}
           </Texto>
-          {solicitud.adjunto_tipo ? (
-            <View style={estilos.adjunto} accessibilityLabel="Tiene adjunto">
-              <Icono nombre="camara" tamano={16} color={colores.textoSecundario} />
-              <Texto variante="secundario" color={colores.textoSecundario}>
-                {solicitud.adjunto_tipo === 'VIDEO' ? 'Video' : 'Foto'}
-              </Texto>
-            </View>
-          ) : null}
+          <Texto variante="secundario" color={colores.textoSecundario} numberOfLines={1}>
+            {detalle}
+          </Texto>
         </View>
-      }
-    />
+        <ChipEstado tipo="mantenimiento" estado={solicitud.estado} />
+      </Pressable>
+    </View>
   );
 }
 
@@ -154,7 +151,15 @@ function ListaConSegmentos({
 
 const estilos = StyleSheet.create({
   grupo: { gap: espaciado.md },
-  detalle: { gap: 4, flexShrink: 1 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: espaciado.sm },
-  adjunto: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  fila: {
+    minHeight: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: espaciado.sm,
+    paddingHorizontal: espaciado.md,
+  },
+  presionada: { backgroundColor: tintaAlfa(0.03) },
+  textos: { flex: 1, minWidth: 0, gap: 2 },
+  separador: { height: 1, marginLeft: 72, backgroundColor: tintaAlfa(0.07) },
 });

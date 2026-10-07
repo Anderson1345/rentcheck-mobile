@@ -9,6 +9,7 @@ import SolicitudesInquilino from '../../app/(inquilino)/(pestanas)/solicitudes';
 import DetalleSolicitudInquilino from '../../app/(inquilino)/solicitud/[id]';
 import { ErrorApi, ErrorCancelado, ErrorSinConexion } from '../api/cliente';
 import type { SolicitudInquilino } from '../api/mantenimiento';
+import { Texto } from '../componentes/Texto';
 import { ContratoSeleccionadoProvider } from '../inquilino/ContratoSeleccionado';
 import { crearToken } from '../pruebas/crearToken';
 import {
@@ -270,17 +271,41 @@ describe('pestaña Solicitudes', () => {
     expect(t).not.toContain('Cambio de bombillo.');
   });
 
-  it('cada fila trae chip de urgencia, chip de estado, fecha de creación y señal de adjunto', async () => {
+  it('cabecera con la píldora del contrato (inmueble · unidad) que abre Mis contratos', async () => {
+    const { raiz } = await montar(<SolicitudesInquilino />);
+    expect(todo(raiz)).toContain('Calle 45 # 12-30 · Apto 302');
+    const pildora = raiz.root.find(
+      (n) =>
+        typeof n.props.onPress === 'function' &&
+        String(n.props.accessibilityLabel ?? '').startsWith('Cambiar de contrato'),
+    );
+    await act(async () => pildora.props.onPress());
+    expect(mockPush).toHaveBeenCalledWith('/mis-contratos');
+  });
+
+  it('R4-A: cada fila trae miniatura si hay imagen, descripción en 2 líneas, "Urgencia X · hace N días" y chip de estado', async () => {
     datos.lista = variasSolicitudes();
     const { raiz } = await montar(<SolicitudesInquilino />);
     const t = todo(raiz);
     expect(t).toContain('Pendiente');
     expect(t).toContain('En proceso');
-    expect(t).toContain('alta');
-    expect(t).toContain('media');
-    expect(t).toContain('Creada el 01/10/2026');
-    expect(t).toContain('Foto');
-    expect(t).toContain('Video');
+    // Creadas el 1 de octubre; hoy es el 2 (reloj fijo).
+    expect(t).toContain('Urgencia alta · ayer');
+    expect(t).toContain('Urgencia media · ayer');
+    const miniaturas = raiz.root.findAll(
+      (n) => typeof n.type === 'string' && n.props.testID === 'miniatura-solicitud',
+    );
+    expect(miniaturas).toHaveLength(1);
+    // El video no tiene miniatura: se anuncia su adjunto.
+    expect(
+      raiz.root.findAll(
+        (n) => typeof n.type === 'string' && n.props.accessibilityLabel === 'Tiene video',
+      ).length,
+    ).toBe(1);
+    const descripcion = raiz.root
+      .findAllByType(Texto)
+      .find((n) => n.props.children === 'Se dañó la cerradura.');
+    expect(descripcion?.props.numberOfLines).toBe(2);
   });
 
   it('un cambio de segmento muestra las resueltas', async () => {
@@ -374,6 +399,34 @@ describe('pestaña Solicitudes', () => {
 describe('detalle de la solicitud', () => {
   const conAdjunto = (tipo: 'IMAGEN' | 'VIDEO' | null, url: string | null, extra = {}) =>
     solicitud('s1', { adjunto_tipo: tipo, adjunto_url: url, ...extra });
+
+  it('R4-A: protagonista arriba con estado, urgencia y la frase del estado; el adjunto va en su sección', async () => {
+    datos.detalle = [
+      solicitud('s1', {
+        estado: 'EN_PROCESO',
+        urgencia: 'ALTO',
+        adjunto_tipo: 'IMAGEN',
+        adjunto_url: URL_UNO,
+      }),
+    ];
+    const { raiz } = await montar(<DetalleSolicitudInquilino />);
+    const [protagonista] = raiz.root.findAll(
+      (n) => typeof n.type === 'string' && n.props.testID === 'protagonista-solicitud',
+    );
+    const textos = protagonista.findAllByType(Texto).map((n) => n.props.children);
+    expect(textos).toEqual(
+      expect.arrayContaining(['El arrendador la está atendiendo', 'La llave del lavamanos gotea.']),
+    );
+    expect(todo(raiz)).toContain('Adjunto');
+    // La foto se amplía al tocarla (con la URL recién pedida).
+    expect(
+      raiz.root.findAll(
+        (n) =>
+          n.props.accessibilityLabel === 'Ampliar foto de la solicitud' &&
+          typeof n.props.onPress === 'function',
+      ).length,
+    ).toBeGreaterThan(0);
+  });
 
   it('muestra la descripción, urgencia, estado con su frase y las fechas; es de solo lectura', async () => {
     datos.detalle = [
@@ -512,6 +565,20 @@ describe('nueva solicitud', () => {
     expect(todo(raiz)).toContain('Apto 302 · Calle 45 # 12-30');
     expect(campoDe(raiz, 'unidadId')).toBeUndefined();
     expect(campoDe(raiz, 'Unidad')).toBeUndefined();
+  });
+
+  it('R4-A: "Enviar solicitud" vive en la barra fija, fuera del contenido que se desplaza', async () => {
+    const { raiz } = await montar(<NuevaSolicitud />);
+    const barra = raiz.root.findByProps({ testID: 'accion-fija' });
+    expect(barra.findAll((n) => n.props.children === 'Enviar solicitud').length).toBeGreaterThan(0);
+    const desplazable = raiz.root.findAll(
+      (n) => n.props.keyboardShouldPersistTaps === 'handled',
+    )[0];
+    expect(desplazable.findAll((n) => n.props.children === 'Enviar solicitud')).toHaveLength(0);
+    // Etiquetas fuera de la caja.
+    expect(textosDe(raiz)).toEqual(
+      expect.arrayContaining(['¿Qué necesita arreglo?', 'Urgencia', 'Adjunto (opcional)']),
+    );
   });
 
   it('"Enviar solicitud" está deshabilitado mientras no haya una descripción válida', async () => {

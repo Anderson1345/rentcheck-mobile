@@ -2,6 +2,7 @@
 // agrupación usan `hoy` inyectado (día de Bogotá): nada depende de la fecha real.
 import type { PeriodoCuenta } from '../../api/contratos';
 import {
+  accionDePeriodo,
   lineaDePagos,
   plazoDePago,
   textoFechaLimite,
@@ -46,6 +47,27 @@ describe('plazoDePago (chip de la tarjeta del próximo pago)', () => {
       tono: 'peligro',
     });
   });
+});
+
+describe('accionDePeriodo (R4-A: la tarjeta según el estado del período)', () => {
+  it('EN_REVISION: sin plazo, la nota de revisión y "Reemplazar comprobante" secundario', () => {
+    expect(accionDePeriodo('EN_REVISION')).toEqual({
+      conPlazo: false,
+      nota: 'Tu comprobante está en revisión',
+      boton: { titulo: 'Reemplazar comprobante', variante: 'secundario' },
+    });
+  });
+
+  it.each(['PARCIAL', 'PENDIENTE', 'VENCIDO'] as const)(
+    '%s: conserva el plazo y "Reportar pago" primario',
+    (estado) => {
+      expect(accionDePeriodo(estado)).toEqual({
+        conPlazo: true,
+        nota: null,
+        boton: { titulo: 'Reportar pago', variante: 'acento' },
+      });
+    },
+  );
 });
 
 describe('textos de la tarjeta', () => {
