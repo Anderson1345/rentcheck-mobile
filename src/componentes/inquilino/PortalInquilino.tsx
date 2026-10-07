@@ -1,6 +1,6 @@
-// Piezas del portal del inquilino (E6-A, solo lectura): selector de contrato, panel por variante,
-// datos de recaudo, fotos de entrega y los estados de error. Todo valor (estado de pago, plazos,
-// montos) es el que responde el servidor: la app no calcula nada.
+// Piezas del portal del inquilino (E6-A, solo lectura; Mi panel rediseñado en R3-B): selector de
+// contrato, panel por variante, datos de recaudo, fotos de entrega y los estados de error. Todo valor
+// (estado de pago, plazos, montos) es el que responde el servidor: la app no calcula nada.
 
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
@@ -8,7 +8,9 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import type { PeriodoCuenta } from '../../api/contratos';
 import type { FotoInventario } from '../../api/inventario';
+import type { SolicitudInquilino } from '../../api/mantenimiento';
 import type {
   ContratoInquilinoResumen,
   PanelContratoActivo,
@@ -18,24 +20,18 @@ import { mensajeDeError } from '../../api/errores';
 import { useRefrescarAlEnfocar } from '../../consultas/enfoque';
 import {
   useContratoInquilino,
+  useEstadoCuentaInquilino,
   usePanelInquilino,
   useRefrescarContratosInquilino,
   useRefrescarSiNoEncontrado,
 } from '../../consultas/inquilino';
-import { mesDePeriodo } from '../../contratos/acciones';
+import { useMisSolicitudes } from '../../consultas/mantenimiento';
 import { claveCachePortada } from '../../inmuebles/claveImagen';
 import { useContratoSeleccionado } from '../../inquilino/ContratoSeleccionado';
-import {
-  descripcionContrato,
-  mensajeFinalizado,
-  textoDiasRestantes,
-  textoVencidos,
-  variantePanel,
-} from '../../inquilino/seleccion';
+import { descripcionContrato, mensajeFinalizado, variantePanel } from '../../inquilino/seleccion';
 import { useVincularPendiente } from '../../sesion/useVincularPendiente';
 import { blancoAlfa, colores, espaciado, radios, tintaAlfa } from '../../tema';
-import { centavosAPesosTexto } from '../../utilidades/dinero';
-import { formatearFechaCorta, formatearFechaLarga } from '../../utilidades/fechas';
+import { formatearFechaAbreviada, formatearFechaLarga } from '../../utilidades/fechas';
 import { Aviso } from '../Aviso';
 import { Boton } from '../Boton';
 import { ChipEstado } from '../ChipEstado';
@@ -45,8 +41,14 @@ import { Icono } from '../iconos/Icono';
 import { Superficie } from '../Superficie';
 import { Texto } from '../Texto';
 import { ImagenAmpliable } from '../VisorImagen';
-
-const ESTADO_PAGO = { al_dia: 'AL_DIA', en_mora: 'EN_MORA', pendiente: 'PENDIENTE' } as const;
+import {
+  AccesosPanel,
+  ComoPagar,
+  ProximoPago,
+  TuContrato,
+  TusPagos,
+  UltimaSolicitud,
+} from './BloquesMiPanel';
 
 /** Error de una consulta de lectura: mensaje en español y "Reintentar". */
 export function ErrorConReintento({
@@ -101,6 +103,36 @@ export function SelectorContrato({ contrato }: { contrato: ContratoInquilinoResu
         </View>
       </View>
       <Icono nombre="adelante" tamano={20} color={blancoAlfa(0.64)} grosor={1.8} />
+    </Pressable>
+  );
+}
+
+/**
+ * Píldora de la cabecera de Mi panel (R3-B): "inmueble · unidad" con el punto lima; abre "Mis contratos"
+ * para cambiar de contrato o agregar otro. Pagos y Solicitudes siguen con SelectorContrato (R4).
+ */
+export function PildoraContrato({ contrato }: { contrato: ContratoInquilinoResumen }) {
+  const router = useRouter();
+  const texto = `${contrato.inmueble.direccion} · ${contrato.unidad.nombre}`;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Cambiar de contrato. ${texto}`}
+      onPress={() => router.push('/mis-contratos')}
+      style={({ pressed }) => [estilos.pildora, pressed && estilos.selectorPresionado]}
+    >
+      <View style={estilos.puntoLima} />
+      <Texto
+        variante="etiqueta"
+        color={colores.sobreTinta}
+        numberOfLines={1}
+        style={estilos.textoPildora}
+      >
+        {texto}
+      </Texto>
+      <View style={estilos.abajo}>
+        <Icono nombre="adelante" tamano={16} color={colores.sobreTinta} grosor={2} />
+      </View>
     </Pressable>
   );
 }
@@ -163,148 +195,127 @@ export function TarjetaRecaudo({ datos }: { datos: string | null | undefined }) 
   );
 }
 
-function Acceso({ titulo, onPress }: { titulo: string; onPress: () => void }) {
-  return <Boton titulo={titulo} variante="secundario" ancho="completo" onPress={onPress} />;
+/** Mientras carga: un bloque por sección de Mi panel, con su forma (tarjeta, accesos y tarjetas). */
+export function EsqueletoMiPanel() {
+  return (
+    <View testID="esqueleto-mi-panel" style={estilos.esqueleto}>
+      <Superficie>
+        <EsqueletoCarga filas={2} />
+      </Superficie>
+      <EsqueletoCarga filas={1} />
+      <EsqueletoCarga filas={2} />
+    </View>
+  );
 }
 
+/**
+ * Contrato ACTIVO, de arriba abajo como la maqueta: próximo pago, cómo pagar (solo con datos de
+ * recaudo), accesos, "Tus pagos" (con el estado de cuenta), "Tu contrato" y la última solicitud (si hay).
+ * Las consultas extra (detalle, estado de cuenta y solicitudes) son las de siempre, con su caché: si una
+ * falla, su bloque no aparece y el resto sigue.
+ */
 function PanelActivo({
   panel,
+  contrato,
   datosRecaudo,
+  periodos,
+  ultimaSolicitud,
 }: {
   panel: PanelContratoActivo;
+  contrato: ContratoInquilinoResumen;
   datosRecaudo: string | null | undefined;
+  periodos: PeriodoCuenta[] | undefined;
+  ultimaSolicitud: SolicitudInquilino | undefined;
 }) {
   const router = useRouter();
   const id = panel.contrato_id;
-  const proximo = panel.proximo_periodo;
-  const vencidos = panel.periodos_vencidos;
   return (
     <>
-      <Superficie style={estilos.tarjeta}>
-        <Texto variante="etiqueta" color={colores.textoSecundario}>
-          Estado de pago
-        </Texto>
-        <ChipEstado tipo="pagoContrato" estado={ESTADO_PAGO[panel.estado_pago]} />
-        <Texto variante="etiqueta" color={colores.textoSecundario} style={estilos.separado}>
-          Canon vigente
-        </Texto>
-        <Texto variante="cifraMedia" cifras>
-          {centavosAPesosTexto(panel.canon_vigente_centavos)}
-        </Texto>
-        <Texto variante="cuerpo">{textoDiasRestantes(panel.dias_restantes)}</Texto>
-        <Texto variante="secundario" color={colores.textoSecundario}>
-          {`Termina el ${formatearFechaCorta(panel.fecha_fin)}`}
-        </Texto>
-      </Superficie>
-
-      <Superficie style={estilos.tarjeta}>
-        {proximo ? (
-          <>
-            <Texto variante="etiqueta" color={colores.textoSecundario}>
-              Próximo período
-            </Texto>
-            <Texto variante="tituloSeccion">{mesDePeriodo(proximo.periodo)}</Texto>
-            <Texto variante="cuerpo">{centavosAPesosTexto(proximo.monto_centavos)}</Texto>
-            <Texto variante="secundario" color={colores.textoSecundario}>
-              {`Fecha límite ${formatearFechaCorta(proximo.fecha_limite)}`}
-            </Texto>
-            <View style={estilos.chips}>
-              <ChipEstado tipo="periodo" estado={proximo.estado} />
-            </View>
-          </>
-        ) : (
-          <Texto variante="cuerpo" color={colores.textoSecundario}>
-            Sin períodos pendientes
-          </Texto>
-        )}
-      </Superficie>
-
-      {vencidos.cantidad > 0 ? (
-        <Superficie style={estilos.tarjeta}>
-          <Texto variante="etiqueta" color={colores.textoSecundario}>
-            Períodos vencidos
-          </Texto>
-          <Texto variante="cuerpoFuerte">
-            {textoVencidos(vencidos.cantidad, vencidos.total_pendiente_centavos)}
-          </Texto>
-        </Superficie>
-      ) : null}
-
-      <TarjetaRecaudo datos={datosRecaudo} />
-
-      <View style={estilos.grupo}>
-        <Acceso
-          titulo="Ver mi contrato"
-          onPress={() => router.push({ pathname: '/mi-contrato/[id]', params: { id } })}
-        />
-        <Acceso
-          titulo="Estado de cuenta"
-          onPress={() =>
-            router.push({ pathname: '/mi-contrato/[id]/estado-cuenta', params: { id } })
-          }
-        />
-        <Acceso
-          titulo="Mis documentos"
-          onPress={() =>
-            router.push({
-              pathname: '/mi-contrato/[id]',
-              params: { id, seccion: 'documentos' },
-            })
-          }
-        />
-      </View>
+      <ProximoPago
+        panel={panel}
+        onReportar={() => router.push({ pathname: '/reportar-pago', params: { contratoId: id } })}
+      />
+      {datosRecaudo ? <ComoPagar datos={datosRecaudo} /> : null}
+      <AccesosPanel
+        contratoId={id}
+        tipos={['contrato', 'estadoCuenta', 'documentos', 'nuevaSolicitud']}
+      />
+      {periodos ? <TusPagos periodos={periodos} /> : null}
+      <TuContrato
+        estado={panel.estado}
+        diasRestantes={panel.dias_restantes}
+        fechaInicio={contrato.fecha_inicio}
+        fechaFin={panel.fecha_fin}
+      />
+      {ultimaSolicitud ? <UltimaSolicitud solicitud={ultimaSolicitud} /> : null}
     </>
   );
 }
 
+/** Contrato PROGRAMADO: cuándo empieza y los accesos de consulta; sin pago ni cómo pagar. */
 function PanelProgramado({ id, panel }: { id: string; panel: PanelContratoProgramado }) {
-  const router = useRouter();
   return (
     <>
       <Superficie style={estilos.tarjeta}>
-        <ChipEstado tipo="contrato" estado="PROGRAMADO" />
+        <View style={estilos.chips}>
+          <ChipEstado tipo="contrato" estado="PROGRAMADO" />
+        </View>
         <Texto variante="tituloSeccion" accessibilityRole="header">
           {`Tu contrato empieza el ${formatearFechaLarga(panel.fecha_inicio)}`}
         </Texto>
+        <Texto variante="secundario" color={colores.textoSecundario}>
+          {`${formatearFechaAbreviada(panel.fecha_inicio)} – ${formatearFechaAbreviada(panel.fecha_fin)}`}
+        </Texto>
         <Texto variante="cuerpo" color={colores.textoSecundario}>
-          Verás los datos de pago cuando el contrato empiece.
+          Verás tu próximo pago y cómo pagar cuando el contrato empiece.
         </Texto>
       </Superficie>
-      <View style={estilos.grupo}>
-        <Acceso
-          titulo="Ver mi contrato"
-          onPress={() => router.push({ pathname: '/mi-contrato/[id]', params: { id } })}
-        />
-        <Acceso
-          titulo="Mis documentos"
-          onPress={() =>
-            router.push({
-              pathname: '/mi-contrato/[id]',
-              params: { id, seccion: 'documentos' },
-            })
-          }
-        />
-      </View>
+      <AccesosPanel contratoId={id} tipos={['contrato', 'documentos']} />
+    </>
+  );
+}
+
+/** Contrato que ya terminó: su estado y los accesos de consulta (sin pago ni solicitudes nuevas). */
+function PanelFinalizado({
+  id,
+  estado,
+}: {
+  id: string;
+  estado: ContratoInquilinoResumen['estado'];
+}) {
+  return (
+    <>
+      <Superficie style={estilos.tarjeta}>
+        <View style={estilos.chips}>
+          <ChipEstado tipo="contrato" estado={estado} />
+        </View>
+        <Texto variante="tituloSeccion" accessibilityRole="header">
+          {mensajeFinalizado(estado)}
+        </Texto>
+        <Texto variante="cuerpo" color={colores.textoSecundario}>
+          Puedes consultar tu contrato, tu estado de cuenta y tus documentos.
+        </Texto>
+      </Superficie>
+      <AccesosPanel contratoId={id} tipos={['contrato', 'estadoCuenta', 'documentos']} />
     </>
   );
 }
 
 /** Cuerpo de Mi panel para el contrato elegido: las tres formas de GET /:id/panel. */
-export function PanelDelContrato({
-  contratoId,
-  estado,
-}: {
-  contratoId: string;
-  /** Estado que dice la lista de contratos: con ACTIVO se pide el recaudo junto con el panel. */
-  estado: ContratoInquilinoResumen['estado'];
-}) {
+export function PanelDelContrato({ contrato }: { contrato: ContratoInquilinoResumen }) {
   const router = useRouter();
+  const contratoId = contrato.id;
+  // Lo que solo existe con el contrato ACTIVO (regla 11: el servidor no manda el recaudo antes).
+  const activo = contrato.estado === 'ACTIVO';
   const panel = usePanelInquilino(contratoId);
   useRefrescarAlEnfocar(panel);
   const noEncontrado = useRefrescarSiNoEncontrado(panel.error);
   const datos = panel.data;
-  // El recaudo solo se pide con el contrato ACTIVO (regla 11: el servidor no lo manda antes).
-  const detalle = useContratoInquilino(contratoId, estado === 'ACTIVO' && !noEncontrado);
+  const detalle = useContratoInquilino(contratoId, activo && !noEncontrado);
+  const cuenta = useEstadoCuentaInquilino(contratoId, activo && !noEncontrado);
+  const solicitudes = useMisSolicitudes(activo && !noEncontrado ? contratoId : null);
+  useRefrescarAlEnfocar(cuenta);
+  useRefrescarAlEnfocar(solicitudes);
 
   // Un 404 manda sobre cualquier dato en caché: el contrato ya no es del inquilino.
   if (noEncontrado) {
@@ -317,7 +328,7 @@ export function PanelDelContrato({
   }
   if (datos === undefined) {
     return panel.isPending ? (
-      <EsqueletoCarga filas={3} />
+      <EsqueletoMiPanel />
     ) : (
       <ErrorConReintento error={panel.error} onReintentar={() => void panel.refetch()} />
     );
@@ -328,27 +339,16 @@ export function PanelDelContrato({
       return (
         <PanelActivo
           panel={datos as PanelContratoActivo}
+          contrato={contrato}
           datosRecaudo={detalle.data?.datos_recaudo}
+          periodos={cuenta.data?.periodos}
+          ultimaSolicitud={solicitudes.data?.[0]}
         />
       );
     case 'programado':
       return <PanelProgramado id={contratoId} panel={datos as PanelContratoProgramado} />;
     default:
-      return (
-        <>
-          <Superficie style={estilos.tarjeta}>
-            <Texto variante="tituloSeccion" accessibilityRole="header">
-              {mensajeFinalizado(datos.estado)}
-            </Texto>
-          </Superficie>
-          <Acceso
-            titulo="Ver mi contrato"
-            onPress={() =>
-              router.push({ pathname: '/mi-contrato/[id]', params: { id: contratoId } })
-            }
-          />
-        </>
-      );
+      return <PanelFinalizado id={contratoId} estado={datos.estado} />;
   }
 }
 
@@ -407,7 +407,7 @@ export function FotosEntrega({ fotos }: { fotos: FotoInventario[] }) {
 const estilos = StyleSheet.create({
   grupo: { gap: espaciado.xs },
   tarjeta: { gap: espaciado.xs },
-  separado: { marginTop: espaciado.xs },
+  esqueleto: { gap: espaciado.lg },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: espaciado.xs },
   selector: {
     minHeight: 56,
@@ -421,6 +421,23 @@ const estilos = StyleSheet.create({
     backgroundColor: blancoAlfa(0.1),
   },
   selectorPresionado: { backgroundColor: blancoAlfa(0.16) },
+  pildora: {
+    minHeight: 44,
+    marginTop: espaciado.sm,
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: espaciado.xs,
+    paddingHorizontal: espaciado.sm,
+    borderRadius: radios.pildora,
+    borderWidth: 1,
+    borderColor: blancoAlfa(0.2),
+    backgroundColor: blancoAlfa(0.06),
+  },
+  puntoLima: { width: 8, height: 8, borderRadius: 4, backgroundColor: colores.lima },
+  textoPildora: { flexShrink: 1 },
+  abajo: { transform: [{ rotate: '90deg' }] },
   selectorTextos: { flex: 1, gap: 6 },
   cuadricula: { flexDirection: 'row', flexWrap: 'wrap', gap: espaciado.sm },
   foto: { width: '48%', gap: 4 },

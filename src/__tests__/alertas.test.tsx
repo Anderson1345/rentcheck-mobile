@@ -1,7 +1,8 @@
-// Alertas de ambos roles (E9-A): lista (carga, vacío, error con reintento, "Cargar más"), tocar una
-// alerta (marca leída sin bloquear y navega al destino; una informativa solo se marca), "Marcar
-// todas" y la campana con punto. La API y el router son dobles; la fecha de las filas sale de datos
-// fijos (instante ISO → día de Bogotá), no de hoy.
+// Alertas de ambos roles (E9-A, rediseño R3-B): lista (carga, vacíos, error con reintento, "Cargar
+// más"), filtro Sin leer / Todas, grupos por día de Bogotá, tocar una alerta (marca leída sin bloquear
+// y navega al destino; una informativa solo se marca), "Marcar todas" en el encabezado, la nota de
+// retención y la campana con punto. La API y el router son dobles; el reloj está fijo (2 de octubre de
+// 2026, 12:00 en Bogotá) y la hora de cada fila sale de instantes fijos.
 import { View } from 'react-native';
 import { act, type ReactTestRenderer } from 'react-test-renderer';
 
@@ -34,6 +35,11 @@ jest.mock('expo-router', () => ({
     canGoBack: () => true,
   }),
   useFocusEffect: () => undefined,
+  // El encabezado nativo no existe en las pruebas: su acción derecha se pinta en el árbol.
+  Stack: {
+    Screen: ({ options }: { options?: { headerRight?: () => unknown } }) =>
+      options?.headerRight?.() ?? null,
+  },
 }));
 jest.mock(
   'react-native-safe-area-context',
@@ -65,8 +71,8 @@ const sesionInquilino: DatosSesion = {
 
 // 15:04 UTC = 10:04 en Bogotá del 2 de octubre de 2026.
 const EN_OCTUBRE = '2026-10-02T15:04:00.000Z';
-// 03:30 UTC del 4 de octubre = 22:30 del 3 de octubre en Bogotá (el día no es el de UTC).
-const MADRUGADA_UTC = '2026-10-04T03:30:00.000Z';
+// 03:30 UTC del 2 de octubre = 22:30 del 1 de octubre en Bogotá (el día no es el de UTC).
+const MADRUGADA_UTC = '2026-10-02T03:30:00.000Z';
 
 const alerta = (id: string, extra: Partial<Alerta> = {}): Alerta => ({
   id,
@@ -96,6 +102,25 @@ function programar(rutas: { feeds?: unknown[]; conteo?: number } = {}) {
 
 const llamadasFeed = () =>
   mockGet.mock.calls.map((c) => c[0] as string).filter((u) => !/\/conteo$/.test(u));
+
+/** La pestaña del filtro (rol "tab") por su etiqueta accesible. */
+const pestana = (raiz: ReactTestRenderer, etiqueta: string) =>
+  raiz.root.findAll(
+    (n) =>
+      n.props.accessibilityRole === 'tab' &&
+      n.props.accessibilityLabel === etiqueta &&
+      typeof n.props.onPress === 'function',
+  )[0];
+const elegir = async (raiz: ReactTestRenderer, etiqueta: string) => {
+  await act(async () => pestana(raiz, etiqueta).props.onPress());
+};
+const seleccionada = (raiz: ReactTestRenderer, etiqueta: string) =>
+  pestana(raiz, etiqueta).props.accessibilityState.selected;
+/** Resumen accesible de los grupos por día, en orden (solo nodos nativos). */
+const grupos = (raiz: ReactTestRenderer) =>
+  raiz.root
+    .findAll((n) => typeof n.type === 'string' && n.props.testID === 'grupo-alertas')
+    .map((n) => n.props.accessibilityLabel as string);
 
 const sinLeer = (raiz: ReactTestRenderer) =>
   raiz.root.findAll((n) => typeof n.type === 'string' && n.props.accessibilityLabel === 'Sin leer')
@@ -147,7 +172,7 @@ describe.each(ROLES)('Pantalla de alertas del $nombre', (rol) => {
     programar({ feeds: [feed([])] });
     const { raiz } = await renderizarPantalla(<rol.Pantalla />, rol.sesion);
     expect(textosDe(raiz)).toContain('No tienes alertas');
-    expect(hayBoton(raiz, 'Marcar todas como leídas')).toBe(false);
+    expect(botonDe(raiz, 'Marcar todas').props.accessibilityState.disabled).toBe(true);
     expect(hayBoton(raiz, 'Cargar más')).toBe(false);
   });
 
@@ -161,7 +186,7 @@ describe.each(ROLES)('Pantalla de alertas del $nombre', (rol) => {
     expect(llamadasFeed()).toHaveLength(2);
   });
 
-  it('muestra título corto, mensaje, fecha de Bogotá y un punto solo en las no leídas', async () => {
+  it('muestra título corto, mensaje, hora de Bogotá y un punto solo en las no leídas', async () => {
     programar({
       feeds: [
         feed([
@@ -178,13 +203,16 @@ describe.each(ROLES)('Pantalla de alertas del $nombre', (rol) => {
       ],
     });
     const { raiz } = await renderizarPantalla(<rol.Pantalla />, rol.sesion);
+    // La leída se ve en "Todas" (con una sin leer, la pantalla abre en "Sin leer").
+    await elegir(raiz, 'Todas');
     const textos = textosDe(raiz);
     expect(textos).toContain('Pago rechazado');
     expect(textos).toContain('Tu pago fue rechazado.');
-    expect(textos).toContain('02/10/2026');
+    expect(textos).toContain('10:04');
     expect(textos).toContain('Otra ya leída.');
-    // El instante de la madrugada del 4 (UTC) es todavía el 3 en Bogotá.
-    expect(textos).toContain('03/10/2026');
+    // El instante de la madrugada del 2 (UTC) es todavía el 1 en Bogotá: "Ayer", 22:30.
+    expect(textos).toContain('22:30');
+    expect(grupos(raiz)).toEqual(['Hoy: 1 alerta, 1 sin leer', 'Ayer: 1 alerta']);
     expect(sinLeer(raiz)).toBe(1);
   });
 
@@ -202,6 +230,8 @@ describe.each(ROLES)('Pantalla de alertas del $nombre', (rol) => {
     await pulsar(raiz, 'Cargar más');
     await esperar();
     expect(llamadasFeed()[1]).toBe(`${rol.feedUrl}&cursor=CURSOR_2`);
+    // a3 ya está leída: se ve en "Todas".
+    await elegir(raiz, 'Todas');
     const textos = textosDe(raiz);
     expect(textos).toEqual(
       expect.arrayContaining(['Mensaje de a1', 'Mensaje de a2', 'Mensaje de a3']),
@@ -324,7 +354,7 @@ describe.each(ROLES)('Pantalla de alertas del $nombre', (rol) => {
     );
   });
 
-  it('"Marcar todas como leídas" llama a la API de su rol y vuelve a pedir el feed', async () => {
+  it('"Marcar todas" (encabezado) llama a la API de su rol y vuelve a pedir el feed', async () => {
     programar({
       feeds: [
         feed([alerta('a1'), alerta('a2')], null, 2),
@@ -332,29 +362,129 @@ describe.each(ROLES)('Pantalla de alertas del $nombre', (rol) => {
       ],
     });
     const { raiz } = await renderizarPantalla(<rol.Pantalla />, rol.sesion);
-    expect(botonDe(raiz, 'Marcar todas como leídas').props.accessibilityState.disabled).toBe(false);
-    await pulsar(raiz, 'Marcar todas como leídas');
+    expect(botonDe(raiz, 'Marcar todas').props.accessibilityState.disabled).toBe(false);
+    await pulsar(raiz, 'Marcar todas');
     await esperar();
     expect(mockPatch).toHaveBeenCalledWith(rol.marcarTodas);
     expect(llamadasFeed()).toHaveLength(2);
     expect(sinLeer(raiz)).toBe(0);
-    expect(botonDe(raiz, 'Marcar todas como leídas').props.accessibilityState.disabled).toBe(true);
+    expect(botonDe(raiz, 'Marcar todas').props.accessibilityState.disabled).toBe(true);
   });
 
-  it('"Marcar todas como leídas" está deshabilitado si no hay alertas sin leer', async () => {
+  it('"Marcar todas" está deshabilitado si no hay alertas sin leer', async () => {
     programar({ feeds: [feed([alerta('a1', { leida: true })], null, 0)] });
     const { raiz } = await renderizarPantalla(<rol.Pantalla />, rol.sesion);
-    expect(botonDe(raiz, 'Marcar todas como leídas').props.accessibilityState.disabled).toBe(true);
+    expect(botonDe(raiz, 'Marcar todas').props.accessibilityState.disabled).toBe(true);
   });
 
   it('si "Marcar todas" falla, avisa y conserva la lista', async () => {
     mockPatch.mockRejectedValue(new ErrorSinConexion());
     programar({ feeds: [feed([alerta('a1')])] });
     const { raiz } = await renderizarPantalla(<rol.Pantalla />, rol.sesion);
-    await pulsar(raiz, 'Marcar todas como leídas');
+    await pulsar(raiz, 'Marcar todas');
     await esperar();
     expect(textosDe(raiz)).toContain(MENSAJE_SIN_CONEXION);
     expect(textosDe(raiz)).toContain('Mensaje de a1');
+  });
+});
+
+describe.each(ROLES)('Alertas del $nombre: filtro, grupos por día y nota (R3-B)', (rol) => {
+  // Hoy es el viernes 2 de octubre de 2026 (12:00 en Bogotá).
+  const DEL_DIA = [
+    alerta('hoy', { creado_en: '2026-10-02T15:04:00.000Z', mensaje: 'De hoy.' }),
+    alerta('ayer', { creado_en: '2026-10-01T23:40:00.000Z', mensaje: 'De ayer.', leida: true }),
+    alerta('semana', {
+      creado_en: '2026-09-28T15:00:00.000Z',
+      mensaje: 'Del lunes.',
+      leida: true,
+    }),
+    alerta('antes', { creado_en: '2026-09-20T15:00:00.000Z', mensaje: 'De antes.', leida: true }),
+  ];
+
+  it('con alertas sin leer abre en "Sin leer · N" (N del servidor) y solo muestra las no leídas', async () => {
+    programar({ feeds: [feed(DEL_DIA, null, 1)] });
+    const { raiz } = await renderizarPantalla(<rol.Pantalla />, rol.sesion);
+    expect(seleccionada(raiz, 'Sin leer · 1')).toBe(true);
+    expect(seleccionada(raiz, 'Todas')).toBe(false);
+    const textos = textosDe(raiz);
+    expect(textos).toContain('De hoy.');
+    expect(textos).not.toContain('De ayer.');
+    expect(sinLeer(raiz)).toBe(1);
+  });
+
+  it('el contador es el del servidor aunque haya no leídas en páginas sin cargar', async () => {
+    programar({ feeds: [feed([alerta('a1')], 'CURSOR_2', 7)] });
+    const { raiz } = await renderizarPantalla(<rol.Pantalla />, rol.sesion);
+    expect(pestana(raiz, 'Sin leer · 7')).toBeDefined();
+    expect(hayBoton(raiz, 'Cargar más')).toBe(true);
+  });
+
+  it('"Todas" las agrupa por día: Hoy, Ayer, Esta semana y Antes, con su hora o fecha', async () => {
+    programar({ feeds: [feed(DEL_DIA, null, 1)] });
+    const { raiz } = await renderizarPantalla(<rol.Pantalla />, rol.sesion);
+    await elegir(raiz, 'Todas');
+    expect(seleccionada(raiz, 'Todas')).toBe(true);
+    expect(grupos(raiz)).toEqual([
+      'Hoy: 1 alerta, 1 sin leer',
+      'Ayer: 1 alerta',
+      'Esta semana: 1 alerta',
+      'Antes: 1 alerta',
+    ]);
+    const textos = textosDe(raiz);
+    expect(textos).toEqual(expect.arrayContaining(['Hoy', 'Ayer', 'Esta semana', 'Antes']));
+    expect(textos).toEqual(expect.arrayContaining(['10:04', '18:40', 'lun.', '20/09/2026']));
+    expect(textos).toEqual(
+      expect.arrayContaining(['De hoy.', 'De ayer.', 'Del lunes.', 'De antes.']),
+    );
+  });
+
+  it('sin alertas sin leer abre en "Todas"', async () => {
+    programar({ feeds: [feed(DEL_DIA.slice(1), null, 0)] });
+    const { raiz } = await renderizarPantalla(<rol.Pantalla />, rol.sesion);
+    expect(seleccionada(raiz, 'Todas')).toBe(true);
+    expect(pestana(raiz, 'Sin leer · 0')).toBeDefined();
+    expect(textosDe(raiz)).toContain('De ayer.');
+  });
+
+  it('"Sin leer" vacío: "Estás al día" (distinto de no tener alertas)', async () => {
+    programar({ feeds: [feed(DEL_DIA.slice(1), null, 0)] });
+    const { raiz } = await renderizarPantalla(<rol.Pantalla />, rol.sesion);
+    await elegir(raiz, 'Sin leer · 0');
+    const textos = textosDe(raiz);
+    expect(textos).toContain('Estás al día');
+    expect(textos).not.toContain('No tienes alertas');
+    expect(textos).not.toContain('De ayer.');
+  });
+
+  it('con alertas, la nota de retención al final; sin alertas no hay nota', async () => {
+    programar({ feeds: [feed(DEL_DIA, null, 1)] });
+    const con = await renderizarPantalla(<rol.Pantalla />, rol.sesion);
+    expect(textosDe(con.raiz)).toContain('Las alertas leídas se ocultan a los 7 días.');
+    programar({ feeds: [feed([])] });
+    const sin = await renderizarPantalla(<rol.Pantalla />, rol.sesion);
+    expect(textosDe(sin.raiz)).not.toContain('Las alertas leídas se ocultan a los 7 días.');
+  });
+
+  it('tocar una no leída marca sin esperar la respuesta: navega mientras la marca sigue en curso', async () => {
+    let soltar: (v: unknown) => void = () => undefined;
+    mockPatch.mockImplementation(() => new Promise((r) => (soltar = r)));
+    programar({
+      feeds: [
+        feed([
+          alerta('a1', {
+            tipo: 'CONTRATO_PROXIMO_A_VENCER',
+            recurso: { tipo: 'CONTRATO', id: 'c1', contrato_id: 'c1' },
+          }),
+        ]),
+      ],
+    });
+    const { raiz } = await renderizarPantalla(<rol.Pantalla />, rol.sesion);
+    await act(async () => {
+      botonDe(raiz, 'Contrato por vencer').props.onPress();
+    });
+    expect(mockPatch).toHaveBeenCalledWith(rol.marcarUna('a1'));
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    await act(async () => soltar({}));
   });
 });
 
