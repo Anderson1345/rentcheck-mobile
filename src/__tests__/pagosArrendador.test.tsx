@@ -160,6 +160,17 @@ const pulsar = async (raiz: Raiz, titulo: string) => {
   await esperar();
 };
 const todo = (raiz: Raiz) => textosDe(raiz).join(' | ');
+/** El botón vive en la barra fija, no en el contenido que se desplaza (R4-C). */
+const enBarraFija = (raiz: Raiz, titulo: string) => {
+  const barras = raiz.root.findAll((n) => n.props.testID === 'accion-fija');
+  if (barras.length === 0) return false;
+  const desplazable = raiz.root.findAll((n) => n.props.keyboardShouldPersistTaps === 'handled')[0];
+  const tiene = (n: (typeof barras)[number]) =>
+    n.findAll((h) => h.props.children === titulo).length > 0;
+  return tiene(barras[0]) && !tiene(desplazable);
+};
+const sinBarraFija = (raiz: Raiz) =>
+  raiz.root.findAll((n) => n.props.testID === 'accion-fija').length === 0;
 const porEtiqueta = (raiz: Raiz, etiqueta: string) => {
   const nodo = raiz.root.findAll(
     (n) => n.props.accessibilityLabel === etiqueta && typeof n.props.onPress === 'function',
@@ -214,28 +225,41 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------------------------
 
 describe('pestaña Pagos del arrendador: cola de validación', () => {
-  it('por defecto "En revisión" (PENDIENTE) con contador; ofrece solo En revisión, Aprobados y Rechazados', async () => {
+  it('por defecto "En revisión" (PENDIENTE); cada segmento con su conteo; solo En revisión, Aprobados y Rechazados', async () => {
     const { raiz } = await montar(<PagosArrendador />);
     expect(mockGet).toHaveBeenCalledWith('/pagos?estado=PENDIENTE');
     expect(porEtiqueta(raiz, 'En revisión, 2')).toBeDefined();
-    expect(porEtiqueta(raiz, 'Aprobados')).toBeDefined();
-    expect(porEtiqueta(raiz, 'Rechazados')).toBeDefined();
+    expect(porEtiqueta(raiz, 'Aprobados, 1')).toBeDefined();
+    expect(porEtiqueta(raiz, 'Rechazados, 1')).toBeDefined();
     expect(todo(raiz)).not.toContain('Reemplazados');
   });
 
-  it('cada fila: inquilino, unidad e inmueble, período, monto, fecha, chip y saldo esperado', async () => {
+  it('R4-C: la cabecera dice cuántos hay por validar', async () => {
     const { raiz } = await montar(<PagosArrendador />);
-    const t = todo(raiz);
-    expect(t).toContain('Camilo Pardo');
-    expect(t).toContain('Laura Gómez');
-    expect(t).toContain('Apto 302 · Calle 45 # 12-30');
-    expect(t).toContain('Octubre de 2026');
-    expect(t).toContain('$ 600.000');
-    expect(t).toContain('$ 1.000.000');
-    expect(t).toContain('Reportado el 06/10/2026');
+    expect(textosDe(raiz)).toContain('2 por validar');
+  });
+
+  it('R4-C: filas compactas: iniciales, "unidad · mes", inquilino, monto, fecha y chip; "esperado" solo si difiere', async () => {
+    const { raiz } = await montar(<PagosArrendador />);
+    const t = textosDe(raiz);
+    expect(t).toEqual(expect.arrayContaining(['CP', 'LG', 'Camilo Pardo', 'Laura Gómez']));
+    expect(t.filter((x) => x === 'Apto 302 · Octubre de 2026')).toHaveLength(2);
+    expect(t).toEqual(expect.arrayContaining(['$ 600.000', '$ 1.000.000']));
+    expect(t.filter((x) => x === 'Reportado el 06/10/2026')).toHaveLength(2);
     expect(t).toContain('En revisión');
-    // saldo esperado del período = canon vigente − aprobado
-    expect(t).toContain('Saldo esperado: $ 600.000');
+    // p1 reporta justo el saldo (600.000): sin "esperado". p2 reporta 1.000.000: lo dice.
+    expect(t.filter((x) => x.startsWith('esperado '))).toEqual(['esperado $ 600.000']);
+  });
+
+  it('R4-C (a8): al cambiar de segmento se conserva lo cargado (sin volver a cargar ni esqueleto)', async () => {
+    const { raiz } = await montar(<PagosArrendador />);
+    const antes = mockGet.mock.calls.length;
+    await elegir(raiz, 'Aprobados, 1');
+    expect(todo(raiz)).toContain('Marcos Rey');
+    await elegir(raiz, 'En revisión, 2');
+    expect(todo(raiz)).toContain('Camilo Pardo');
+    expect(raiz.root.findAll((n) => n.props.accessibilityLabel === 'Cargando')).toHaveLength(0);
+    expect(mockGet.mock.calls.length).toBe(antes);
   });
 
   it('el orden es el del servidor', async () => {
@@ -252,12 +276,12 @@ describe('pestaña Pagos del arrendador: cola de validación', () => {
 
   it('Aprobados y Rechazados piden su estado y no muestran el saldo esperado', async () => {
     const { raiz } = await montar(<PagosArrendador />);
-    await elegir(raiz, 'Aprobados');
+    await elegir(raiz, 'Aprobados, 1');
     await esperar();
     expect(mockGet).toHaveBeenCalledWith('/pagos?estado=APROBADO');
     expect(todo(raiz)).toContain('Marcos Rey');
-    expect(todo(raiz)).not.toContain('Saldo esperado');
-    await elegir(raiz, 'Rechazados');
+    expect(todo(raiz)).not.toMatch(/esperado/i);
+    await elegir(raiz, 'Rechazados, 1');
     await esperar();
     expect(mockGet).toHaveBeenCalledWith('/pagos?estado=RECHAZADO');
     expect(todo(raiz)).toContain('Sofía Lara');
@@ -267,10 +291,10 @@ describe('pestaña Pagos del arrendador: cola de validación', () => {
   });
 
   it.each([
-    ['PENDIENTE', 'En revisión', 'No hay pagos en revisión'],
-    ['APROBADO', 'Aprobados', 'No hay pagos aprobados'],
-    ['RECHAZADO', 'Rechazados', 'No hay pagos rechazados'],
-  ])('%s sin pagos: estado vacío', async (estado, segmento, texto) => {
+    ['PENDIENTE', 'En revisión, 0', 'No hay comprobantes por validar'],
+    ['APROBADO', 'Aprobados, 0', 'Aún no hay pagos aprobados'],
+    ['RECHAZADO', 'Rechazados, 0', 'No hay pagos rechazados'],
+  ])('%s sin pagos: estado vacío que explica qué pasa', async (estado, segmento, texto) => {
     datos.lista = {};
     const { raiz } = await montar(<PagosArrendador />);
     if (estado !== 'PENDIENTE') {
@@ -304,6 +328,49 @@ describe('pestaña Pagos del arrendador: cola de validación', () => {
 });
 
 // ---------------------------------------------------------------------------------------------
+
+describe('detalle del pago (R4-C): protagonista y barra fija', () => {
+  it('protagonista: monto reportado frente al esperado del período, inquilino, unidad, mes y fecha', async () => {
+    datos.pago = pago('p1', { monto_centavos: 40_000_000 });
+    const { raiz } = await montar(<DetallePago />);
+    const [protagonista] = raiz.root.findAll(
+      (n) => typeof n.type === 'string' && n.props.testID === 'protagonista-pago',
+    );
+    const textos = protagonista
+      .findAll((n) => typeof n.type === 'string' && typeof n.props.children === 'string')
+      .map((n) => n.props.children);
+    expect(textos).toEqual(
+      expect.arrayContaining([
+        '$ 400.000',
+        'Esperado $ 600.000 · faltan $ 200.000',
+        'Camilo Pardo',
+        'Apto 302 · Calle 45 # 12-30',
+        'Octubre de 2026 · reportado el 06/10/2026',
+      ]),
+    );
+  });
+
+  it('"Aprobar pago" y "Rechazar pago" en la barra fija; rechazar abre el formulario y "Confirmar rechazo" pasa a la barra', async () => {
+    const { raiz } = await montar(<DetallePago />);
+    expect(enBarraFija(raiz, 'Aprobar pago')).toBe(true);
+    expect(enBarraFija(raiz, 'Rechazar pago')).toBe(true);
+    await pulsar(raiz, 'Rechazar pago');
+    expect(enBarraFija(raiz, 'Confirmar rechazo')).toBe(true);
+    expect(textosDe(raiz)).toContain('Motivo del rechazo');
+    await pulsar(raiz, 'Cancelar');
+    expect(enBarraFija(raiz, 'Aprobar pago')).toBe(true);
+    expect(textosDe(raiz)).not.toContain('Motivo del rechazo');
+  });
+
+  it.each(['APROBADO', 'RECHAZADO', 'REEMPLAZADO'] as const)(
+    '%s: sin barra de acciones',
+    async (estado) => {
+      datos.pago = pago('p1', { estado });
+      const { raiz } = await montar(<DetallePago />);
+      expect(sinBarraFija(raiz)).toBe(true);
+    },
+  );
+});
 
 describe('detalle del pago: esperado vs. reportado', () => {
   it('muestra inquilino, teléfono, unidad, período y el estado del período', async () => {

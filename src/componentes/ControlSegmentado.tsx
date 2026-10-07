@@ -8,6 +8,8 @@ export interface OpcionSegmento<T extends string> {
   etiqueta: string;
   /** Contador opcional ("Por validar 3"). */
   contador?: number;
+  /** Lo que el lector agrega a la etiqueta ("ordenado por urgencia"), antes del contador. */
+  descripcion?: string;
 }
 
 interface Props<T extends string> {
@@ -27,11 +29,13 @@ export function ControlSegmentado<T extends string>({ opciones, valor, onCambio 
             key={opcion.valor}
             accessibilityRole="tab"
             accessibilityState={{ selected: activa }}
-            accessibilityLabel={
-              opcion.contador !== undefined
-                ? `${opcion.etiqueta}, ${opcion.contador}`
-                : opcion.etiqueta
-            }
+            accessibilityLabel={[
+              opcion.etiqueta,
+              opcion.descripcion,
+              opcion.contador !== undefined ? String(opcion.contador) : undefined,
+            ]
+              .filter(Boolean)
+              .join(', ')}
             onPress={() => onCambio(opcion.valor)}
             // La opción mide 40 dp (48 menos el relleno): 2 dp más por arriba y por abajo llegan a 44.
             hitSlop={{ top: 2, bottom: 2 }}

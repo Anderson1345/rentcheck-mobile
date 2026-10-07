@@ -46,9 +46,8 @@ export default function PagoDetalle() {
       </PantallaPila>
     );
   }
+  // El detalle pone su propia PantallaPila: con barra fija para aprobar y rechazar (R4-C).
   return (
-    <PantallaPila>
-      <DetallePago pago={pago} refrescar={async () => (await refetch()).data} alVolver={volver} />
-    </PantallaPila>
+    <DetallePago pago={pago} refrescar={async () => (await refetch()).data} alVolver={volver} />
   );
 }

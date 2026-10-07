@@ -24,13 +24,16 @@ import {
   filtrosAParametros,
   FRASE_ESTADO_ARRENDADOR,
   hayFiltros,
+  listaDeSegmento,
   OPCIONES_FILTRO_URGENCIA,
   opcionesDeUnidad,
+  ordenarPorUrgencia,
   SEGMENTOS_ARRENDADOR,
   SIN_FILTROS,
   textoConfirmacion,
   TEXTO_YA_RESUELTA,
 } from '../reglas';
+import { alTerminarLaPrueba } from '../../pruebas/limpieza';
 
 const mockGet = jest.fn();
 const mockPatch = jest.fn();
@@ -47,6 +50,16 @@ beforeEach(() => {
   mockGet.mockReset();
   mockPatch.mockReset();
 });
+
+/**
+ * R4-C: un QueryClient con el gcTime por defecto deja un temporizador de 5 minutos por consulta y el
+ * worker de Jest no terminaba. Sin recolección y vaciado al terminar la prueba.
+ */
+function nuevoCliente(): QueryClient {
+  const cliente = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity } } });
+  alTerminarLaPrueba(() => cliente.clear());
+  return cliente;
+}
 
 const solicitud = (id: string, estado: EstadoSolicitud, extra: Partial<SolicitudArrendador> = {}) =>
   ({ id, estado, ...extra }) as SolicitudArrendador;
@@ -80,6 +93,54 @@ describe('segmentos y contadores del arrendador', () => {
     expect(filtrarPorEstado(lista, 'PENDIENTE').map((s) => s.id)).toEqual(['1', '4']);
     expect(filtrarPorEstado(lista, 'EN_PROCESO').map((s) => s.id)).toEqual(['2']);
     expect(filtrarPorEstado(lista, 'RESUELTO').map((s) => s.id)).toEqual(['3', '5', '6']);
+  });
+});
+
+describe('R4-C (a8): "Pendiente" ordenado por urgencia', () => {
+  const s = (
+    id: string,
+    urgencia: 'ALTO' | 'MEDIO' | 'BAJO',
+    dia: string,
+    estado: EstadoSolicitud = 'PENDIENTE',
+  ) => solicitud(id, estado, { urgencia, creado_en: `2026-10-${dia}T15:00:00.000Z` });
+
+  it('alta → media → baja; dentro de la misma urgencia, la más antigua primero', () => {
+    const ordenadas = ordenarPorUrgencia([
+      s('baja-nueva', 'BAJO', '05'),
+      s('media-nueva', 'MEDIO', '04'),
+      s('alta-nueva', 'ALTO', '03'),
+      s('media-vieja', 'MEDIO', '01'),
+      s('alta-vieja', 'ALTO', '02'),
+      s('baja-vieja', 'BAJO', '01'),
+    ]);
+    expect(ordenadas.map((x) => x.id)).toEqual([
+      'alta-vieja',
+      'alta-nueva',
+      'media-vieja',
+      'media-nueva',
+      'baja-vieja',
+      'baja-nueva',
+    ]);
+  });
+
+  it('no cambia la lista recibida (devuelve una nueva)', () => {
+    const lista = [s('b', 'BAJO', '01'), s('a', 'ALTO', '02')];
+    ordenarPorUrgencia(lista);
+    expect(lista.map((x) => x.id)).toEqual(['b', 'a']);
+  });
+
+  it('solo "Pendiente" se ordena por urgencia; En proceso y Resuelta conservan el orden del servidor', () => {
+    const lista = [
+      s('p-baja', 'BAJO', '05'),
+      s('e-baja', 'BAJO', '05', 'EN_PROCESO'),
+      s('p-alta', 'ALTO', '01'),
+      s('e-alta', 'ALTO', '01', 'EN_PROCESO'),
+      s('r-baja', 'BAJO', '02', 'RESUELTO'),
+      s('r-alta', 'ALTO', '03', 'RESUELTO'),
+    ];
+    expect(listaDeSegmento(lista, 'PENDIENTE').map((x) => x.id)).toEqual(['p-alta', 'p-baja']);
+    expect(listaDeSegmento(lista, 'EN_PROCESO').map((x) => x.id)).toEqual(['e-baja', 'e-alta']);
+    expect(listaDeSegmento(lista, 'RESUELTO').map((x) => x.id)).toEqual(['r-baja', 'r-alta']);
   });
 });
 
@@ -235,7 +296,7 @@ describe('claves de consulta del arrendador, separadas de las del inquilino', ()
   });
 
   it('invalidar las del portal del inquilino no toca las del arrendador', async () => {
-    const cliente = new QueryClient();
+    const cliente = nuevoCliente();
     sembrar(cliente);
     await cliente.invalidateQueries({ queryKey: clavesInquilino.todos });
     expect(invalidada(cliente, clavesMantenimiento.lista('c1'))).toBe(true);
@@ -245,7 +306,7 @@ describe('claves de consulta del arrendador, separadas de las del inquilino', ()
   });
 
   it('invalidar todas las del arrendador alcanza listas con cualquier filtro y el detalle, y no toca al inquilino', async () => {
-    const cliente = new QueryClient();
+    const cliente = nuevoCliente();
     sembrar(cliente);
     await cliente.invalidateQueries({ queryKey: clavesSolicitudes.todos });
     expect(invalidada(cliente, clavesSolicitudes.lista({}))).toBe(true);
@@ -256,7 +317,7 @@ describe('claves de consulta del arrendador, separadas de las del inquilino', ()
   });
 
   it('cerrar sesión (clear de toda la caché) las alcanza', () => {
-    const cliente = new QueryClient();
+    const cliente = nuevoCliente();
     sembrar(cliente);
     cliente.clear();
     expect(cliente.getQueryData(clavesSolicitudes.lista({}))).toBeUndefined();

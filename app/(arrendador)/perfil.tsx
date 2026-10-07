@@ -21,6 +21,9 @@ import { useActualizarPerfil, usePerfil, useSubirFotoCedula } from '@/consultas/
 import { camposCambiadosPerfil, esquemaPerfil, type ValoresPerfil } from '@/perfil/esquemas';
 import { colores, espaciado } from '@/tema';
 
+// Mi perfil del arrendador (rediseño R4-C, como el del inquilino en R4-B): el correo es una fila de solo
+// lectura; nombre, teléfono y cédula se editan con sus validaciones de siempre; "Guardar cambios" (con
+// sus avisos) va en la barra fija; la foto de la cédula no cambia.
 export default function MiPerfil() {
   const { data: perfil, isPending, isError, error, refetch } = usePerfil();
 
@@ -48,12 +51,7 @@ export default function MiPerfil() {
     );
   }
 
-  return (
-    <PantallaPila>
-      <FormularioPerfil key={perfil.id} perfil={perfil} />
-      <FotoCedula perfil={perfil} />
-    </PantallaPila>
-  );
+  return <FormularioPerfil key={perfil.id} perfil={perfil} />;
 }
 
 function FormularioPerfil({ perfil }: { perfil: PerfilArrendador }) {
@@ -110,8 +108,9 @@ function FormularioPerfil({ perfil }: { perfil: PerfilArrendador }) {
     }
   }
 
-  return (
-    <View style={estilos.grupo}>
+  // La acción principal queda fija abajo; lo que pasó al guardar va justo encima.
+  const accionFija = (
+    <View style={estilos.barra}>
       {errorServidor ? (
         <>
           <Aviso mensaje={errorServidor.mensaje} />
@@ -120,70 +119,6 @@ function FormularioPerfil({ perfil }: { perfil: PerfilArrendador }) {
       ) : null}
       {guardado ? <Aviso mensaje="Cambios guardados." tono="exito" /> : null}
       {sinCambios ? <Aviso mensaje="No hiciste ningún cambio." tono="informacion" /> : null}
-
-      <Superficie style={estilos.correo}>
-        <Texto variante="etiqueta" color={colores.textoFuerte}>
-          Correo
-        </Texto>
-        <Texto variante="cuerpoFuerte">{perfil.correo}</Texto>
-        <Texto variante="secundario" color={colores.textoSecundario}>
-          No se puede cambiar.
-        </Texto>
-      </Superficie>
-
-      <Controller
-        control={control}
-        name="nombre"
-        render={({ field }) => (
-          <CampoTexto
-            etiqueta="Nombre completo"
-            valor={field.value}
-            onCambio={field.onChange}
-            onBlur={field.onBlur}
-            error={errors.nombre?.message}
-            keyboardType="default"
-            autoCapitalize="words"
-            returnKeyType="next"
-            onSubmitEditing={() => telefono.current?.focus()}
-          />
-        )}
-      />
-      <Controller
-        control={control}
-        name="telefono"
-        render={({ field }) => (
-          <CampoTexto
-            etiqueta="Teléfono"
-            valor={field.value}
-            onCambio={field.onChange}
-            onBlur={field.onBlur}
-            error={errors.telefono?.message}
-            inputRef={telefono}
-            keyboardType="phone-pad"
-            returnKeyType="next"
-            onSubmitEditing={() => cedula.current?.focus()}
-          />
-        )}
-      />
-      <Controller
-        control={control}
-        name="cedula"
-        render={({ field }) => (
-          <CampoTexto
-            etiqueta="Cédula o NIT"
-            valor={field.value}
-            onCambio={field.onChange}
-            onBlur={field.onBlur}
-            error={errors.cedula?.message}
-            ayuda="La cédula es obligatoria para confirmar un contrato."
-            inputRef={cedula}
-            keyboardType="number-pad"
-            maxLength={16}
-            returnKeyType="done"
-            onSubmitEditing={() => void enviar()}
-          />
-        )}
-      />
       <Boton
         titulo="Guardar cambios"
         tituloCargando="Guardando…"
@@ -192,6 +127,81 @@ function FormularioPerfil({ perfil }: { perfil: PerfilArrendador }) {
         onPress={() => void enviar()}
       />
     </View>
+  );
+
+  return (
+    <PantallaPila accionFija={accionFija}>
+      <View style={estilos.grupo}>
+        <View style={estilos.soloLectura}>
+          <Superficie relleno="ninguno">
+            <View testID="dato-perfil" style={estilos.dato}>
+              <Texto variante="etiqueta" color={colores.textoFuerte}>
+                Correo
+              </Texto>
+              <Texto variante="cuerpoFuerte">{perfil.correo}</Texto>
+            </View>
+          </Superficie>
+          <Texto variante="secundario" color={colores.textoSecundario}>
+            No se puede cambiar.
+          </Texto>
+        </View>
+
+        <Controller
+          control={control}
+          name="nombre"
+          render={({ field }) => (
+            <CampoTexto
+              etiqueta="Nombre completo"
+              valor={field.value}
+              onCambio={field.onChange}
+              onBlur={field.onBlur}
+              error={errors.nombre?.message}
+              keyboardType="default"
+              autoCapitalize="words"
+              returnKeyType="next"
+              onSubmitEditing={() => telefono.current?.focus()}
+            />
+          )}
+        />
+        <Controller
+          control={control}
+          name="telefono"
+          render={({ field }) => (
+            <CampoTexto
+              etiqueta="Teléfono"
+              valor={field.value}
+              onCambio={field.onChange}
+              onBlur={field.onBlur}
+              error={errors.telefono?.message}
+              inputRef={telefono}
+              keyboardType="phone-pad"
+              returnKeyType="next"
+              onSubmitEditing={() => cedula.current?.focus()}
+            />
+          )}
+        />
+        <Controller
+          control={control}
+          name="cedula"
+          render={({ field }) => (
+            <CampoTexto
+              etiqueta="Cédula o NIT"
+              valor={field.value}
+              onCambio={field.onChange}
+              onBlur={field.onBlur}
+              error={errors.cedula?.message}
+              ayuda="La cédula es obligatoria para confirmar un contrato."
+              inputRef={cedula}
+              keyboardType="number-pad"
+              maxLength={16}
+              returnKeyType="done"
+              onSubmitEditing={() => void enviar()}
+            />
+          )}
+        />
+      </View>
+      <FotoCedula perfil={perfil} />
+    </PantallaPila>
   );
 }
 
@@ -223,6 +233,14 @@ function FotoCedula({ perfil }: { perfil: PerfilArrendador }) {
 
 const estilos = StyleSheet.create({
   grupo: { gap: espaciado.md },
-  correo: { gap: espaciado.xxs },
+  barra: { gap: espaciado.sm },
+  soloLectura: { gap: espaciado.xs },
+  dato: {
+    minHeight: 64,
+    justifyContent: 'center',
+    gap: 2,
+    paddingHorizontal: espaciado.md,
+    paddingVertical: espaciado.sm,
+  },
   foto: { marginTop: espaciado.lg },
 });

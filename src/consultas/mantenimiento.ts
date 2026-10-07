@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { mensajeDeErrorEstadoSolicitud } from '../api/errores';
 import {
@@ -84,13 +84,15 @@ export const clavesSolicitudes = {
 /**
  * UNA lista sin filtro de estado: los segmentos y sus contadores se calculan en la app. Sin
  * paginación (B-72). El estado cambia desde otros dispositivos (y las alertas nuevas llegan por la
- * campana): la lista se refresca al abrir.
+ * campana): la lista se refresca al abrir. R4-C (a8): al cambiar un filtro se sigue viendo la lista
+ * anterior mientras llega la nueva (placeholderData), en lugar de vaciar la pantalla.
  */
 export function useSolicitudes(filtros: FiltrosSolicitudes) {
   return useQuery({
     queryKey: clavesSolicitudes.lista(filtros),
     queryFn: () => listarSolicitudes(filtros),
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
 }
 

@@ -48,13 +48,12 @@ export default function MantenimientoDetalle() {
       </PantallaPila>
     );
   }
+  // El detalle pone su propia PantallaPila: con barra fija para el cambio de estado (R4-C).
   return (
-    <PantallaPila>
-      <DetalleSolicitudArrendador
-        solicitud={solicitud}
-        // Con throwOnError un fallo de red llega al adjunto como "No pudimos abrir el adjunto".
-        refrescar={async () => (await refetch({ throwOnError: true })).data}
-      />
-    </PantallaPila>
+    <DetalleSolicitudArrendador
+      solicitud={solicitud}
+      // Con throwOnError un fallo de red llega al adjunto como "No pudimos abrir el adjunto".
+      refrescar={async () => (await refetch({ throwOnError: true })).data}
+    />
   );
 }

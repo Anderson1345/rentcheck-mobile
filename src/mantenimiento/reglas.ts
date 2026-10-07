@@ -113,6 +113,30 @@ export function filtrarPorEstado<T extends { estado: EstadoSolicitud }>(
   return solicitudes.filter((s) => s.estado === estado);
 }
 
+const PESO_URGENCIA: Record<UrgenciaSolicitud, number> = { ALTO: 0, MEDIO: 1, BAJO: 2 };
+
+/**
+ * R4-C (a8): alta → media → baja y, a igual urgencia, la más antigua primero (la que lleva más tiempo
+ * esperando). Devuelve una lista nueva; no toca la recibida.
+ */
+export function ordenarPorUrgencia<T extends { urgencia: UrgenciaSolicitud; creado_en: string }>(
+  solicitudes: readonly T[],
+): T[] {
+  return [...solicitudes].sort(
+    (a, b) =>
+      PESO_URGENCIA[a.urgencia] - PESO_URGENCIA[b.urgencia] ||
+      a.creado_en.localeCompare(b.creado_en),
+  );
+}
+
+/** Lo que muestra un segmento: "Pendiente" por urgencia; los demás, en el orden del servidor. */
+export function listaDeSegmento<
+  T extends { estado: EstadoSolicitud; urgencia: UrgenciaSolicitud; creado_en: string },
+>(solicitudes: readonly T[], estado: EstadoSolicitud): T[] {
+  const delEstado = filtrarPorEstado(solicitudes, estado);
+  return estado === 'PENDIENTE' ? ordenarPorUrgencia(delEstado) : delEstado;
+}
+
 export type FiltroUrgencia = 'TODAS' | UrgenciaSolicitud;
 
 /** Filtros del servidor: la urgencia y la unidad. El estado se filtra en la app (ver arriba). */

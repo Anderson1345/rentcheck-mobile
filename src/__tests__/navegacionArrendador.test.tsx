@@ -353,7 +353,7 @@ describe('barra inferior del arrendador (layouts reales)', () => {
   it('pagos-arrendador: ya es la cola de validación (no "Próximamente") y la pestaña queda activa', async () => {
     const m = await montar(ARRENDADOR(), ['(arrendador)', '(pestanas)', 'pagos-arrendador']);
     expect(m.textos()).not.toContain('Próximamente (E7)');
-    expect(m.textos()).toContain('No hay pagos en revisión');
+    expect(m.textos()).toContain('No hay comprobantes por validar');
     expect(m.pestana('Pagos').props).toMatchObject({ accessibilityState: { selected: true } });
   });
 

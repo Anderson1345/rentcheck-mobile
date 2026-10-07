@@ -1,6 +1,6 @@
 // Mantenimiento del arrendador (E8-B): lista por estado con contadores y filtros, detalle con foto o
 // video y cambio de estado con confirmación (doble toque, 409, "sin respuesta"), y la fila en Más.
-import { Alert, RefreshControl } from 'react-native';
+import { Alert, Linking, RefreshControl } from 'react-native';
 import { act } from 'react-test-renderer';
 
 import MasArrendador from '../../app/(arrendador)/(pestanas)/mas-arrendador';
@@ -8,6 +8,8 @@ import ListaMantenimiento from '../../app/(arrendador)/mantenimiento/index';
 import DetalleMantenimiento from '../../app/(arrendador)/mantenimiento/[id]';
 import { ErrorApi, ErrorSinConexion } from '../api/cliente';
 import type { SolicitudArrendador } from '../api/mantenimiento';
+import { Icono } from '../componentes/iconos/Icono';
+import { Texto } from '../componentes/Texto';
 import { crearToken } from '../pruebas/crearToken';
 import { botonDe, hayBoton, renderizarPantalla, textosDe } from '../pruebas/pantallas';
 import { fijarReloj, restaurarReloj } from '../pruebas/reloj';
@@ -192,6 +194,15 @@ const pulsar = async (raiz: Raiz, titulo: string) => {
   await esperar();
 };
 const todo = (raiz: Raiz) => textosDe(raiz).join(' | ');
+/** El botón principal vive en la barra fija, no en el contenido que se desplaza (R4-C). */
+const enBarraFija = (raiz: Raiz, titulo: string) => {
+  const barras = raiz.root.findAll((n) => n.props.testID === 'accion-fija');
+  if (barras.length === 0) return false;
+  const desplazable = raiz.root.findAll((n) => n.props.keyboardShouldPersistTaps === 'handled')[0];
+  const tiene = (n: (typeof barras)[number]) =>
+    n.findAll((h) => h.props.children === titulo).length > 0;
+  return tiene(barras[0]) && !tiene(desplazable);
+};
 const pestana = (raiz: Raiz, etiqueta: string) =>
   raiz.root.find(
     (n) => n.props.accessibilityRole === 'tab' && n.props.accessibilityLabel === etiqueta,
@@ -231,6 +242,22 @@ beforeEach(() => {
 afterEach(restaurarReloj);
 
 // ---------------------------------------------------------------------------------------------
+
+describe('Más del arrendador (R4-C): filas agrupadas con icono', () => {
+  it('"Tu trabajo" (Mantenimiento) y "Tu cuenta" (Mi perfil); "Cerrar sesión" al final, en su grupo', async () => {
+    const { raiz } = await montar(<MasArrendador />);
+    const grupos = raiz.root
+      .findAll((n) => typeof n.type === 'string' && /^grupo-/.test(String(n.props.testID ?? '')))
+      .map((n) => n.props.testID);
+    expect(grupos).toEqual(['grupo-trabajo', 'grupo-cuenta', 'grupo-sesion']);
+    const t = textosDe(raiz);
+    expect(t.indexOf('Cerrar sesión')).toBeGreaterThan(t.indexOf('Mi perfil'));
+    expect(t.indexOf('Cerrar sesión')).toBeGreaterThan(t.indexOf('Mantenimiento'));
+    expect(hayBoton(raiz, 'Cerrar sesión')).toBe(true);
+    await act(async () => botonDe(raiz, 'Mi perfil').props.onPress());
+    expect(mockPush).toHaveBeenCalledWith('/perfil');
+  });
+});
 
 describe('fila "Mantenimiento" en Más', () => {
   it('aparece con su subtítulo y abre la lista de mantenimiento', async () => {
@@ -273,7 +300,9 @@ describe('lista de mantenimiento del arrendador', () => {
     expect(llamadasLista()).toBe(1);
     expect(mockGet).toHaveBeenCalledWith(LISTA_BASE);
     expect(JSON.stringify(mockGet.mock.calls)).not.toContain('estado=');
-    expect(pestana(raiz, 'Pendiente, 2').props.accessibilityState.selected).toBe(true);
+    expect(
+      pestana(raiz, 'Pendiente, ordenado por urgencia, 2').props.accessibilityState.selected,
+    ).toBe(true);
     expect(pestana(raiz, 'En proceso, 1').props.accessibilityState.selected).toBe(false);
     expect(pestana(raiz, 'Resuelta, 1').props.accessibilityState.selected).toBe(false);
     const t = todo(raiz);
@@ -291,24 +320,86 @@ describe('lista de mantenimiento del arrendador', () => {
     await tocarPestana(raiz, 'Resuelta, 1');
     expect(todo(raiz)).toContain('Cambio de bombillo.');
     expect(llamadasLista()).toBe(1);
-    for (const etiqueta of ['Pendiente, 2', 'En proceso, 1', 'Resuelta, 1']) {
+    for (const etiqueta of [
+      'Pendiente, ordenado por urgencia, 2',
+      'En proceso, 1',
+      'Resuelta, 1',
+    ]) {
       expect(pestana(raiz, etiqueta)).toBeTruthy();
     }
   });
 
-  it('cada fila trae unidad e inmueble, inquilino, chips de urgencia y estado, fecha y señal de adjunto', async () => {
+  it('R4-C: cada fila: miniatura de la foto, descripción en 2 líneas, "unidad · Urgencia X · hace N días", inquilino y chip', async () => {
     datos.listas[LISTA_BASE] = variasSolicitudes();
     const { raiz } = await montar(<ListaMantenimiento />);
     const t = todo(raiz);
-    expect(t).toContain('Apto 101 · Calle 45 # 12-30');
+    // Creadas el 1 de octubre; hoy es el 2 (reloj fijo).
+    expect(t).toContain('Apto 101 · Urgencia alta · ayer');
+    expect(t).toContain('Apto 101 · Urgencia media · ayer');
     expect(t).toContain('Camilo Pardo');
     expect(t).toContain('Pendiente');
-    expect(t).toContain('alta');
-    expect(t).toContain('media');
-    expect(t).toContain('Creada el 01/10/2026');
-    expect(t).toContain('Foto');
+    const descripcion = raiz.root
+      .findAllByType(Texto)
+      .find((n) => n.props.children === 'La llave del lavamanos gotea.');
+    expect(descripcion?.props.numberOfLines).toBe(2);
+    expect(
+      raiz.root.findAll(
+        (n) => typeof n.type === 'string' && n.props.testID === 'miniatura-solicitud',
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('R4-C (a8): un video tiene su icono propio (no el de la cámara)', async () => {
+    datos.listas[LISTA_BASE] = variasSolicitudes();
+    const { raiz } = await montar(<ListaMantenimiento />);
     await tocarPestana(raiz, 'En proceso, 1');
-    expect(todo(raiz)).toContain('Video');
+    const video = raiz.root.find(
+      (n) => typeof n.type === 'string' && n.props.accessibilityLabel === 'Tiene video',
+    );
+    expect(video.findAllByType(Icono).map((i) => i.props.nombre)).toEqual(['video']);
+  });
+
+  it('R4-C (a8): "Pendiente" va por urgencia (alta → media → baja) y, a igual urgencia, la más antigua primero', async () => {
+    const creada = (dia: string) => `2026-09-${dia}T15:00:00.000Z`;
+    datos.listas[LISTA_BASE] = [
+      solicitud('n-baja', {
+        descripcion: 'Baja nueva.',
+        urgencia: 'BAJO',
+        creado_en: creada('20'),
+      }),
+      solicitud('n-alta', {
+        descripcion: 'Alta nueva.',
+        urgencia: 'ALTO',
+        creado_en: creada('19'),
+      }),
+      solicitud('v-media', {
+        descripcion: 'Media vieja.',
+        urgencia: 'MEDIO',
+        creado_en: creada('02'),
+      }),
+      solicitud('v-alta', {
+        descripcion: 'Alta vieja.',
+        urgencia: 'ALTO',
+        creado_en: creada('01'),
+      }),
+    ];
+    const { raiz } = await montar(<ListaMantenimiento />);
+    const orden = textosDe(raiz).filter((x) => / (nueva|vieja)\.$/.test(x));
+    expect(orden).toEqual(['Alta vieja.', 'Alta nueva.', 'Media vieja.', 'Baja nueva.']);
+    // El segmento lo anuncia.
+    expect(pestana(raiz, 'Pendiente, ordenado por urgencia, 4')).toBeTruthy();
+  });
+
+  it('R4-C (a8): al cambiar un filtro se conserva la lista mientras llega la nueva', async () => {
+    datos.listas[LISTA_BASE] = variasSolicitudes();
+    const { raiz } = await montar(<ListaMantenimiento />);
+    mockGet.mockImplementation((url: string) =>
+      url === `${LISTA_BASE}?urgencia=BAJO` ? new Promise(() => undefined) : responder(url),
+    );
+    await tocarPestana(raiz, 'Baja');
+    expect(mockGet).toHaveBeenCalledWith(`${LISTA_BASE}?urgencia=BAJO`);
+    expect(todo(raiz)).toContain('La llave del lavamanos gotea.');
+    expect(raiz.root.findAll((n) => n.props.accessibilityLabel === 'Cargando')).toHaveLength(0);
   });
 
   it('un inquilino sin datos del contrato no rompe la fila', async () => {
@@ -340,11 +431,11 @@ describe('lista de mantenimiento del arrendador', () => {
     const { raiz } = await montar(<ListaMantenimiento />);
     await tocarPestana(raiz, 'Alta');
     expect(mockGet).toHaveBeenCalledWith(`${LISTA_BASE}?urgencia=ALTO`);
-    expect(pestana(raiz, 'Pendiente, 1')).toBeTruthy();
+    expect(pestana(raiz, 'Pendiente, ordenado por urgencia, 1')).toBeTruthy();
     expect(pestana(raiz, 'En proceso, 0')).toBeTruthy();
     expect(pestana(raiz, 'Resuelta, 0')).toBeTruthy();
     await tocarPestana(raiz, 'Todas');
-    expect(pestana(raiz, 'Pendiente, 2')).toBeTruthy();
+    expect(pestana(raiz, 'Pendiente, ordenado por urgencia, 2')).toBeTruthy();
   });
 
   it('filtro de unidad: ofrece solo las unidades de los inmuebles del arrendador y pide ?unidadId=', async () => {
@@ -468,9 +559,33 @@ describe('detalle de la solicitud (arrendador)', () => {
     expect(t).toContain('Apto 101 · Calle 45 # 12-30');
     expect(t).toContain('Camilo Pardo');
     expect(t).toContain('Teléfono 3001234567');
-    // El repositorio no tiene un patrón para llamar: solo texto, sin botones de contacto.
-    expect(hayBoton(raiz, 'Llamar')).toBe(false);
     expect(t).not.toContain('Adjunto');
+  });
+
+  it('R4-C (a8): "Llamar" abre tel: con el teléfono del inquilino', async () => {
+    const abrir = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    const { raiz } = await montar(<DetalleMantenimiento />);
+    await pulsar(raiz, 'Llamar');
+    expect(abrir).toHaveBeenCalledWith('tel:3001234567');
+  });
+
+  it('R4-C: el protagonista va arriba y el cambio de estado en la barra fija', async () => {
+    datos.detalle = [solicitud('s1', { estado: 'PENDIENTE' })];
+    const { raiz } = await montar(<DetalleMantenimiento />);
+    const [protagonista] = raiz.root.findAll(
+      (n) => typeof n.type === 'string' && n.props.testID === 'protagonista-solicitud',
+    );
+    expect(protagonista.findAllByType(Texto).map((n) => n.props.children)).toEqual(
+      expect.arrayContaining(['Está esperando que la atiendas', 'La llave del lavamanos gotea.']),
+    );
+    expect(enBarraFija(raiz, 'Marcar en proceso')).toBe(true);
+    expect(enBarraFija(raiz, 'Marcar resuelta')).toBe(true);
+  });
+
+  it('R4-C: resuelta, sin barra de acciones', async () => {
+    datos.detalle = [solicitud('s1', { estado: 'RESUELTO' })];
+    const { raiz } = await montar(<DetalleMantenimiento />);
+    expect(raiz.root.findAll((n) => n.props.testID === 'accion-fija')).toHaveLength(0);
   });
 
   it('un inquilino sin datos del contrato se dice sin inventar un teléfono', async () => {
@@ -480,6 +595,7 @@ describe('detalle de la solicitud (arrendador)', () => {
     const { raiz } = await montar(<DetalleMantenimiento />);
     expect(todo(raiz)).toContain('Inquilino sin datos');
     expect(todo(raiz)).not.toContain('Teléfono');
+    expect(hayBoton(raiz, 'Llamar')).toBe(false);
   });
 
   it('PENDIENTE ofrece dos botones; EN_PROCESO uno; RESUELTO ninguno, con su texto', async () => {
