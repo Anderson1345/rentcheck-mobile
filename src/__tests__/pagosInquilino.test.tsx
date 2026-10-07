@@ -1,5 +1,6 @@
-// Pagos del inquilino (E7-A): pestaña Pagos (recaudo, períodos, historial) y formulario de reporte
-// con comprobante (idempotencia, avisos, errores por código).
+// Pagos del inquilino (E7-A, rediseño R4-A): pestaña Pagos (protagonista, recaudo en una línea,
+// historial con reemplazados plegados) y formulario de reporte con comprobante (resumen del período,
+// idempotencia, avisos, errores por código).
 import type { ReactNode } from 'react';
 import { Alert } from 'react-native';
 import { act } from 'react-test-renderer';
@@ -10,6 +11,7 @@ import { ErrorApi, ErrorSinConexion } from '../api/cliente';
 import type { EstadoCuenta, PeriodoCuenta } from '../api/contratos';
 import type { PagoRespuesta } from '../api/pagos';
 import { SelectorFecha } from '../componentes/contratos/PasoFechas';
+import { Texto } from '../componentes/Texto';
 import { ContratoSeleccionadoProvider } from '../inquilino/ContratoSeleccionado';
 import { FORMATO_CLAVE_IDEMPOTENCIA } from '../utilidades/idempotencia';
 import { crearToken } from '../pruebas/crearToken';
@@ -21,6 +23,7 @@ import {
   renderizarPantalla,
   textosDe,
 } from '../pruebas/pantallas';
+import { fijarReloj, restaurarReloj } from '../pruebas/reloj';
 import type { DatosSesion } from '../sesion/tipos';
 import { hoyBogota } from '../utilidades/fechas';
 
@@ -37,6 +40,7 @@ const mockManipular = jest.fn();
 const mockDescargar = jest.fn();
 const mockCompartir = jest.fn();
 const mockBorrar = jest.fn();
+const mockCopiar = jest.fn();
 let mockParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
@@ -61,7 +65,7 @@ jest.mock('@react-native-community/datetimepicker', () => ({
   __esModule: true,
   default: () => null,
 }));
-jest.mock('expo-clipboard', () => ({ setStringAsync: async () => true }));
+jest.mock('expo-clipboard', () => ({ setStringAsync: (...a: unknown[]) => mockCopiar(...a) }));
 jest.mock('../api/cliente', () => ({
   ...jest.requireActual('../api/cliente'),
   api: {
@@ -237,7 +241,7 @@ const PDF = {
 };
 const elegirElPdf = (raiz: Raiz) => {
   mockDocumento.mockResolvedValue(PDF);
-  return pulsar(raiz, 'Elegir un PDF');
+  return pulsar(raiz, 'PDF');
 };
 
 beforeEach(() => {
@@ -245,6 +249,7 @@ beforeEach(() => {
   mockDescargar.mockReset().mockResolvedValue({ status: 200, uri: 'file:///cache/c' });
   mockCompartir.mockReset().mockResolvedValue(undefined);
   mockBorrar.mockReset().mockResolvedValue(undefined);
+  mockCopiar.mockReset().mockResolvedValue(true);
   for (const m of [
     mockGet,
     mockSubir,
@@ -288,35 +293,111 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------------------------
 
 describe('pestaña Pagos del inquilino', () => {
-  it('contrato ACTIVO: datos de recaudo, períodos con su chip y botón de reportar en los no pagados', async () => {
+  // El plazo de la tarjeta depende de hoy: reloj fijo (2 de octubre de 2026 en Bogotá).
+  beforeEach(() => fijarReloj());
+  afterEach(() => restaurarReloj());
+
+  const filaGrupo = (raiz: Raiz) =>
+    raiz.root.findAll(
+      (n) =>
+        typeof n.props.onPress === 'function' &&
+        /comprobantes? reemplazados?,/.test(String(n.props.accessibilityLabel ?? '')),
+    )[0];
+  const meses = (raiz: Raiz) => textosDe(raiz).filter((t) => / de 2026$/.test(t));
+
+  it('cabecera con la píldora del contrato (inmueble · unidad) que abre Mis contratos', async () => {
+    const { raiz } = await montar(<PagosInquilino />);
+    expect(todo(raiz)).toContain('Calle 45 # 12-30 · Apto 302');
+    const pildora = raiz.root.find(
+      (n) =>
+        typeof n.props.onPress === 'function' &&
+        String(n.props.accessibilityLabel ?? '').startsWith('Cambiar de contrato'),
+    );
+    await act(async () => pildora.props.onPress());
+    expect(mockPush).toHaveBeenCalledWith('/mis-contratos');
+  });
+
+  it('protagonista: el período del panel (el vencido más antiguo) con monto, estado y un solo "Reportar pago" con el período', async () => {
     const { raiz } = await montar(<PagosInquilino />);
     const t = todo(raiz);
-    expect(t).toContain('Datos de recaudo');
-    expect(t).toContain('Bancolombia ahorros 123-456');
-    expect(t).toContain('Septiembre de 2026');
-    expect(t).toContain('Pagado');
-    // 3 períodos no pagados: vencido, en revisión y por vencer
-    expect(cuantos(raiz, 'Reportar pago')).toBe(3);
-  });
-
-  it('un período EN_REVISION se muestra "En revisión", nunca como vencido', async () => {
-    datos.cuenta = {
-      estadoPago: 'pendiente',
-      periodos: [periodo('2026-11-01', 'EN_REVISION')],
-    };
-    const { raiz } = await montar(<PagosInquilino />);
-    expect(todo(raiz)).toContain('En revisión');
-    expect(todo(raiz)).not.toContain('Vencido');
-  });
-
-  it('"Reportar pago" abre el formulario con ese contrato y período', async () => {
-    datos.cuenta = { estadoPago: 'en_mora', periodos: [periodo('2026-10-01', 'VENCIDO')] };
-    const { raiz } = await montar(<PagosInquilino />);
+    expect(t).toContain('Tu próximo pago · Octubre');
+    expect(t).toContain('$ 1.500.000');
+    expect(t).toContain('1 período vencido · Total pendiente $ 1.500.000');
+    expect(cuantos(raiz, 'Reportar pago')).toBe(1);
     await pulsar(raiz, 'Reportar pago');
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/reportar-pago',
       params: { contratoId: 'c1', periodo: '2026-10-01' },
     });
+  });
+
+  it('protagonista EN_REVISION: "En revisión", nunca como vencido, y "Reemplazar comprobante"', async () => {
+    datos.panel = {
+      ...(datos.panel as object),
+      proximo_periodo: {
+        periodo: '2026-09-01T00:00:00.000Z',
+        fecha_limite: '2026-09-05T00:00:00.000Z',
+        monto_centavos: 150_000_000,
+        estado: 'EN_REVISION',
+      },
+      periodos_vencidos: { cantidad: 0, total_pendiente_centavos: 0 },
+    };
+    const { raiz } = await montar(<PagosInquilino />);
+    expect(todo(raiz)).toContain('En revisión');
+    expect(todo(raiz)).not.toContain('Vencido');
+    expect(hayBoton(raiz, 'Reemplazar comprobante')).toBe(true);
+  });
+
+  it('al día (sin período pendiente): "Estás al día" y sin "Reportar pago"', async () => {
+    datos.panel = { ...(datos.panel as object), proximo_periodo: null };
+    const { raiz } = await montar(<PagosInquilino />);
+    expect(todo(raiz)).toContain('Estás al día');
+    expect(hayBoton(raiz, 'Reportar pago')).toBe(false);
+  });
+
+  it('recaudo en UNA línea con "Copiar" (copia el texto completo)', async () => {
+    const { raiz } = await montar(<PagosInquilino />);
+    const linea = raiz.root
+      .findAllByType(Texto)
+      .find((n) => n.props.children === 'Bancolombia ahorros 123-456');
+    expect(linea?.props.numberOfLines).toBe(1);
+    await pulsar(raiz, 'Copiar');
+    expect(mockCopiar).toHaveBeenCalledWith('Bancolombia ahorros 123-456');
+    expect(todo(raiz)).toContain('Copiado');
+  });
+
+  it('ACTIVO sin datos de recaudo (null): no aparece la línea ni "Copiar"', async () => {
+    datos.detalle = { contratoId: 'c1', estado: 'ACTIVO', datos_recaudo: null };
+    const { raiz } = await montar(<PagosInquilino />);
+    expect(todo(raiz)).not.toContain('Bancolombia');
+    expect(hayBoton(raiz, 'Copiar')).toBe(false);
+  });
+
+  it('"Estado de cuenta" abre la lista completa de períodos del contrato', async () => {
+    const { raiz } = await montar(<PagosInquilino />);
+    await act(async () => {
+      raiz.root
+        .find(
+          (n) =>
+            n.props.accessibilityRole === 'link' &&
+            n.props.accessibilityLabel === 'Estado de cuenta',
+        )
+        .props.onPress();
+    });
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/mi-contrato/[id]/estado-cuenta',
+      params: { id: 'c1' },
+    });
+  });
+
+  it('historial en filas, del período más reciente al más antiguo', async () => {
+    datos.pagos = [
+      pago('p-sep', { estado: 'APROBADO', periodo: '2026-09-01T00:00:00.000Z' }),
+      pago('p-nov', { periodo: '2026-11-01T00:00:00.000Z' }),
+      pago('p-oct', { estado: 'RECHAZADO' }),
+    ];
+    const { raiz } = await montar(<PagosInquilino />);
+    expect(meses(raiz)).toEqual(['Noviembre de 2026', 'Octubre de 2026', 'Septiembre de 2026']);
   });
 
   it('historial: período, monto, fecha, chip y, si fue rechazado, el motivo en texto humano y el mensaje', async () => {
@@ -335,15 +416,41 @@ describe('pestaña Pagos del inquilino', () => {
     const t = todo(raiz);
     expect(t).toContain('Mis pagos');
     expect(t).toContain('$ 1.500.000');
-    expect(t).toContain('06/10/2026');
+    expect(t).toContain('Reportado el 06/10/2026');
     expect(t).toContain('Rechazado');
     expect(t).toContain('El monto no coincide');
     expect(t).toContain('Faltan 50.000');
     expect(t).toContain('Foto borrosa');
     expect(t).toContain('Aprobado');
-    expect(t).toContain('Reemplazado');
+    // El reemplazado está plegado: se ve al desplegar su grupo.
+    expect(t).not.toContain('Reemplazado');
+    await act(async () => filaGrupo(raiz).props.onPress());
+    expect(todo(raiz)).toContain('Reemplazado');
     // OTRO: solo el mensaje, sin un texto de motivo inventado
     expect(t).not.toContain('Otro motivo');
+  });
+
+  it('reemplazados plegados por período: "N comprobantes reemplazados" (contraído/expandido); lo demás nunca se oculta', async () => {
+    datos.pagos = [
+      pago('oct-revision', { estado: 'PENDIENTE', creado_en: '2026-10-06T15:00:00.000Z' }),
+      pago('oct-r1', { estado: 'REEMPLAZADO', creado_en: '2026-10-03T15:00:00.000Z' }),
+      pago('oct-r2', { estado: 'REEMPLAZADO', creado_en: '2026-10-04T15:00:00.000Z' }),
+      pago('sep-aprobado', { estado: 'APROBADO', periodo: '2026-09-01T00:00:00.000Z' }),
+      pago('ago-rechazado', { estado: 'RECHAZADO', periodo: '2026-08-01T00:00:00.000Z' }),
+    ];
+    const { raiz } = await montar(<PagosInquilino />);
+    expect(cuantos(raiz, 'Reemplazado')).toBe(0);
+    expect(cuantos(raiz, 'En revisión')).toBeGreaterThan(0);
+    expect(cuantos(raiz, 'Aprobado')).toBe(1);
+    expect(cuantos(raiz, 'Rechazado')).toBe(1);
+    expect(todo(raiz)).toContain('2 comprobantes reemplazados');
+    expect(filaGrupo(raiz).props.accessibilityLabel).toBe('2 comprobantes reemplazados, contraído');
+    expect(filaGrupo(raiz).props.accessibilityState.expanded).toBe(false);
+
+    await act(async () => filaGrupo(raiz).props.onPress());
+    expect(cuantos(raiz, 'Reemplazado')).toBe(2);
+    expect(filaGrupo(raiz).props.accessibilityLabel).toBe('2 comprobantes reemplazados, expandido');
+    expect(filaGrupo(raiz).props.accessibilityState.expanded).toBe(true);
   });
 
   it('un rechazo anterior a B0.6-A1 (sin motivo ni mensaje) no inventa nada', async () => {
@@ -354,9 +461,17 @@ describe('pestaña Pagos del inquilino', () => {
     expect(t).not.toMatch(/El monto no coincide|No se ve el pago|no se lee|Motivo/);
   });
 
-  it('historial vacío', async () => {
+  it('vacío: "Aún no has reportado pagos" y "Reportar pago" si hay período pendiente', async () => {
     const { raiz } = await montar(<PagosInquilino />);
-    expect(todo(raiz)).toContain('Aún no has reportado pagos.');
+    expect(todo(raiz)).toContain('Aún no has reportado pagos');
+    expect(hayBoton(raiz, 'Reportar pago')).toBe(true);
+  });
+
+  it('vacío y al día: el mensaje, sin "Reportar pago"', async () => {
+    datos.panel = { ...(datos.panel as object), proximo_periodo: null };
+    const { raiz } = await montar(<PagosInquilino />);
+    expect(todo(raiz)).toContain('Aún no has reportado pagos');
+    expect(hayBoton(raiz, 'Reportar pago')).toBe(false);
   });
 
   it('error al cargar los pagos: aviso y "Reintentar"', async () => {
@@ -379,7 +494,7 @@ describe('pestaña Pagos del inquilino', () => {
     expect(mockPush).toHaveBeenCalledWith('/agregar-contrato');
   });
 
-  it('contrato VENCIDO: sin recaudo y solo se reporta en períodos VENCIDO o PARCIAL', async () => {
+  it('contrato VENCIDO: sin recaudo ni panel; el protagonista es el período reportable más antiguo (VENCIDO o PARCIAL)', async () => {
     datos.estadoContrato = 'VENCIDO';
     datos.cuenta = {
       estadoPago: 'en_mora',
@@ -391,46 +506,87 @@ describe('pestaña Pagos del inquilino', () => {
       ],
     };
     const { raiz } = await montar(<PagosInquilino />);
-    expect(todo(raiz)).not.toContain('Datos de recaudo');
+    expect(hayBoton(raiz, 'Copiar')).toBe(false);
     expect(mockGet).not.toHaveBeenCalledWith('/inquilino/contratos/c1');
-    expect(cuantos(raiz, 'Reportar pago')).toBe(2);
+    expect(mockGet).not.toHaveBeenCalledWith('/inquilino/contratos/c1/panel');
+    expect(todo(raiz)).toContain('Tu próximo pago · Octubre');
+    expect(cuantos(raiz, 'Reportar pago')).toBe(1);
+    await pulsar(raiz, 'Reportar pago');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/reportar-pago',
+      params: { contratoId: 'c1', periodo: '2026-10-01' },
+    });
   });
 
   it('contrato PROGRAMADO: sin recaudo, sin botón de reportar y sin pedir períodos', async () => {
     datos.estadoContrato = 'PROGRAMADO';
     const { raiz } = await montar(<PagosInquilino />);
-    expect(todo(raiz)).not.toContain('Datos de recaudo');
+    expect(hayBoton(raiz, 'Copiar')).toBe(false);
     expect(cuantos(raiz, 'Reportar pago')).toBe(0);
     expect(todo(raiz)).toContain('Cuando tu contrato empiece podrás reportar tus pagos aquí.');
-  });
-
-  it('ACTIVO sin datos de recaudo (null): no muestra la tarjeta', async () => {
-    datos.detalle = { contratoId: 'c1', estado: 'ACTIVO', datos_recaudo: null };
-    const { raiz } = await montar(<PagosInquilino />);
-    expect(todo(raiz)).not.toContain('Datos de recaudo');
   });
 });
 
 // ---------------------------------------------------------------------------------------------
 
 describe('formulario de reporte de pago', () => {
-  it('U8: el título lo pone solo el encabezado de la pila y "Enviar" queda en la barra fija', async () => {
+  it('U8: el título lo pone solo el encabezado de la pila y "Enviar comprobante" queda en la barra fija', async () => {
     const { raiz } = await montar(<ReportarPago />);
     // El cuerpo no repite "Reportar pago" (lo muestra el encabezado nativo).
     expect(textosDe(raiz)).not.toContain('Reportar pago');
     // El botón principal vive en la barra fija, no dentro del contenido que se desplaza.
     const barra = raiz.root.findByProps({ testID: 'accion-fija' });
-    expect(barra.findAll((n) => n.props.children === 'Enviar').length).toBeGreaterThan(0);
+    expect(barra.findAll((n) => n.props.children === 'Enviar comprobante').length).toBeGreaterThan(
+      0,
+    );
     const desplazable = raiz.root.findAll(
       (n) => n.props.keyboardShouldPersistTaps === 'handled',
     )[0];
-    expect(desplazable.findAll((n) => n.props.children === 'Enviar').length).toBe(0);
+    expect(desplazable.findAll((n) => n.props.children === 'Enviar comprobante').length).toBe(0);
   });
 
   it('preselecciona el período del parámetro y precarga el monto con el saldo del período', async () => {
     const { raiz } = await montar(<ReportarPago />);
     expect(todo(raiz)).toContain('Octubre de 2026');
     expect(campoDe(raiz, 'Monto pagado')?.props.value).toBe('1.500.000');
+    expect(todo(raiz)).toContain('Saldo del período: $ 1.500.000');
+  });
+
+  it('R4-A: resumen del período arriba con canon y fecha límite; la lista de períodos se abre con "Cambiar"', async () => {
+    const { raiz } = await montar(<ReportarPago />);
+    const [resumen] = raiz.root.findAll(
+      (n) => typeof n.type === 'string' && n.props.testID === 'resumen-periodo',
+    );
+    const textos = resumen.findAllByType(Texto).map((n) => n.props.children);
+    expect(textos).toEqual(
+      expect.arrayContaining([
+        'Período',
+        'Octubre de 2026',
+        'Canon',
+        '$ 1.500.000',
+        'Fecha límite',
+        '05/10/2026',
+      ]),
+    );
+    const opcionDiciembre = () =>
+      raiz.root.findAll(
+        (n) =>
+          n.props.accessibilityLabel === 'Diciembre de 2026' &&
+          typeof n.props.onPress === 'function',
+      );
+    expect(opcionDiciembre()).toHaveLength(0);
+    await pulsar(raiz, 'Cambiar');
+    expect(opcionDiciembre().length).toBeGreaterThan(0);
+  });
+
+  it('R4-A: campos con etiqueta fuera: "Monto pagado", "Fecha en que pagaste" y "Comprobante" (Cámara, Galería, PDF)', async () => {
+    const { raiz } = await montar(<ReportarPago />);
+    expect(raiz.root.findAllByType(SelectorFecha)[0].props.etiqueta).toBe('Fecha en que pagaste');
+    const t = textosDe(raiz);
+    expect(t).toEqual(expect.arrayContaining(['Monto pagado', 'Comprobante']));
+    for (const opcion of ['Cámara', 'Galería', 'PDF']) expect(hayBoton(raiz, opcion)).toBe(true);
+    // Sin campo de referencia (llega en P1).
+    expect(todo(raiz)).not.toMatch(/Referencia/);
   });
 
   it('sin parámetro usa proximo_periodo del panel', async () => {
@@ -446,6 +602,13 @@ describe('formulario de reporte de pago', () => {
     };
     const { raiz } = await montar(<ReportarPago />);
     await esperar();
+    const [resumen] = raiz.root.findAll(
+      (n) => typeof n.type === 'string' && n.props.testID === 'resumen-periodo',
+    );
+    expect(resumen.findAllByType(Texto).map((n) => n.props.children)).toContain(
+      'Diciembre de 2026',
+    );
+    await pulsar(raiz, 'Cambiar');
     expect(
       raiz.root.findAll(
         (n) =>
@@ -457,6 +620,14 @@ describe('formulario de reporte de pago', () => {
 
   it('el período se puede cambiar entre los reportables y el monto se vuelve a precargar', async () => {
     const { raiz } = await montar(<ReportarPago />);
+    await pulsar(raiz, 'Cambiar');
+    // Con la lista abierta: PAGADO no es reportable; los demás sí.
+    expect(
+      raiz.root.findAll((n) => n.props.accessibilityLabel === 'Septiembre de 2026').length,
+    ).toBe(0);
+    expect(
+      raiz.root.findAll((n) => n.props.accessibilityLabel === 'Noviembre de 2026').length,
+    ).toBeGreaterThan(0);
     await act(async () => {
       raiz.root
         .findAll(
@@ -467,10 +638,7 @@ describe('formulario de reporte de pago', () => {
         .props.onPress();
     });
     expect(campoDe(raiz, 'Monto pagado')?.props.value).toBe('1.500.000');
-    // PAGADO no es reportable
-    expect(
-      raiz.root.findAll((n) => n.props.accessibilityLabel === 'Septiembre de 2026').length,
-    ).toBe(0);
+    expect(todo(raiz)).toContain('Diciembre de 2026');
   });
 
   it('fecha: por defecto hoy, máximo hoy y mínimo el inicio del contrato', async () => {
@@ -483,7 +651,7 @@ describe('formulario de reporte de pago', () => {
 
   it('sin comprobante no se envía ni se pide confirmación', async () => {
     const { raiz } = await montar(<ReportarPago />);
-    await pulsar(raiz, 'Enviar');
+    await pulsar(raiz, 'Enviar comprobante');
     expect(alerta).not.toHaveBeenCalled();
     expect(mockSubir).not.toHaveBeenCalled();
     expect(todo(raiz)).toContain('Adjunta el comprobante del pago.');
@@ -496,7 +664,7 @@ describe('formulario de reporte de pago', () => {
       'Este monto es menor al canon: el período quedará como pago parcial al aprobarse.',
     );
     await elegirElPdf(raiz);
-    await pulsar(raiz, 'Enviar');
+    await pulsar(raiz, 'Enviar comprobante');
     expect(alerta).toHaveBeenCalledTimes(1);
   });
 
@@ -508,22 +676,56 @@ describe('formulario de reporte de pago', () => {
     );
   });
 
-  it('período EN_REVISION: avisa que el comprobante anterior quedará reemplazado', async () => {
+  it('período EN_REVISION: avisa que el comprobante anterior quedará reemplazado; otro período no', async () => {
     mockParams = { contratoId: 'c1', periodo: '2026-11-01' };
     const { raiz } = await montar(<ReportarPago />);
     expect(todo(raiz)).toContain(
-      'Ya tienes un comprobante en revisión para este período; al enviar este, el anterior quedará reemplazado.',
+      'Ya enviaste un comprobante para este mes. Si envías otro, reemplaza al anterior.',
     );
+    mockParams = { contratoId: 'c1', periodo: '2026-10-01' };
+    const otro = await montar(<ReportarPago />);
+    expect(todo(otro.raiz)).not.toContain('Ya enviaste un comprobante');
   });
 
-  it('con PDF: muestra nombre y tamaño; permite quitarlo', async () => {
+  it('con PDF: muestra nombre y tamaño; "Quitar" lo borra', async () => {
     const { raiz } = await montar(<ReportarPago />);
     expect(mockDocumento).not.toHaveBeenCalled();
     await elegirElPdf(raiz);
     expect(todo(raiz)).toContain('recibo.pdf');
     expect(todo(raiz)).toContain('244 KB');
-    await pulsar(raiz, 'Quitar comprobante');
+    await pulsar(raiz, 'Quitar');
     expect(todo(raiz)).not.toContain('recibo.pdf');
+  });
+
+  it('R4-A: con foto de la galería: vista previa ampliable, nombre y "Quitar"', async () => {
+    mockElegirFoto.mockResolvedValue({
+      tipo: 'elegida',
+      archivo: { uri: 'file:///cache/g.jpg', name: 'g.jpg', type: 'image/jpeg' },
+    });
+    const referencia = {
+      width: 800,
+      height: 600,
+      saveAsync: jest
+        .fn()
+        .mockResolvedValue({ uri: 'file:///cache/g-red.jpg', width: 800, height: 600 }),
+    };
+    mockManipular.mockReturnValue({
+      resize: jest.fn().mockReturnThis(),
+      renderAsync: jest.fn().mockResolvedValue(referencia),
+    });
+    const { raiz } = await montar(<ReportarPago />);
+    await pulsar(raiz, 'Galería');
+    expect(mockElegirFoto).toHaveBeenCalledWith('galeria');
+    expect(todo(raiz)).toContain('comprobante.jpg');
+    expect(
+      raiz.root.findAll(
+        (n) =>
+          n.props.accessibilityLabel === 'Ampliar foto del comprobante' &&
+          typeof n.props.onPress === 'function',
+      ).length,
+    ).toBeGreaterThan(0);
+    await pulsar(raiz, 'Quitar');
+    expect(todo(raiz)).not.toContain('comprobante.jpg');
   });
 
   it('con foto de la cámara: se reduce antes de subir (JPEG)', async () => {
@@ -543,10 +745,10 @@ describe('formulario de reporte de pago', () => {
       renderAsync: jest.fn().mockResolvedValue(referencia),
     });
     const { raiz } = await montar(<ReportarPago />);
-    await pulsar(raiz, 'Tomar foto');
+    await pulsar(raiz, 'Cámara');
     expect(referencia.saveAsync).toHaveBeenCalledWith({ compress: 0.75, format: 'jpeg' });
 
-    await pulsar(raiz, 'Enviar');
+    await pulsar(raiz, 'Enviar comprobante');
     await confirmarAlerta();
     expect(mockSubir.mock.calls[0][2]).toMatchObject({
       uri: 'file:///cache/reducida.jpg',
@@ -557,7 +759,7 @@ describe('formulario de reporte de pago', () => {
   it('confirmación con el resumen y envío con cabecera, período, monto en centavos y fecha', async () => {
     const { raiz } = await montar(<ReportarPago />);
     await elegirElPdf(raiz);
-    await pulsar(raiz, 'Enviar');
+    await pulsar(raiz, 'Enviar comprobante');
     expect(alerta).toHaveBeenCalledTimes(1);
     const mensaje = alerta.mock.calls[0][1] as string;
     expect(mensaje).toContain('Octubre de 2026');
@@ -586,7 +788,7 @@ describe('formulario de reporte de pago', () => {
     const invalidar = jest.spyOn(cliente, 'invalidateQueries');
     const antesCuenta = llamadasA('/inquilino/contratos/c1/estado-cuenta');
     await elegirElPdf(raiz);
-    await pulsar(raiz, 'Enviar');
+    await pulsar(raiz, 'Enviar comprobante');
     await confirmarAlerta();
     expect(todo(raiz)).toContain('Pago reportado. Tu arrendador lo revisará.');
     const claves = invalidar.mock.calls.map(([filtro]) => JSON.stringify(filtro?.queryKey));
@@ -603,7 +805,7 @@ describe('formulario de reporte de pago', () => {
     mockSubir.mockReturnValue(new Promise(() => undefined));
     const { raiz } = await montar(<ReportarPago />);
     await elegirElPdf(raiz);
-    await pulsar(raiz, 'Enviar');
+    await pulsar(raiz, 'Enviar comprobante');
     await act(async () => {
       alerta.mock.calls[0][2][1].onPress();
       alerta.mock.calls[0][2][1].onPress();
@@ -615,14 +817,14 @@ describe('formulario de reporte de pago', () => {
     mockSubir.mockRejectedValueOnce(new ErrorSinConexion()).mockResolvedValueOnce(pago('p1'));
     const { raiz } = await montar(<ReportarPago />);
     await elegirElPdf(raiz);
-    await pulsar(raiz, 'Enviar');
+    await pulsar(raiz, 'Enviar comprobante');
     await confirmarAlerta(0);
     expect(mockSubir).toHaveBeenCalledTimes(1);
     expect(todo(raiz)).toContain(
       'No sabemos si el pago se envió. Puedes volver a enviarlo: no se duplicará.',
     );
 
-    await pulsar(raiz, 'Enviar');
+    await pulsar(raiz, 'Enviar comprobante');
     await confirmarAlerta(1);
     expect(mockSubir).toHaveBeenCalledTimes(2);
     expect(mockSubir.mock.calls[1][4].encabezados['Idempotency-Key']).toBe(
@@ -634,10 +836,10 @@ describe('formulario de reporte de pago', () => {
     mockSubir.mockRejectedValueOnce(new ErrorSinConexion()).mockResolvedValueOnce(pago('p1'));
     const { raiz } = await montar(<ReportarPago />);
     await elegirElPdf(raiz);
-    await pulsar(raiz, 'Enviar');
+    await pulsar(raiz, 'Enviar comprobante');
     await confirmarAlerta(0);
     await escribirEn(raiz, 'Monto pagado', '1400000');
-    await pulsar(raiz, 'Enviar');
+    await pulsar(raiz, 'Enviar comprobante');
     await confirmarAlerta(1);
     expect(mockSubir.mock.calls[1][4].encabezados['Idempotency-Key']).not.toBe(
       mockSubir.mock.calls[0][4].encabezados['Idempotency-Key'],
@@ -652,12 +854,12 @@ describe('formulario de reporte de pago', () => {
       .mockResolvedValueOnce(pago('p1'));
     const { raiz } = await montar(<ReportarPago />);
     await elegirElPdf(raiz);
-    await pulsar(raiz, 'Enviar');
+    await pulsar(raiz, 'Enviar comprobante');
     await confirmarAlerta(0);
     expect(todo(raiz)).toContain(
       'Los datos del pago cambiaron mientras se enviaba. Revísalos y vuelve a enviar.',
     );
-    await pulsar(raiz, 'Enviar');
+    await pulsar(raiz, 'Enviar comprobante');
     await confirmarAlerta(1);
     expect(mockSubir.mock.calls[1][4].encabezados['Idempotency-Key']).not.toBe(
       mockSubir.mock.calls[0][4].encabezados['Idempotency-Key'],
@@ -670,7 +872,7 @@ describe('formulario de reporte de pago', () => {
     );
     const { raiz } = await montar(<ReportarPago />);
     await elegirElPdf(raiz);
-    await pulsar(raiz, 'Enviar');
+    await pulsar(raiz, 'Enviar comprobante');
     await confirmarAlerta();
     expect(todo(raiz)).toContain(
       'Tu pago se está procesando. Espera unos segundos y revisa Mis pagos.',
@@ -698,18 +900,18 @@ describe('formulario de reporte de pago', () => {
     mockSubir.mockRejectedValueOnce(new ErrorApi({ status, codigo, mensaje: 'técnico' }));
     const { raiz } = await montar(<ReportarPago />);
     await elegirElPdf(raiz);
-    await pulsar(raiz, 'Enviar');
+    await pulsar(raiz, 'Enviar comprobante');
     await confirmarAlerta();
     expect(todo(raiz)).toContain(mensaje);
     expect(todo(raiz)).not.toContain('técnico');
-    expect(hayBoton(raiz, 'Enviar')).toBe(true);
+    expect(hayBoton(raiz, 'Enviar comprobante')).toBe(true);
   });
 
   it('contrato PROGRAMADO: no hay períodos reportables', async () => {
     datos.estadoContrato = 'PROGRAMADO';
     const { raiz } = await montar(<ReportarPago />);
     expect(todo(raiz)).toContain('Este contrato no tiene períodos para reportar.');
-    expect(hayBoton(raiz, 'Enviar')).toBe(false);
+    expect(hayBoton(raiz, 'Enviar comprobante')).toBe(false);
   });
 
   it('contrato que no es del inquilino (404 del estado de cuenta): "No encontramos este contrato"', async () => {

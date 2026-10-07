@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import type { ContratoInquilinoResumen } from '@/api/inquilino';
 import type { PeriodoCuenta } from '@/api/contratos';
@@ -32,10 +32,10 @@ import {
   periodosReportables,
 } from '@/pagos/reglas';
 import { useReportarPago } from '@/pagos/useReportarPago';
-import { colores, espaciado } from '@/tema';
+import { blancoAlfa, colores, espaciado, radios } from '@/tema';
 import type { Comprobante } from '@/utilidades/comprobante';
 import { centavosAPesosTexto } from '@/utilidades/dinero';
-import { formatearFechaLarga, hoyBogota } from '@/utilidades/fechas';
+import { formatearFechaCorta, formatearFechaLarga, hoyBogota } from '@/utilidades/fechas';
 
 // Pantalla de pila propia (el reporte necesita todo el ancho y el teclado; dos grupos de rutas no
 // pueden compartir URL, por eso no se llama "pago"). Recibe el contrato y, opcionalmente, el período.
@@ -159,6 +159,8 @@ function Campos({
   const [errores, setErrores] = useState<{ comprobante?: string; monto?: string; fecha?: string }>(
     {},
   );
+  // La lista de períodos que ya existía se abre con "Cambiar" (maqueta Formulario).
+  const [cambiando, setCambiando] = useState(false);
 
   const periodo = periodos.find((p) => p.periodo === periodoElegido) ?? inicial;
   const aviso = avisoDeMonto(monto, periodo);
@@ -213,7 +215,7 @@ function Campos({
     <View style={estilos.grupo}>
       {reporte.error ? <Aviso mensaje={reporte.error} /> : null}
       <Boton
-        titulo="Enviar"
+        titulo="Enviar comprobante"
         tituloCargando="Enviando pago…"
         cargando={enviando}
         ancho="completo"
@@ -223,15 +225,26 @@ function Campos({
   );
   return (
     <PantallaPila accionFija={accionFija}>
-      <View style={estilos.grupo}>
-        <Texto variante="etiqueta" color={colores.textoSecundario}>
-          Período
-        </Texto>
-        <OpcionesRadio
-          opciones={periodos.map((p) => ({ valor: p.periodo, etiqueta: mesDePeriodo(p.periodo) }))}
-          valor={periodo.periodo}
-          onCambio={cambiarPeriodo}
+      <View style={estilos.formulario}>
+        <ResumenPeriodo
+          periodo={periodo}
+          puedeCambiar={periodos.length > 1}
+          cambiando={cambiando}
+          onCambiar={() => setCambiando((actual) => !actual)}
         />
+        {cambiando ? (
+          <OpcionesRadio
+            opciones={periodos.map((p) => ({
+              valor: p.periodo,
+              etiqueta: mesDePeriodo(p.periodo),
+            }))}
+            valor={periodo.periodo}
+            onCambio={(clave) => {
+              cambiarPeriodo(clave);
+              setCambiando(false);
+            }}
+          />
+        ) : null}
         {periodo.estado === 'EN_REVISION' ? (
           <Aviso tono="advertencia" mensaje={AVISO_REEMPLAZO} />
         ) : null}
@@ -250,7 +263,7 @@ function Campos({
         {aviso === 'mayor' ? <Aviso tono="informacion" mensaje={AVISO_MAYOR} /> : null}
 
         <SelectorFecha
-          etiqueta="Fecha del pago"
+          etiqueta="Fecha en que pagaste"
           valor={fecha}
           hoy={hoy}
           minimo={minimo}
@@ -262,23 +275,106 @@ function Campos({
           }}
         />
 
-        <Texto variante="etiqueta" color={colores.textoSecundario}>
-          Comprobante
-        </Texto>
-        <SelectorComprobante
-          valor={comprobante}
-          onCambio={(c) => {
-            setComprobante(c);
-            setErrores((e) => ({ ...e, comprobante: undefined }));
-          }}
-          deshabilitado={enviando}
-          error={errores.comprobante}
-        />
+        <View style={estilos.campo}>
+          <Texto variante="etiqueta" color={colores.textoFuerte}>
+            Comprobante
+          </Texto>
+          <SelectorComprobante
+            valor={comprobante}
+            onCambio={(c) => {
+              setComprobante(c);
+              setErrores((e) => ({ ...e, comprobante: undefined }));
+            }}
+            deshabilitado={enviando}
+            error={errores.comprobante}
+          />
+        </View>
       </View>
     </PantallaPila>
   );
 }
 
+/**
+ * Resumen del período arriba (maqueta Formulario, sin la referencia: llega en P1): el mes, "Cambiar" (si
+ * hay otro período reportable) y, en dos columnas, el canon del período y su fecha límite, del servidor.
+ */
+function ResumenPeriodo({
+  periodo,
+  puedeCambiar,
+  cambiando,
+  onCambiar,
+}: {
+  periodo: PeriodoCuenta;
+  puedeCambiar: boolean;
+  cambiando: boolean;
+  onCambiar: () => void;
+}) {
+  return (
+    <View testID="resumen-periodo" style={estilos.resumen}>
+      <View style={estilos.filaResumen}>
+        <View style={estilos.flex}>
+          <Texto variante="secundario" color={blancoAlfa(0.65)}>
+            Período
+          </Texto>
+          <Texto variante="tituloSeccion" color={colores.sobreTinta} accessibilityRole="header">
+            {mesDePeriodo(periodo.periodo)}
+          </Texto>
+        </View>
+        {puedeCambiar ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityHint="Muestra los períodos que puedes reportar"
+            accessibilityState={{ expanded: cambiando }}
+            onPress={onCambiar}
+            style={estilos.cambiar}
+          >
+            <Texto variante="etiqueta" color={colores.sobreTinta}>
+              Cambiar
+            </Texto>
+          </Pressable>
+        ) : null}
+      </View>
+      <View style={estilos.columnas}>
+        <View style={estilos.flex}>
+          <Texto variante="secundario" color={blancoAlfa(0.65)}>
+            Canon
+          </Texto>
+          <Texto variante="valor" color={colores.sobreTinta} cifras>
+            {centavosAPesosTexto(periodo.canonVigenteCentavos)}
+          </Texto>
+        </View>
+        <View style={estilos.flex}>
+          <Texto variante="secundario" color={blancoAlfa(0.65)}>
+            Fecha límite
+          </Texto>
+          <Texto variante="valor" color={colores.sobreTinta} cifras>
+            {formatearFechaCorta(periodo.fechaLimite)}
+          </Texto>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 const estilos = StyleSheet.create({
   grupo: { gap: espaciado.sm },
+  formulario: { gap: espaciado.xl },
+  campo: { gap: 10 },
+  flex: { flex: 1, minWidth: 0 },
+  resumen: {
+    gap: 14,
+    padding: 18,
+    borderRadius: 20,
+    backgroundColor: colores.tinta,
+  },
+  filaResumen: { flexDirection: 'row', alignItems: 'flex-start', gap: espaciado.sm },
+  cambiar: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: espaciado.sm,
+    borderRadius: radios.pildora,
+    borderWidth: 1,
+    borderColor: blancoAlfa(0.22),
+  },
+  columnas: { flexDirection: 'row', gap: espaciado.sm },
 });

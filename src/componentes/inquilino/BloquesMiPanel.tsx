@@ -14,6 +14,7 @@ import type { SolicitudInquilino } from '../../api/mantenimiento';
 import { avanceContrato } from '../../contratos/lectura';
 import { claveCachePortada } from '../../inmuebles/claveImagen';
 import {
+  accionDePeriodo,
   lineaDePagos,
   plazoDePago,
   textoFechaLimite,
@@ -46,21 +47,25 @@ function ChipPlazo({ texto, tono }: ReturnType<typeof plazoDePago>) {
   );
 }
 
+/** El período protagonista con los campos del panel (proximo_periodo). */
+export type PeriodoProtagonista = NonNullable<PanelContratoActivo['proximo_periodo']>;
+
 /**
- * La tarjeta protagonista: el próximo período sin pagar (el servidor lo elige: si hay vencidos, es el
- * más antiguo), su plazo, el monto, la fecha límite y "Reportar pago"; si hay vencidos, una línea de
- * alerta con la cantidad y el total pendiente del servidor. Sin período pendiente: "Estás al día".
+ * La tarjeta protagonista (Mi panel y Pagos): el período sin pagar que corresponde (en Mi panel lo elige
+ * el servidor: si hay vencidos, es el más antiguo), su plazo, el monto, la fecha límite y la acción; si
+ * hay vencidos, una línea de alerta con la cantidad y el total pendiente del servidor. Con el comprobante
+ * EN_REVISION no hay plazo: "Tu comprobante está en revisión" y "Reemplazar comprobante" (R4-A). Sin
+ * período pendiente: "Estás al día".
  */
-export function ProximoPago({
-  panel,
+export function TarjetaPeriodo({
+  periodo: proximo,
+  vencidos,
   onReportar,
 }: {
-  panel: PanelContratoActivo;
+  periodo: PeriodoProtagonista | null;
+  vencidos?: PanelContratoActivo['periodos_vencidos'];
   onReportar: () => void;
 }) {
-  const proximo = panel.proximo_periodo;
-  const vencidos = panel.periodos_vencidos;
-
   if (!proximo) {
     return (
       <View testID="proximo-pago">
@@ -83,7 +88,8 @@ export function ProximoPago({
     );
   }
 
-  const plazo = plazoDePago(proximo.fecha_limite, hoyBogota());
+  const accion = accionDePeriodo(proximo.estado);
+  const plazo = accion.conPlazo ? plazoDePago(proximo.fecha_limite, hoyBogota()) : null;
   const mostrarEstado = proximo.estado === 'EN_REVISION' || proximo.estado === 'PARCIAL';
   return (
     <View testID="proximo-pago">
@@ -97,7 +103,7 @@ export function ProximoPago({
           >
             {tituloProximoPago(proximo.periodo)}
           </Texto>
-          <ChipPlazo {...plazo} />
+          {plazo ? <ChipPlazo {...plazo} /> : null}
         </View>
         <Texto variante="cifraProtagonista" cifras numberOfLines={1} adjustsFontSizeToFit>
           {centavosAPesosTexto(proximo.monto_centavos)}
@@ -106,11 +112,16 @@ export function ProximoPago({
           {textoFechaLimite(proximo.fecha_limite)}
         </Texto>
         {mostrarEstado ? (
-          <View style={estilos.fila}>
+          <View style={estilos.estado}>
             <ChipEstado tipo="periodo" estado={proximo.estado} />
+            {accion.nota ? (
+              <Texto variante="secundario" color={colores.textoFuerte} style={estilos.flex}>
+                {accion.nota}
+              </Texto>
+            ) : null}
           </View>
         ) : null}
-        {vencidos.cantidad > 0 ? (
+        {vencidos && vencidos.cantidad > 0 ? (
           <View
             accessibilityRole="alert"
             style={[
@@ -124,8 +135,75 @@ export function ProximoPago({
             </Texto>
           </View>
         ) : null}
-        <Boton titulo="Reportar pago" variante="acento" ancho="completo" onPress={onReportar} />
+        <Boton
+          titulo={accion.boton.titulo}
+          variante={accion.boton.variante}
+          ancho="completo"
+          onPress={onReportar}
+        />
       </Superficie>
+    </View>
+  );
+}
+
+/** La tarjeta de Mi panel con el próximo período y los vencidos del panel. */
+export function ProximoPago({
+  panel,
+  onReportar,
+}: {
+  panel: PanelContratoActivo;
+  onReportar: () => void;
+}) {
+  return (
+    <TarjetaPeriodo
+      periodo={panel.proximo_periodo}
+      vencidos={panel.periodos_vencidos}
+      onReportar={onReportar}
+    />
+  );
+}
+
+/**
+ * Recaudo en UNA línea con "Copiar" (U9, pestaña Pagos): el texto libre del arrendador, recortado a una
+ * línea (el completo está en "Cómo pagar" de Mi panel y en Mi contrato; "Copiar" copia todo).
+ */
+export function LineaRecaudo({ datos }: { datos: string }) {
+  const [copia, setCopia] = useState<'copiado' | 'error' | null>(null);
+
+  async function copiar() {
+    try {
+      await Clipboard.setStringAsync(datos);
+      setCopia('copiado');
+    } catch {
+      setCopia('error');
+    }
+  }
+
+  return (
+    <View testID="linea-recaudo" style={estilos.seccion}>
+      <View style={estilos.lineaRecaudo} accessible={false}>
+        <Icono nombre="pagos" tamano={20} grosor={1.7} />
+        <Texto
+          variante="cuerpoFuerte"
+          numberOfLines={1}
+          accessibilityLabel={`Datos de pago: ${datos}`}
+          style={estilos.flex}
+        >
+          {datos}
+        </Texto>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Copiar datos de pago"
+          onPress={() => void copiar()}
+          style={estilos.copiar}
+        >
+          <Texto variante="etiqueta" color={colores.tintaCapa}>
+            Copiar
+          </Texto>
+        </Pressable>
+      </View>
+      {copia === 'copiado' ? <Aviso tono="exito" mensaje="Copiado" /> : null}
+      {copia === 'error' ? <Aviso mensaje="No pudimos copiar los datos." /> : null}
     </View>
   );
 }
@@ -285,14 +363,22 @@ export function TuContrato({
   );
 }
 
-/** Miniatura de la foto adjunta; si la URL firmada ya no sirve, el icono (no se guarda la URL). */
-function MiniaturaSolicitud({ solicitud }: { solicitud: SolicitudInquilino }) {
+/**
+ * Miniatura de la foto adjunta (Mi panel y la lista de Solicitudes); si la URL firmada ya no sirve, el
+ * icono (no se guarda la URL). Un video no tiene miniatura: el icono de cámara lo anuncia.
+ */
+export function MiniaturaSolicitud({ solicitud }: { solicitud: SolicitudInquilino }) {
   const [fallida, setFallida] = useState(false);
   const url = solicitud.adjunto_tipo === 'IMAGEN' && !fallida ? solicitud.adjunto_url : null;
   if (!url) {
+    const video = solicitud.adjunto_tipo === 'VIDEO';
     return (
-      <View style={[estilos.miniatura, estilos.sinFoto]}>
-        <Icono nombre="mantenimiento" tamano={22} grosor={1.7} />
+      <View
+        accessible={video}
+        accessibilityLabel={video ? 'Tiene video' : undefined}
+        style={[estilos.miniatura, estilos.sinFoto]}
+      >
+        <Icono nombre={video ? 'camara' : 'mantenimiento'} tamano={22} grosor={1.7} />
       </View>
     );
   }
@@ -350,7 +436,23 @@ const estilos = StyleSheet.create({
   seccion: { gap: espaciado.xs },
   tarjeta: { gap: espaciado.sm },
   tarjetaPago: { gap: 14 },
-  fila: { flexDirection: 'row' },
+  estado: { flexDirection: 'row', alignItems: 'center', gap: espaciado.xs },
+  lineaRecaudo: {
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: espaciado.sm,
+    paddingLeft: espaciado.md,
+    paddingRight: espaciado.xxs,
+    borderRadius: radios.medio,
+    backgroundColor: colores.superficie,
+  },
+  copiar: {
+    minHeight: 44,
+    minWidth: 44,
+    justifyContent: 'center',
+    paddingHorizontal: espaciado.sm,
+  },
   filaTitulo: { flexDirection: 'row', alignItems: 'center', gap: espaciado.xs },
   chip: {
     minHeight: 28,

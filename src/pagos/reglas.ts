@@ -11,7 +11,7 @@ export const AVISO_PARCIAL =
 export const AVISO_MAYOR =
   'Un monto mayor no cubre otros meses; cada período se reporta por separado.';
 export const AVISO_REEMPLAZO =
-  'Ya tienes un comprobante en revisión para este período; al enviar este, el anterior quedará reemplazado.';
+  'Ya enviaste un comprobante para este mes. Si envías otro, reemplaza al anterior.';
 
 /** "2026-10-01T00:00:00.000Z" o "2026-10-01" → "2026-10-01". */
 export function diaDePeriodo(periodo: string): string {

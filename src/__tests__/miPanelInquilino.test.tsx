@@ -12,6 +12,7 @@ import type {
   PanelContratoInquilino,
 } from '../api/inquilino';
 import type { SolicitudInquilino } from '../api/mantenimiento';
+import { Boton } from '../componentes/Boton';
 import { ContratoSeleccionadoProvider } from '../inquilino/ContratoSeleccionado';
 import { crearToken } from '../pruebas/crearToken';
 import { botonDe, hayBoton, renderizarPantalla, textosDe } from '../pruebas/pantallas';
@@ -242,6 +243,52 @@ describe('Mi panel ACTIVO: bloques y orden', () => {
     });
     const raiz = await montar();
     expect(todo(raiz)).toContain('Vence hoy');
+  });
+
+  it('R4-A: período EN_REVISION, sin plazo (ni rojo ni "Faltan"), "En revisión" y "Reemplazar comprobante" secundario', async () => {
+    programar({
+      '/inquilino/contratos/c1/panel': {
+        ...PANEL,
+        proximo_periodo: {
+          periodo: '2026-09-01T00:00:00.000Z',
+          fecha_limite: '2026-09-05T00:00:00.000Z',
+          monto_centavos: 185_000_000,
+          estado: 'EN_REVISION',
+        },
+      },
+    });
+    const raiz = await montar();
+    const t = todo(raiz);
+    expect(t).not.toMatch(/Vencido hace|Faltan|Falta 1 día|Vence hoy/);
+    expect(t).toContain('En revisión');
+    expect(t).toContain('Tu comprobante está en revisión');
+    expect(hayBoton(raiz, 'Reportar pago')).toBe(false);
+    const boton = raiz.root
+      .findAllByType(Boton)
+      .find((b) => b.props.titulo === 'Reemplazar comprobante');
+    expect(boton?.props.variante).toBe('secundario');
+    await pulsar(raiz, 'Reemplazar comprobante');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/reportar-pago',
+      params: { contratoId: 'c1' },
+    });
+  });
+
+  it('R4-A: período PARCIAL conserva el plazo, el chip "Parcial" y "Reportar pago" primario', async () => {
+    programar({
+      '/inquilino/contratos/c1/panel': {
+        ...PANEL,
+        proximo_periodo: { ...PANEL.proximo_periodo!, estado: 'PARCIAL' },
+      },
+    });
+    const raiz = await montar();
+    const t = todo(raiz);
+    expect(t).toContain('Faltan 3 días');
+    expect(t).toContain('Parcial');
+    expect(t).not.toContain('Tu comprobante está en revisión');
+    const boton = raiz.root.findAllByType(Boton).find((b) => b.props.titulo === 'Reportar pago');
+    expect(boton?.props.variante).toBe('acento');
+    expect(hayBoton(raiz, 'Reemplazar comprobante')).toBe(false);
   });
 
   it('con períodos vencidos: chip "Vencido hace N días" y la línea de alerta con el total del servidor', async () => {

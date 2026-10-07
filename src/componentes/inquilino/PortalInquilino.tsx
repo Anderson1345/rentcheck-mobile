@@ -28,7 +28,7 @@ import {
 import { useMisSolicitudes } from '../../consultas/mantenimiento';
 import { claveCachePortada } from '../../inmuebles/claveImagen';
 import { useContratoSeleccionado } from '../../inquilino/ContratoSeleccionado';
-import { descripcionContrato, mensajeFinalizado, variantePanel } from '../../inquilino/seleccion';
+import { mensajeFinalizado, variantePanel } from '../../inquilino/seleccion';
 import { useVincularPendiente } from '../../sesion/useVincularPendiente';
 import { blancoAlfa, colores, espaciado, radios, tintaAlfa } from '../../tema';
 import { formatearFechaAbreviada, formatearFechaLarga } from '../../utilidades/fechas';
@@ -84,32 +84,9 @@ export function ContratoNoEncontrado({
   );
 }
 
-/** Cabecera tocable de Mi panel: unidad · dirección y estado; abre "Mis contratos". */
-export function SelectorContrato({ contrato }: { contrato: ContratoInquilinoResumen }) {
-  const router = useRouter();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`Cambiar de contrato. ${descripcionContrato(contrato)}`}
-      onPress={() => router.push('/mis-contratos')}
-      style={({ pressed }) => [estilos.selector, pressed && estilos.selectorPresionado]}
-    >
-      <View style={estilos.selectorTextos}>
-        <Texto variante="cuerpoFuerte" color={colores.sobreTinta} numberOfLines={2}>
-          {descripcionContrato(contrato)}
-        </Texto>
-        <View style={estilos.chips}>
-          <ChipEstado tipo="contrato" estado={contrato.estado} sobre="tinta" />
-        </View>
-      </View>
-      <Icono nombre="adelante" tamano={20} color={blancoAlfa(0.64)} grosor={1.8} />
-    </Pressable>
-  );
-}
-
 /**
- * Píldora de la cabecera de Mi panel (R3-B): "inmueble · unidad" con el punto lima; abre "Mis contratos"
- * para cambiar de contrato o agregar otro. Pagos y Solicitudes siguen con SelectorContrato (R4).
+ * Píldora de la cabecera de Mi panel, Pagos y Solicitudes (R3-B, R4-A): "inmueble · unidad" con el punto
+ * lima; abre "Mis contratos" para cambiar de contrato o agregar otro.
  */
 export function PildoraContrato({ contrato }: { contrato: ContratoInquilinoResumen }) {
   const router = useRouter();
@@ -409,17 +386,6 @@ const estilos = StyleSheet.create({
   tarjeta: { gap: espaciado.xs },
   esqueleto: { gap: espaciado.lg },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: espaciado.xs },
-  selector: {
-    minHeight: 56,
-    marginTop: espaciado.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: espaciado.sm,
-    paddingHorizontal: espaciado.md,
-    paddingVertical: espaciado.sm,
-    borderRadius: radios.grande,
-    backgroundColor: blancoAlfa(0.1),
-  },
   selectorPresionado: { backgroundColor: blancoAlfa(0.16) },
   pildora: {
     minHeight: 44,
@@ -438,7 +404,6 @@ const estilos = StyleSheet.create({
   puntoLima: { width: 8, height: 8, borderRadius: 4, backgroundColor: colores.lima },
   textoPildora: { flexShrink: 1 },
   abajo: { transform: [{ rotate: '90deg' }] },
-  selectorTextos: { flex: 1, gap: 6 },
   cuadricula: { flexDirection: 'row', flexWrap: 'wrap', gap: espaciado.sm },
   foto: { width: '48%', gap: 4 },
   imagen: { width: '100%', aspectRatio: 4 / 3, borderRadius: radios.medio },

@@ -108,3 +108,24 @@ export function textoSolicitud(
 ): string {
   return `Urgencia ${URGENCIAS[urgencia].etiqueta.toLowerCase()} · ${textoHace(creadoEn, ahora)}`;
 }
+
+/**
+ * La tarjeta del período según su estado (R4-A). Con un comprobante EN_REVISION no se muestra plazo
+ * (ni "Faltan N días" ni "Vencido" en rojo): el pago ya se reportó y el arrendador lo revisa; la acción
+ * pasa a "Reemplazar comprobante" (secundaria, misma ruta). Los demás estados conservan el plazo y
+ * "Reportar pago" como acción principal.
+ */
+export function accionDePeriodo(estado: PeriodoCuenta['estado']): {
+  conPlazo: boolean;
+  nota: string | null;
+  boton: { titulo: string; variante: 'acento' | 'secundario' };
+} {
+  if (estado === 'EN_REVISION') {
+    return {
+      conPlazo: false,
+      nota: 'Tu comprobante está en revisión',
+      boton: { titulo: 'Reemplazar comprobante', variante: 'secundario' },
+    };
+  }
+  return { conPlazo: true, nota: null, boton: { titulo: 'Reportar pago', variante: 'acento' } };
+}

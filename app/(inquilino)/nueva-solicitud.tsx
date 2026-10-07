@@ -29,7 +29,8 @@ import type { AdjuntoElegido } from '@/utilidades/adjuntoSolicitud';
 
 // Pantalla de pila propia (necesita todo el ancho y el teclado; dos grupos de rutas no pueden
 // compartir URL). La unidad sale del contrato seleccionado (`unidad.id`): nunca se le pide a la
-// persona. Sin confirmación previa: no es una acción de dinero ni legal.
+// persona. Sin confirmación previa: no es una acción de dinero ni legal. R4-A: etiquetas fuera de la
+// caja y "Enviar solicitud" (con el progreso y "Cancelar envío") en la barra fija.
 export default function NuevaSolicitud() {
   const router = useRouter();
   const { lista, contrato } = useContratoSeleccionado();
@@ -66,7 +67,7 @@ export default function NuevaSolicitud() {
       </EstadoMensaje>
     );
   } else {
-    cuerpo = <Formulario contrato={contrato} onListo={volver} />;
+    return <Formulario contrato={contrato} onListo={volver} />;
   }
 
   return <PantallaPila>{cuerpo}</PantallaPila>;
@@ -103,71 +104,21 @@ function Formulario({
 
   if (envio.fase === 'exito') {
     return (
-      <View style={estilos.grupo}>
-        <Aviso tono="exito" mensaje="Solicitud enviada. Tu arrendador la verá en su lista." />
-        <Boton titulo="Volver a Solicitudes" ancho="completo" onPress={onListo} />
-      </View>
+      <PantallaPila>
+        <View style={estilos.grupo}>
+          <Aviso tono="exito" mensaje="Solicitud enviada. Tu arrendador la verá en su lista." />
+          <Boton titulo="Volver a Solicitudes" ancho="completo" onPress={onListo} />
+        </View>
+      </PantallaPila>
     );
   }
 
-  return (
-    <View style={estilos.grupo}>
-      <Texto variante="cuerpoFuerte">{descripcionContrato(contrato)}</Texto>
-
-      <View style={estilos.campo}>
-        <Texto variante="etiqueta" color={colores.textoSecundario}>
-          ¿Qué necesita arreglo?
-        </Texto>
-        <TextInput
-          accessibilityLabel="Descripción"
-          value={descripcion}
-          onChangeText={setDescripcion}
-          editable={!enviando}
-          multiline
-          textAlignVertical="top"
-          placeholder="Cuéntale a tu arrendador qué pasa y dónde."
-          placeholderTextColor={colores.textoSecundario}
-          cursorColor={colores.tintaCapa}
-          selectionColor={colores.lima}
-          style={[tipografia.cuerpo, estilos.entrada, errorDescripcion ? estilos.conError : null]}
-        />
-        <Texto
-          variante="secundario"
-          color={errorDescripcion ? colores.peligroTexto : colores.textoSecundario}
-        >
-          {errorDescripcion ?? `${descripcion.trim().length} / ${MAXIMO_DESCRIPCION}`}
-        </Texto>
-      </View>
-
-      <View style={estilos.campo}>
-        <Texto variante="etiqueta" color={colores.textoSecundario}>
-          Urgencia
-        </Texto>
-        <ControlSegmentado
-          opciones={OPCIONES_URGENCIA.map((o) => ({ valor: o.valor, etiqueta: o.etiqueta }))}
-          valor={urgencia}
-          onCambio={setUrgencia}
-        />
-        {ayudaUrgencia ? (
-          <Texto variante="secundario" color={colores.textoSecundario}>
-            {ayudaUrgencia}
-          </Texto>
-        ) : null}
-      </View>
-
-      <View style={estilos.campo}>
-        <Texto variante="etiqueta" color={colores.textoSecundario}>
-          Adjunto (opcional)
-        </Texto>
-        <Texto variante="secundario" color={colores.textoSecundario}>
-          Una foto o un video MP4 de hasta 20 MB. Los videos cortos suben más rápido.
-        </Texto>
-        <SelectorAdjunto valor={adjunto} onCambio={setAdjunto} deshabilitado={enviando} />
-      </View>
-
+  // El botón principal queda fijo abajo (maqueta Formulario); el error, el progreso y "Cancelar envío"
+  // van con él.
+  const accionFija = (
+    <View style={estilos.campo}>
       {envio.cancelado ? <Aviso tono="informacion" mensaje="Envío cancelado." /> : null}
       {envio.error ? <Aviso mensaje={envio.error} /> : null}
-
       {enviando && envio.progreso !== null ? <Progreso fraccion={envio.progreso} /> : null}
       <Boton
         titulo="Enviar solicitud"
@@ -187,6 +138,65 @@ function Formulario({
         />
       ) : null}
     </View>
+  );
+
+  return (
+    <PantallaPila accionFija={accionFija}>
+      <View style={estilos.formulario}>
+        <Texto variante="cuerpoFuerte">{descripcionContrato(contrato)}</Texto>
+
+        <View style={estilos.campo}>
+          <Texto variante="etiqueta" color={colores.textoFuerte}>
+            ¿Qué necesita arreglo?
+          </Texto>
+          <TextInput
+            accessibilityLabel="Descripción"
+            value={descripcion}
+            onChangeText={setDescripcion}
+            editable={!enviando}
+            multiline
+            textAlignVertical="top"
+            placeholder="Cuéntale a tu arrendador qué pasa y dónde."
+            placeholderTextColor={colores.textoSecundario}
+            cursorColor={colores.tintaCapa}
+            selectionColor={colores.lima}
+            style={[tipografia.cuerpo, estilos.entrada, errorDescripcion ? estilos.conError : null]}
+          />
+          <Texto
+            variante="secundario"
+            color={errorDescripcion ? colores.peligroTexto : colores.textoSecundario}
+          >
+            {errorDescripcion ?? `${descripcion.trim().length} / ${MAXIMO_DESCRIPCION}`}
+          </Texto>
+        </View>
+
+        <View style={estilos.campo}>
+          <Texto variante="etiqueta" color={colores.textoFuerte}>
+            Urgencia
+          </Texto>
+          <ControlSegmentado
+            opciones={OPCIONES_URGENCIA.map((o) => ({ valor: o.valor, etiqueta: o.etiqueta }))}
+            valor={urgencia}
+            onCambio={setUrgencia}
+          />
+          {ayudaUrgencia ? (
+            <Texto variante="secundario" color={colores.textoSecundario}>
+              {ayudaUrgencia}
+            </Texto>
+          ) : null}
+        </View>
+
+        <View style={estilos.campo}>
+          <Texto variante="etiqueta" color={colores.textoFuerte}>
+            Adjunto (opcional)
+          </Texto>
+          <Texto variante="secundario" color={colores.textoSecundario}>
+            Una foto o un video MP4 de hasta 20 MB. Los videos cortos suben más rápido.
+          </Texto>
+          <SelectorAdjunto valor={adjunto} onCambio={setAdjunto} deshabilitado={enviando} />
+        </View>
+      </View>
+    </PantallaPila>
   );
 }
 
@@ -210,12 +220,16 @@ function Progreso({ fraccion }: { fraccion: number }) {
 
 const estilos = StyleSheet.create({
   grupo: { gap: espaciado.md },
+  formulario: { gap: espaciado.xl },
   campo: { gap: espaciado.xs },
+  // La caja del campo de texto del sistema (CampoTexto), en varias líneas.
   entrada: {
     minHeight: 120,
     padding: espaciado.md,
     borderRadius: radios.medio,
-    backgroundColor: tintaAlfa(0.05),
+    borderWidth: 1,
+    borderColor: tintaAlfa(0.14),
+    backgroundColor: colores.superficie,
     color: colores.texto,
   },
   conError: { boxShadow: `0 0 0 2px ${colores.peligroTexto}` },

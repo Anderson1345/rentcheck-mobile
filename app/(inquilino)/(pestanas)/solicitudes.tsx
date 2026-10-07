@@ -8,7 +8,7 @@ import { Boton } from '@/componentes/Boton';
 import { CabeceraTinta, ContenidoBajoCabecera, TituloCabecera } from '@/componentes/CabeceraTinta';
 import { EsqueletoCarga } from '@/componentes/EsqueletoCarga';
 import { EstadoMensaje } from '@/componentes/EstadoMensaje';
-import { ErrorConReintento, SelectorContrato } from '@/componentes/inquilino/PortalInquilino';
+import { ErrorConReintento, PildoraContrato } from '@/componentes/inquilino/PortalInquilino';
 import { ListaSolicitudes } from '@/componentes/mantenimiento/ListaSolicitudes';
 import { useRefrescarAlEnfocar } from '@/consultas/enfoque';
 import { clavesInquilino } from '@/consultas/inquilino';
@@ -39,7 +39,7 @@ export default function SolicitudesInquilino() {
     <View style={estilos.pantalla}>
       <CabeceraTinta conSolapa>
         <TituloCabecera titulo="Solicitudes" />
-        {contrato ? <SelectorContrato contrato={contrato} /> : null}
+        {contrato ? <PildoraContrato contrato={contrato} /> : null}
       </CabeceraTinta>
       <ContenidoBajoCabecera style={estilos.cuerpo}>
         <ScrollView
