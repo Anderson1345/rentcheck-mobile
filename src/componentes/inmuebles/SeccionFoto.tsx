@@ -7,6 +7,7 @@ import { Aviso } from '../Aviso';
 import { Boton } from '../Boton';
 import type { NombreIcono } from '../iconos/Icono';
 import { DetalleTecnico } from '../DetalleTecnico';
+import { EncabezadoSeccion } from '../EncabezadoSeccion';
 import { Superficie } from '../Superficie';
 import { Texto } from '../Texto';
 import { OpcionesFoto } from './OpcionesFoto';
@@ -22,16 +23,23 @@ interface Props {
   cachePolicy?: 'memory' | 'memory-disk';
   icono?: NombreIcono;
   descripcion: string;
-  subida: ReturnType<typeof useSubidaFoto>;
+  /** Sin subida (crear inmueble, R4-E): la foto se queda local y el padre la sube después. */
+  subida?: ReturnType<typeof useSubidaFoto>;
   /** Se llama con cada foto elegida (el padre decide cómo subirla). */
   onElegida: (foto: ArchivoFoto) => void;
   alFallarUrl?: () => void;
   nota?: string;
+  /** "Quitar foto" (solo una foto local que aún no se sube). */
+  onQuitar?: () => void;
+  /** Sin foto todavía: las opciones de Cámara y Galería a la vista, sin el marcador vacío. */
+  elegirSinFoto?: boolean;
+  deshabilitado?: boolean;
 }
 
 /**
- * Foto con vista previa y "Cambiar foto": portada de la unidad y foto de la cédula. Mientras sube se
- * ve la foto local; si falla, mensaje en español, "Detalle técnico" y Reintentar.
+ * Foto con vista previa ampliable y "Cambiar foto": portada de la unidad, foto de la cédula y (R4-E) la
+ * portada al crear un inmueble. Mientras sube se ve la foto local; si falla, mensaje en español,
+ * "Detalle técnico" y Reintentar.
  */
 export function SeccionFoto({
   titulo,
@@ -44,15 +52,35 @@ export function SeccionFoto({
   onElegida,
   alFallarUrl,
   nota,
+  onQuitar,
+  elegirSinFoto = false,
+  deshabilitado = false,
 }: Props) {
   const [verOpciones, setVerOpciones] = useState(false);
+  const vista = subida?.pendiente?.uri ?? url;
+  const ocupado = deshabilitado || subida?.subiendo === true;
+  const opciones = (
+    <OpcionesFoto
+      onElegida={(foto) => {
+        onElegida(foto);
+        setVerOpciones(false);
+      }}
+      deshabilitado={ocupado}
+    />
+  );
+  if (elegirSinFoto && vista === null) {
+    return (
+      <View style={estilos.grupo}>
+        <EncabezadoSeccion titulo={titulo} />
+        {opciones}
+      </View>
+    );
+  }
   return (
     <View style={estilos.grupo}>
-      <Texto variante="tituloSeccion" accessibilityRole="header">
-        {titulo}
-      </Texto>
+      <EncabezadoSeccion titulo={titulo} />
       <PortadaInmueble
-        url={subida.pendiente?.uri ?? url}
+        url={vista}
         variante="grande"
         inmuebleId={claveCache}
         cachePolicy={cachePolicy}
@@ -66,12 +94,12 @@ export function SeccionFoto({
           {nota}
         </Texto>
       ) : null}
-      {subida.subiendo ? (
+      {subida?.subiendo ? (
         <Texto variante="secundario" color={colores.textoSecundario}>
           Subiendo foto…
         </Texto>
       ) : null}
-      {subida.error && subida.pendiente ? (
+      {subida?.error && subida.pendiente ? (
         <View style={estilos.grupo}>
           <Aviso mensaje={subida.error.mensaje} />
           <DetalleTecnico detalle={subida.error.detalle} />
@@ -91,16 +119,15 @@ export function SeccionFoto({
         ancho="completo"
         onPress={() => setVerOpciones((visible) => !visible)}
       />
-      {verOpciones ? (
-        <Superficie>
-          <OpcionesFoto
-            onElegida={(foto) => {
-              onElegida(foto);
-              setVerOpciones(false);
-            }}
-            deshabilitado={subida.subiendo}
-          />
-        </Superficie>
+      {verOpciones ? <Superficie>{opciones}</Superficie> : null}
+      {onQuitar ? (
+        <Boton
+          titulo="Quitar foto"
+          variante="secundario"
+          ancho="completo"
+          deshabilitado={ocupado}
+          onPress={onQuitar}
+        />
       ) : null}
     </View>
   );

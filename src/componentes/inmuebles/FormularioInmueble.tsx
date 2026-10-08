@@ -17,9 +17,10 @@ import { Aviso } from '../Aviso';
 import { Boton } from '../Boton';
 import { CampoTexto } from '../CampoTexto';
 import { ControlSegmentado } from '../ControlSegmentado';
+import { EncabezadoSeccion } from '../EncabezadoSeccion';
+import { PantallaPila } from '../PantallaPila';
 import { Texto } from '../Texto';
-import { OpcionesFoto } from './OpcionesFoto';
-import { PortadaInmueble } from './PortadaInmueble';
+import { SeccionFoto } from './SeccionFoto';
 import { SelectorEstrato } from './SelectorEstrato';
 
 const OPCIONES_USO = [
@@ -46,6 +47,8 @@ type Valores = DatosFormularioEditar & { uso_unidad_principal: UsoPermitido };
 /**
  * Formulario de crear y de editar inmueble: dirección, ciudad y matrícula (obligatorias,
  * recortadas), estrato 1 a 6 y, al crear, el uso de la unidad principal y la foto de portada.
+ * R4-E: pone su propia pantalla, con secciones (EncabezadoSeccion), la foto en SeccionFoto (vista previa
+ * ampliable; se sube después de crear, fuera de la creación) y el botón principal en la barra fija.
  */
 export function FormularioInmueble(props: Props) {
   const crear = props.modo === 'crear';
@@ -107,144 +110,140 @@ export function FormularioInmueble(props: Props) {
     }
   }
 
+  const boton = (
+    <Boton
+      titulo={crear ? 'Crear inmueble' : 'Guardar cambios'}
+      tituloCargando={crear ? 'Creando inmueble…' : 'Guardando…'}
+      cargando={isSubmitting}
+      ancho="completo"
+      onPress={() => void enviar()}
+    />
+  );
+
   return (
-    <View style={estilos.formulario}>
+    <PantallaPila accionFija={boton}>
       {errorServidor ? <Aviso mensaje={errorServidor} /> : null}
       {avisoSinCambios ? <Aviso mensaje="No hiciste ningún cambio." tono="informacion" /> : null}
 
-      <Controller
-        control={control}
-        name="direccion"
-        render={({ field }) => (
-          <CampoTexto
-            etiqueta="Dirección"
-            valor={field.value}
-            onCambio={field.onChange}
-            onBlur={field.onBlur}
-            error={errors.direccion?.message}
-            keyboardType="default"
-            autoCapitalize="words"
-            autoComplete="street-address"
-            returnKeyType="next"
-            onSubmitEditing={() => ciudad.current?.focus()}
-          />
-        )}
-      />
-      <Controller
-        control={control}
-        name="ciudad"
-        render={({ field }) => (
-          <CampoTexto
-            etiqueta="Ciudad"
-            valor={field.value}
-            onCambio={field.onChange}
-            onBlur={field.onBlur}
-            error={errors.ciudad?.message}
-            inputRef={ciudad}
-            keyboardType="default"
-            autoCapitalize="words"
-            returnKeyType="next"
-            onSubmitEditing={() => matricula.current?.focus()}
-          />
-        )}
-      />
-      <Controller
-        control={control}
-        name="matricula_inmobiliaria"
-        render={({ field }) => (
-          <CampoTexto
-            etiqueta="Matrícula inmobiliaria"
-            valor={field.value}
-            onCambio={field.onChange}
-            onBlur={field.onBlur}
-            error={errors.matricula_inmobiliaria?.message}
-            inputRef={matricula}
-            keyboardType="default"
-            autoCapitalize="characters"
-            returnKeyType="done"
-            onSubmitEditing={() => void enviar()}
-          />
-        )}
-      />
-
-      {crear ? (
-        <View style={estilos.grupo}>
-          <Texto variante="etiqueta" color={colores.textoFuerte}>
-            Uso de la unidad principal
-          </Texto>
-          <Controller
-            control={control}
-            name="uso_unidad_principal"
-            render={({ field }) => (
-              <ControlSegmentado
-                opciones={OPCIONES_USO}
-                valor={field.value}
-                onCambio={field.onChange}
-              />
-            )}
-          />
-        </View>
-      ) : null}
-
-      {verEstrato ? (
+      <View style={estilos.seccion}>
+        <EncabezadoSeccion titulo="Datos del inmueble" />
         <Controller
           control={control}
-          name="estrato"
+          name="direccion"
           render={({ field }) => (
-            <View style={estilos.grupo}>
-              <SelectorEstrato
-                valor={field.value}
-                onCambio={field.onChange}
-                error={errors.estrato?.message}
-              />
-              {!crear && field.value !== null ? (
-                <Boton
-                  titulo="Quitar estrato"
-                  variante="secundario"
-                  onPress={() => field.onChange(null)}
-                />
-              ) : null}
-            </View>
+            <CampoTexto
+              etiqueta="Dirección"
+              valor={field.value}
+              onCambio={field.onChange}
+              onBlur={field.onBlur}
+              error={errors.direccion?.message}
+              keyboardType="default"
+              autoCapitalize="words"
+              autoComplete="street-address"
+              returnKeyType="next"
+              onSubmitEditing={() => ciudad.current?.focus()}
+            />
           )}
         />
-      ) : null}
+        <Controller
+          control={control}
+          name="ciudad"
+          render={({ field }) => (
+            <CampoTexto
+              etiqueta="Ciudad"
+              valor={field.value}
+              onCambio={field.onChange}
+              onBlur={field.onBlur}
+              error={errors.ciudad?.message}
+              inputRef={ciudad}
+              keyboardType="default"
+              autoCapitalize="words"
+              returnKeyType="next"
+              onSubmitEditing={() => matricula.current?.focus()}
+            />
+          )}
+        />
+        <Controller
+          control={control}
+          name="matricula_inmobiliaria"
+          render={({ field }) => (
+            <CampoTexto
+              etiqueta="Matrícula inmobiliaria"
+              valor={field.value}
+              onCambio={field.onChange}
+              onBlur={field.onBlur}
+              error={errors.matricula_inmobiliaria?.message}
+              inputRef={matricula}
+              keyboardType="default"
+              autoCapitalize="characters"
+              returnKeyType="done"
+              onSubmitEditing={() => void enviar()}
+            />
+          )}
+        />
+      </View>
+
+      <View style={estilos.seccion}>
+        <EncabezadoSeccion titulo={crear ? 'Uso y estrato' : 'Estrato'} />
+        {crear ? (
+          <View style={estilos.grupo}>
+            <Texto variante="etiqueta" color={colores.textoFuerte}>
+              Uso de la unidad principal
+            </Texto>
+            <Controller
+              control={control}
+              name="uso_unidad_principal"
+              render={({ field }) => (
+                <ControlSegmentado
+                  opciones={OPCIONES_USO}
+                  valor={field.value}
+                  onCambio={field.onChange}
+                />
+              )}
+            />
+          </View>
+        ) : null}
+
+        {verEstrato ? (
+          <Controller
+            control={control}
+            name="estrato"
+            render={({ field }) => (
+              <View style={estilos.grupo}>
+                <SelectorEstrato
+                  valor={field.value}
+                  onCambio={field.onChange}
+                  error={errors.estrato?.message}
+                />
+                {!crear && field.value !== null ? (
+                  <Boton
+                    titulo="Quitar estrato"
+                    variante="secundario"
+                    onPress={() => field.onChange(null)}
+                  />
+                ) : null}
+              </View>
+            )}
+          />
+        ) : null}
+      </View>
 
       {crear ? (
-        <View style={estilos.grupo}>
-          <Texto variante="etiqueta" color={colores.textoFuerte}>
-            Foto de portada (opcional)
-          </Texto>
-          {foto ? (
-            <>
-              <PortadaInmueble
-                url={foto.uri}
-                variante="grande"
-                descripcion="Vista previa de la foto de portada"
-              />
-              <Boton
-                titulo="Quitar foto"
-                variante="secundario"
-                ancho="completo"
-                onPress={() => setFoto(null)}
-              />
-            </>
-          ) : null}
-          <OpcionesFoto onElegida={setFoto} deshabilitado={isSubmitting} />
-        </View>
+        <SeccionFoto
+          titulo="Foto de portada (opcional)"
+          url={foto?.uri ?? null}
+          descripcion="Vista previa de la foto de portada"
+          onElegida={setFoto}
+          onQuitar={foto ? () => setFoto(null) : undefined}
+          elegirSinFoto
+          deshabilitado={isSubmitting}
+        />
       ) : null}
-
-      <Boton
-        titulo={crear ? 'Crear inmueble' : 'Guardar cambios'}
-        tituloCargando={crear ? 'Creando inmueble…' : 'Guardando…'}
-        cargando={isSubmitting}
-        ancho="completo"
-        onPress={() => void enviar()}
-      />
-    </View>
+    </PantallaPila>
   );
 }
 
 const estilos = StyleSheet.create({
-  formulario: { gap: espaciado.md },
+  seccion: { gap: espaciado.md },
   grupo: { gap: espaciado.xs },
 });

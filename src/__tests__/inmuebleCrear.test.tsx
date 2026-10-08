@@ -376,3 +376,37 @@ describe('Crear inmueble: foto de portada', () => {
     expect(mockSubir).not.toHaveBeenCalled();
   });
 });
+
+/** R4-E: el botón vive en la barra fija, no en el contenido que se desplaza. */
+const enBarraFija = (raiz: Raiz, titulo: string) => {
+  const barras = raiz.root.findAll((n) => n.props.testID === 'accion-fija');
+  if (barras.length === 0) return false;
+  const desplazable = raiz.root.findAll((n) => n.props.keyboardShouldPersistTaps === 'handled')[0];
+  const tiene = (n: (typeof barras)[number]) =>
+    n.findAll((h) => h.props.children === titulo).length > 0;
+  return tiene(barras[0]) && !tiene(desplazable);
+};
+const encabezadosDe = (raiz: Raiz) =>
+  raiz.root
+    .findAll((n) => n.props.accessibilityRole === 'header' && typeof n.props.children === 'string')
+    .map((n) => n.props.children as string);
+
+describe('Crear inmueble: rediseño (R4-E)', () => {
+  it('secciones con encabezado y "Crear inmueble" en la barra fija', async () => {
+    const { raiz } = await renderizarPantalla(<Nuevo />);
+    expect(encabezadosDe(raiz)).toEqual(
+      expect.arrayContaining(['Datos del inmueble', 'Uso y estrato', 'Foto de portada (opcional)']),
+    );
+    expect(enBarraFija(raiz, 'Crear inmueble')).toBe(true);
+  });
+
+  it('la foto elegida se ve con SeccionFoto: vista previa ampliable, Cambiar foto y Quitar foto', async () => {
+    mockElegir.mockResolvedValue({ tipo: 'elegida', archivo: FOTO });
+    const { raiz } = await renderizarPantalla(<Nuevo />);
+    await pulsar(raiz, 'Elegir de la galería');
+    const vistas = raiz.root.findAll((n) => n.props.ampliable === true && n.props.url === FOTO.uri);
+    expect(vistas.length).toBeGreaterThan(0);
+    expect(hayBoton(raiz, 'Cambiar foto')).toBe(true);
+    expect(hayBoton(raiz, 'Quitar foto')).toBe(true);
+  });
+});
