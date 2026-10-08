@@ -79,6 +79,17 @@ const pulsar = async (raiz: Raiz, titulo: string) => {
 };
 const porEtiqueta = (raiz: Raiz, etiqueta: string) =>
   raiz.root.find((n) => n.props.accessibilityLabel === etiqueta && !!n.props.onPress);
+/** El botón vive en la barra fija, no en el contenido que se desplaza (R4-D). */
+const enBarraFija = (raiz: Raiz, titulo: string) => {
+  const barras = raiz.root.findAll((n) => n.props.testID === 'accion-fija');
+  if (barras.length === 0) return false;
+  const desplazable = raiz.root.findAll((n) => n.props.keyboardShouldPersistTaps === 'handled')[0];
+  const tiene = (n: (typeof barras)[number]) =>
+    n.findAll((h) => h.props.children === titulo).length > 0;
+  return tiene(barras[0]) && !tiene(desplazable);
+};
+const nativos = (raiz: Raiz, testID: string) =>
+  raiz.root.findAll((n) => typeof n.type === 'string' && n.props.testID === testID);
 const elegirZona = (raiz: Raiz, zona: string) =>
   act(async () => porEtiqueta(raiz, zona).props.onPress());
 
@@ -151,6 +162,53 @@ describe('Inventario: pantalla', () => {
     );
     await pulsar(raiz, 'Reintentar');
     expect(hayBoton(raiz, 'Terminar')).toBe(true);
+  });
+
+  it('R4-D: "Terminar" en la barra fija; con fotos por subir, "Subir fotos" también', async () => {
+    const { raiz } = await montar();
+    expect(enBarraFija(raiz, 'Terminar')).toBe(true);
+    expect(hayBoton(raiz, 'Subir fotos')).toBe(false);
+    await elegirZona(raiz, 'Sala');
+    await agregar(raiz, FOTOS[0]);
+    expect(enBarraFija(raiz, 'Subir fotos')).toBe(true);
+    expect(enBarraFija(raiz, 'Terminar')).toBe(true);
+  });
+
+  it('R4-D: las fotos por subir son filas de un mismo contenedor', async () => {
+    const { raiz } = await montar();
+    await elegirZona(raiz, 'Sala');
+    await agregar(raiz, FOTOS[0]);
+    await elegirZona(raiz, 'Cocina');
+    await agregar(raiz, FOTOS[1]);
+    const [cola] = nativos(raiz, 'cola-fotos');
+    const etiquetas = cola
+      .findAll((n) => typeof n.type === 'string' && n.props.accessibilityLiveRegion === 'polite')
+      .map((n) => n.props.accessibilityLabel);
+    expect(etiquetas).toEqual(['Sala, pendiente', 'Cocina, pendiente']);
+  });
+
+  it('R4-D: las fotos subidas se agrupan por zona, en cuadrícula ampliable', async () => {
+    lista = [
+      guardada(),
+      guardada({ id: 'f2', zona: 'Cocina', foto_url: 'https://b.test/2.jpg' }),
+      guardada({ id: 'f3', foto_url: 'https://b.test/3.jpg' }),
+    ];
+    const { raiz } = await montar();
+    const grupos = nativos(raiz, 'grupo-zona').map((g) => ({
+      zona: g.props.accessibilityLabel,
+      fotos: g.findAllByType(Image).length,
+    }));
+    expect(grupos).toEqual([
+      { zona: 'Sala, 2 fotos', fotos: 2 },
+      { zona: 'Cocina, 1 foto', fotos: 1 },
+    ]);
+    expect(
+      raiz.root.findAll(
+        (n) =>
+          String(n.props.accessibilityLabel ?? '').startsWith('Ampliar Foto de inventario') &&
+          typeof n.props.onPress === 'function',
+      ).length,
+    ).toBeGreaterThan(0);
   });
 
   it('"Terminar" siempre está disponible y vuelve atrás; sin fotos no pregunta nada', async () => {
