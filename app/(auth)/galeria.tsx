@@ -33,6 +33,7 @@ import { PESTANAS_ARRENDADOR, PESTANAS_INQUILINO } from '@/componentes/navegacio
 import { NavInferior } from '@/componentes/navegacion/NavInferior';
 import { PantallaConectando } from '@/componentes/PantallaConectando';
 import { Superficie } from '@/componentes/Superficie';
+import { SoloDesarrollo } from '@/componentes/SoloDesarrollo';
 import { Texto, type VarianteTexto } from '@/componentes/Texto';
 import { ImagenAmpliable } from '@/componentes/VisorImagen';
 import { blancoAlfa, colores, coloresEstado, espaciado, radios, sombras, tintaAlfa } from '@/tema';
@@ -205,7 +206,16 @@ function ChipsDeTipo({ tipo, sobre }: { tipo: TipoEstado; sobre?: 'claro' | 'tin
   );
 }
 
+// Solo en desarrollo (A1): fuera de él la ruta lleva a la entrada.
 export default function Galeria() {
+  return (
+    <SoloDesarrollo>
+      <PantallaGaleria />
+    </SoloDesarrollo>
+  );
+}
+
+function PantallaGaleria() {
   const router = useRouter();
   const { bottom } = useSafeAreaInsets();
   const [filtro, setFiltro] = useState<'validar' | 'vencidos' | 'historial'>('validar');

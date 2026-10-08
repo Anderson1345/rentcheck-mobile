@@ -9,6 +9,7 @@ import { Boton } from '@/componentes/Boton';
 import { CabeceraTinta, ContenidoBajoCabecera, TituloCabecera } from '@/componentes/CabeceraTinta';
 import { FilaLista } from '@/componentes/FilaLista';
 import { PantallaConectando } from '@/componentes/PantallaConectando';
+import { SoloDesarrollo } from '@/componentes/SoloDesarrollo';
 import { Superficie } from '@/componentes/Superficie';
 import { Texto } from '@/componentes/Texto';
 import { colores, coloresEstado, espaciado } from '@/tema';
@@ -27,7 +28,16 @@ function describirValor(valor: unknown): string {
   return String(valor);
 }
 
+// Solo en desarrollo (A1): fuera de él la ruta lleva a la entrada.
 export default function Diagnostico() {
+  return (
+    <SoloDesarrollo>
+      <PantallaDiagnostico />
+    </SoloDesarrollo>
+  );
+}
+
+function PantallaDiagnostico() {
   const router = useRouter();
   const { bottom } = useSafeAreaInsets();
   const consulta = useQuery({

@@ -5,6 +5,7 @@ import { CabeceraTinta, ContenidoBajoCabecera, TituloCabecera } from '@/componen
 import { EncabezadoSeccion } from '@/componentes/EncabezadoSeccion';
 import { FilaLista } from '@/componentes/FilaLista';
 import { Superficie } from '@/componentes/Superficie';
+import { VersionApp } from '@/componentes/VersionApp';
 import { useContratoSeleccionado } from '@/inquilino/ContratoSeleccionado';
 import { useSesion } from '@/sesion/SesionProvider';
 import { colores, espaciado } from '@/tema';
@@ -56,6 +57,7 @@ export default function MasInquilino() {
             />
           </Superficie>
         </View>
+        <VersionApp />
       </ContenidoBajoCabecera>
     </View>
   );

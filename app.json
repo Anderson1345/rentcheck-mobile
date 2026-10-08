@@ -10,6 +10,14 @@
     "android": {
       "package": "com.rentcheck.app",
       "allowBackup": false,
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.VIBRATE",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.READ_CONTACTS"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#0A1A1F",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

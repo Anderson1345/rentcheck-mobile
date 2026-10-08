@@ -39,3 +39,21 @@ npm run lint
 npm test
 npx expo-doctor
 ```
+
+## Generar el APK de demostración
+
+El APK se compila en la nube con EAS (perfil `preview`, `buildType: apk`). La URL del backend del APK
+sale de `eas.json` (`build.preview.env.EXPO_PUBLIC_API_URL`), **no** de `.env`: EAS respeta `.gitignore`
+y `.env` no llega a la compilación. En el APK, Diagnóstico y Galería no existen (solo en desarrollo).
+
+1. Instalar la CLI de EAS: `npm install -g eas-cli`
+2. Iniciar sesión con la cuenta de Expo: `eas login`
+3. Vincular el proyecto (una sola vez): `eas init`. Escribe `extra.eas.projectId` en `app.json`;
+   confirma ese cambio con un commit.
+4. Compilar: `eas build -p android --profile preview`. La primera vez, aceptar que EAS genere la
+   llave de Android (keystore) y la guarde.
+5. Descargar el APK desde el enlace que muestra EAS al terminar.
+6. En el teléfono, permitir "instalar apps de origen desconocido" para el navegador o el gestor de
+   archivos con el que se abra el APK, e instalarlo.
+
+La versión instalada se ve al final de "Más" ("RentCheck · versión 1.0.0").
