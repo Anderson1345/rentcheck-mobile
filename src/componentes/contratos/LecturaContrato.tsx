@@ -277,32 +277,44 @@ export function FilaPeriodo({
 /**
  * Estado de cuenta ya cargado: título, estado de pago y períodos. Los valores son los del servidor.
  * `accionDe` (inquilino, R4-B) pone una acción bajo los períodos que la tienen ("Reportar pago").
+ * `resumen` y `vacio` (arrendador, R4-E) reemplazan el encabezado y el texto sin períodos; el inquilino
+ * no los usa, así que su pantalla queda igual.
  */
 export function VistaEstadoCuenta({
   data,
   accionDe,
+  resumen,
+  vacio,
 }: {
   data: EstadoCuenta;
   accionDe?: (periodo: PeriodoCuenta) => ReactNode;
+  resumen?: ReactNode;
+  vacio?: ReactNode;
 }) {
   return (
     <>
-      <Superficie style={estilos.encabezado}>
-        <Texto variante="etiqueta" color={colores.textoSecundario}>
-          Estado de pago
-        </Texto>
-        <ChipEstado tipo="pagoContrato" estado={ESTADO_PAGO[data.estadoPago]} />
-      </Superficie>
-      {data.periodos.length === 0 ? (
-        <Texto variante="cuerpo" color={colores.textoSecundario}>
-          Este contrato aún no tiene períodos
-        </Texto>
-      ) : (
-        <Superficie relleno="ninguno">
-          {data.periodos.map((p, indice) => (
-            <FilaPeriodo key={p.periodo} p={p} separador={indice > 0} accion={accionDe?.(p)} />
-          ))}
+      {resumen ?? (
+        <Superficie style={estilos.encabezado}>
+          <Texto variante="etiqueta" color={colores.textoSecundario}>
+            Estado de pago
+          </Texto>
+          <ChipEstado tipo="pagoContrato" estado={ESTADO_PAGO[data.estadoPago]} />
         </Superficie>
+      )}
+      {data.periodos.length === 0 ? (
+        (vacio ?? (
+          <Texto variante="cuerpo" color={colores.textoSecundario}>
+            Este contrato aún no tiene períodos
+          </Texto>
+        ))
+      ) : (
+        <View testID="periodos-cuenta">
+          <Superficie relleno="ninguno">
+            {data.periodos.map((p, indice) => (
+              <FilaPeriodo key={p.periodo} p={p} separador={indice > 0} accion={accionDe?.(p)} />
+            ))}
+          </Superficie>
+        </View>
       )}
     </>
   );

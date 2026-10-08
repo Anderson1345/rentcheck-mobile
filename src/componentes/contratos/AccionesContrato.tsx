@@ -1,6 +1,8 @@
 // Piezas compartidas de las acciones sobre un contrato: confirmación, mensajes de una acción en curso,
 // opciones excluyentes y la carga del contrato para las pantallas de formulario. Las acciones del detalle
-// del arrendador viven en GestionarContrato (R2-B).
+// del arrendador viven en GestionarContrato (R2-B). R4-E: el resumen de lo que va a pasar (ResumenCambio)
+// y los estados "no encontrado" y "no disponible" de las pantallas de acción del arrendador.
+import { useRouter } from 'expo-router';
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
@@ -13,8 +15,11 @@ import { type FaseAccion, MENSAJE_VERIFICANDO } from '../../contratos/useAccionC
 import { colores, espaciado, radios, tintaAlfa } from '../../tema';
 import { Aviso } from '../Aviso';
 import { Boton } from '../Boton';
+import { EncabezadoSeccion } from '../EncabezadoSeccion';
 import { EsqueletoCarga } from '../EsqueletoCarga';
+import { EstadoMensaje } from '../EstadoMensaje';
 import { PantallaPila } from '../PantallaPila';
+import { Superficie } from '../Superficie';
 import { Texto } from '../Texto';
 
 /** Confirmación final con el resumen de lo que se hará (Alert nativo). */
@@ -67,6 +72,96 @@ export function MensajeAccion({
         </>
       ) : null}
     </>
+  );
+}
+
+/** Una fila del resumen: qué cambia y cómo queda ("Canon actual", "$ 1.000.000"). */
+export interface FilaCambio {
+  etiqueta: string;
+  /** Lo que se lee después de la etiqueta; en pantalla empieza con mayúscula. */
+  valor: string;
+}
+
+const conMayuscula = (texto: string) => texto.charAt(0).toUpperCase() + texto.slice(1);
+
+/**
+ * Resumen arriba de lo que va a pasar (R4-E): filas de un mismo contenedor, etiqueta a la izquierda y
+ * valor a la derecha. Solo muestra datos del contrato y lo que eligió la persona; lo que calcula el
+ * servidor (canon nuevo, nueva fecha de fin) se dice así, la app no lo calcula.
+ */
+export function ResumenCambio({
+  titulo = 'Qué va a pasar',
+  filas,
+}: {
+  titulo?: string;
+  filas: readonly FilaCambio[];
+}) {
+  return (
+    <View style={estilos.grupo}>
+      <EncabezadoSeccion titulo={titulo} />
+      <Superficie relleno="ninguno">
+        {filas.map((fila, indice) => (
+          <View
+            key={fila.etiqueta}
+            testID="fila-cambio"
+            accessible
+            accessibilityLabel={`${fila.etiqueta}: ${fila.valor}`}
+            style={[estilos.filaCambio, indice > 0 && estilos.conSeparador]}
+          >
+            <Texto variante="secundario" color={colores.textoSecundario} style={estilos.etiqueta}>
+              {fila.etiqueta}
+            </Texto>
+            <Texto variante="cuerpoFuerte" style={estilos.valor}>
+              {conMayuscula(fila.valor)}
+            </Texto>
+          </View>
+        ))}
+      </Superficie>
+    </View>
+  );
+}
+
+/** 404 de una pantalla de acción del arrendador: el contrato no existe o no es suyo. */
+export function NoEncontradoContrato() {
+  const router = useRouter();
+  return (
+    <EstadoMensaje
+      titulo="No encontrado"
+      mensaje="Este contrato no existe o no tienes acceso a él."
+    >
+      <Boton
+        titulo="Volver"
+        variante="acento"
+        ancho="completo"
+        onPress={() => {
+          if (router.canGoBack()) router.back();
+          else router.replace('/contratos-arrendador');
+        }}
+      />
+    </EstadoMensaje>
+  );
+}
+
+/**
+ * La acción no se ofrece porque el servidor no la permite (los mismos booleanos y estados con los que
+ * GestionarContrato decide qué fila mostrar): llegar por un enlace viejo no abre el formulario.
+ */
+export function AccionNoDisponible() {
+  const router = useRouter();
+  return (
+    <PantallaPila>
+      <EstadoMensaje
+        titulo="Esta acción no está disponible"
+        mensaje="El contrato cambió o su estado ya no la permite. Vuelve al contrato para ver qué puedes hacer."
+      >
+        <Boton
+          titulo="Volver al contrato"
+          variante="acento"
+          ancho="completo"
+          onPress={() => router.back()}
+        />
+      </EstadoMensaje>
+    </PantallaPila>
   );
 }
 
@@ -151,6 +246,17 @@ export function CargaContrato<D = ContratoDetalle>({
 
 const estilos = StyleSheet.create({
   grupo: { gap: espaciado.xs },
+  filaCambio: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: espaciado.sm,
+    minHeight: 52,
+    paddingHorizontal: espaciado.md,
+    paddingVertical: espaciado.sm,
+  },
+  conSeparador: { borderTopWidth: 1, borderTopColor: tintaAlfa(0.07) },
+  etiqueta: { flex: 1 },
+  valor: { flex: 1, textAlign: 'right' },
   opciones: { flexDirection: 'row', flexWrap: 'wrap', gap: espaciado.xs },
   opcion: {
     minHeight: 48,

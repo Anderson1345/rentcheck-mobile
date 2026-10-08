@@ -593,3 +593,50 @@ describe('Duplicar unidad (R2-A)', () => {
     expect(barra.findAll((n) => n.props.children === 'Crear unidad').length).toBeGreaterThan(0);
   });
 });
+
+/** R4-E: el botón vive en la barra fija, no en el contenido que se desplaza. */
+const enBarraFija = (raiz: Raiz, titulo: string) => {
+  const barras = raiz.root.findAll((n) => n.props.testID === 'accion-fija');
+  if (barras.length === 0) return false;
+  const desplazable = raiz.root.findAll((n) => n.props.keyboardShouldPersistTaps === 'handled')[0];
+  const tiene = (n: (typeof barras)[number]) =>
+    n.findAll((h) => h.props.children === titulo).length > 0;
+  return tiene(barras[0]) && !tiene(desplazable);
+};
+const encabezadosDe = (raiz: Raiz) =>
+  raiz.root
+    .findAll((n) => n.props.accessibilityRole === 'header' && typeof n.props.children === 'string')
+    .map((n) => n.props.children as string);
+
+describe('Formulario de unidad: rediseño (R4-E)', () => {
+  it('nueva: secciones con encabezado; Comercial oculta "Características"', async () => {
+    const { raiz } = await renderizarPantalla(<NuevaUnidad />);
+    await esperar();
+    expect(encabezadosDe(raiz)).toEqual(
+      expect.arrayContaining(['Datos de la unidad', 'Características']),
+    );
+    await tocar(raiz, 'Comercial');
+    expect(encabezadosDe(raiz)).not.toContain('Características');
+  });
+
+  it('editar: "Guardar cambios" en la barra fija, foto ampliable y eliminar siguen ahí', async () => {
+    mockParams = { id: 'i1', unidadId: 'u1' };
+    const { raiz } = await renderizarPantalla(<EditarUnidad />);
+    await esperar();
+    expect(enBarraFija(raiz, 'Guardar cambios')).toBe(true);
+    expect(encabezadosDe(raiz)).toEqual(
+      expect.arrayContaining(['Datos de la unidad', 'Foto de la unidad']),
+    );
+    expect(raiz.root.findAll((n) => n.props.ampliable === true).length).toBeGreaterThan(0);
+    expect(hayBoton(raiz, 'Eliminar unidad')).toBe(true);
+    expect(hayBoton(raiz, 'Duplicar unidad')).toBe(true);
+  });
+
+  it('editar sin cambios: no llama al servidor', async () => {
+    const { raiz } = await renderizarPantalla(<EditarUnidad />);
+    await esperar();
+    await pulsar(raiz, 'Guardar cambios');
+    await esperar();
+    expect(mockPatch).not.toHaveBeenCalled();
+  });
+});

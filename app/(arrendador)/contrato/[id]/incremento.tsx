@@ -7,14 +7,19 @@ import { Aviso } from '@/componentes/Aviso';
 import { Boton } from '@/componentes/Boton';
 import { CampoTexto } from '@/componentes/CampoTexto';
 import {
+  AccionNoDisponible,
   CargaContrato,
   confirmarAccion,
   MensajeAccion,
+  NoEncontradoContrato,
+  ResumenCambio,
 } from '@/componentes/contratos/AccionesContrato';
 import { ControlSegmentado } from '@/componentes/ControlSegmentado';
+import { EncabezadoSeccion } from '@/componentes/EncabezadoSeccion';
+import { PantallaPila } from '@/componentes/PantallaPila';
 import { Superficie } from '@/componentes/Superficie';
 import { Texto } from '@/componentes/Texto';
-import { formatearPorcentaje, parsearPorcentaje } from '@/contratos/acciones';
+import { accionesDisponibles, formatearPorcentaje, parsearPorcentaje } from '@/contratos/acciones';
 import { esPlantillaVivienda } from '@/contratos/plantilla';
 import { useAccionContrato } from '@/contratos/useAccionContrato';
 import { colores, espaciado } from '@/tema';
@@ -25,6 +30,20 @@ const OPCIONES = [
   { valor: 'otro', etiqueta: 'Otro porcentaje' },
 ] as const;
 
+/** Lo que dice la fila "Incremento" del resumen según lo elegido (sin calcular el canon nuevo). */
+function textoIncremento(modo: 'ipc' | 'otro', texto: string): string {
+  if (modo === 'ipc') return 'IPC del año anterior';
+  if (texto.trim() === '') return 'Escribe el porcentaje';
+  const resultado = parsearPorcentaje(texto);
+  return 'error' in resultado
+    ? 'Revisa el porcentaje'
+    : `${formatearPorcentaje(resultado.valor)} %`;
+}
+
+// Incremento anual (rediseño R4-E): arriba el resumen (canon actual, el incremento elegido y el canon
+// nuevo, que calcula el servidor), luego la opción y el porcentaje con la etiqueta afuera, los avisos de
+// siempre (períodos pagados con el canon anterior; el tope del IPC en vivienda) y "Aplicar incremento" en
+// la barra fija. Solo con el contrato ACTIVO, como en el detalle (accionesDisponibles).
 export default function IncrementoContrato() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -36,7 +55,7 @@ export default function IncrementoContrato() {
   const ocupado = accion.fase === 'enviando' || accion.fase === 'verificando';
 
   return (
-    <CargaContrato id={id}>
+    <CargaContrato id={id} sinMarco noEncontrado={() => <NoEncontradoContrato />}>
       {(contrato) => {
         if (accion.fase === 'exito') {
           const incremento = accion.resultado?.incremento_ipc;
@@ -44,7 +63,9 @@ export default function IncrementoContrato() {
           const nuevo = incremento?.canon_nuevo_centavos ?? accion.despues?.canon_centavos;
           const porcentaje = formatearPorcentaje(incremento?.porcentaje_ipc_aplicado);
           return (
-            <View style={estilos.grupo}>
+            <PantallaPila
+              accionFija={<Boton titulo="Listo" ancho="completo" onPress={() => router.back()} />}
+            >
               <Texto variante="titulo" accessibilityRole="header">
                 Incremento aplicado
               </Texto>
@@ -61,9 +82,13 @@ export default function IncrementoContrato() {
                   Se generó un otrosí: lo verás en los documentos del contrato.
                 </Texto>
               </Superficie>
-              <Boton titulo="Listo" ancho="completo" onPress={() => router.back()} />
-            </View>
+            </PantallaPila>
           );
+        }
+
+        // Antes de actuar, la pantalla solo se ofrece cuando el detalle la ofrecería.
+        if (accion.fase === 'inactivo' && !accionesDisponibles(contrato).incremento) {
+          return <AccionNoDisponible />;
         }
 
         const vivienda = esPlantillaVivienda(contrato.tipo_plantilla);
@@ -92,26 +117,50 @@ export default function IncrementoContrato() {
         }
 
         return (
-          <View style={estilos.grupo}>
-            <ControlSegmentado opciones={OPCIONES} valor={modo} onCambio={setModo} />
-            {modo === 'ipc' ? (
-              <Texto variante="cuerpo">IPC del año anterior (lo calcula el servidor)</Texto>
-            ) : (
-              <CampoTexto
-                etiqueta="Porcentaje"
-                valor={texto}
-                onCambio={setTexto}
-                error={errorLocal ?? undefined}
-                keyboardType="decimal-pad"
-                returnKeyType="done"
-                ayuda="Hasta 2 decimales, mayor que 0 y máximo 100."
-              />
-            )}
-            {vivienda ? (
-              <Texto variante="secundario" color={colores.textoSecundario}>
-                No puede superar el IPC del año anterior.
-              </Texto>
-            ) : null}
+          <PantallaPila
+            accionFija={
+              accion.fase === 'incierto' ? undefined : (
+                <Boton
+                  titulo="Aplicar incremento"
+                  tituloCargando="Aplicando…"
+                  cargando={ocupado}
+                  ancho="completo"
+                  onPress={aplicar}
+                />
+              )
+            }
+          >
+            <ResumenCambio
+              filas={[
+                { etiqueta: 'Canon actual', valor: centavosAPesosTexto(contrato.canon_centavos) },
+                { etiqueta: 'Incremento', valor: textoIncremento(modo, texto) },
+                { etiqueta: 'Canon nuevo', valor: 'lo calcula el servidor al aplicar' },
+              ]}
+            />
+
+            <View style={estilos.grupo}>
+              <EncabezadoSeccion titulo="Incremento" />
+              <ControlSegmentado opciones={OPCIONES} valor={modo} onCambio={setModo} />
+              {modo === 'ipc' ? (
+                <Texto variante="cuerpo">IPC del año anterior (lo calcula el servidor)</Texto>
+              ) : (
+                <CampoTexto
+                  etiqueta="Porcentaje"
+                  valor={texto}
+                  onCambio={setTexto}
+                  error={errorLocal ?? undefined}
+                  keyboardType="decimal-pad"
+                  returnKeyType="done"
+                  ayuda="Hasta 2 decimales, mayor que 0 y máximo 100."
+                />
+              )}
+              {vivienda ? (
+                <Texto variante="secundario" color={colores.textoSecundario}>
+                  No puede superar el IPC del año anterior.
+                </Texto>
+              ) : null}
+            </View>
+
             <Aviso
               tono="advertencia"
               mensaje="Los períodos futuros que ya estén pagados por adelantado con el canon anterior quedarán debiendo la diferencia."
@@ -123,16 +172,7 @@ export default function IncrementoContrato() {
               recargable={accion.recargable}
               onRecargar={() => void accion.recargar()}
             />
-            {accion.fase === 'incierto' ? null : (
-              <Boton
-                titulo="Aplicar incremento"
-                tituloCargando="Aplicando…"
-                cargando={ocupado}
-                ancho="completo"
-                onPress={aplicar}
-              />
-            )}
-          </View>
+          </PantallaPila>
         );
       }}
     </CargaContrato>

@@ -54,22 +54,21 @@ export default function EditarInmueble() {
     );
   }
 
+  // El formulario pone su propia pantalla, con "Guardar cambios" en la barra fija (R4-E).
   return (
-    <PantallaPila>
-      <FormularioInmueble
-        key={inmueble.id}
-        modo="editar"
-        valoresIniciales={{
-          direccion: inmueble.direccion,
-          ciudad: inmueble.ciudad,
-          matricula_inmobiliaria: inmueble.matricula_inmobiliaria,
-          estrato: inmueble.estrato,
-        }}
-        onGuardar={async (cambios) => {
-          await actualizar.mutateAsync(cambios);
-          volver();
-        }}
-      />
-    </PantallaPila>
+    <FormularioInmueble
+      key={inmueble.id}
+      modo="editar"
+      valoresIniciales={{
+        direccion: inmueble.direccion,
+        ciudad: inmueble.ciudad,
+        matricula_inmobiliaria: inmueble.matricula_inmobiliaria,
+        estrato: inmueble.estrato,
+      }}
+      onGuardar={async (cambios) => {
+        await actualizar.mutateAsync(cambios);
+        volver();
+      }}
+    />
   );
 }

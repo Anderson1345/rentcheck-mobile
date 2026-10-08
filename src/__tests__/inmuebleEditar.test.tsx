@@ -176,3 +176,34 @@ describe('Editar inmueble', () => {
     await esperar();
   });
 });
+
+/** R4-E: el botón vive en la barra fija, no en el contenido que se desplaza. */
+const enBarraFija = (raiz: Raiz, titulo: string) => {
+  const barras = raiz.root.findAll((n) => n.props.testID === 'accion-fija');
+  if (barras.length === 0) return false;
+  const desplazable = raiz.root.findAll((n) => n.props.keyboardShouldPersistTaps === 'handled')[0];
+  const tiene = (n: (typeof barras)[number]) =>
+    n.findAll((h) => h.props.children === titulo).length > 0;
+  return tiene(barras[0]) && !tiene(desplazable);
+};
+const encabezadosDe = (raiz: Raiz) =>
+  raiz.root
+    .findAll((n) => n.props.accessibilityRole === 'header' && typeof n.props.children === 'string')
+    .map((n) => n.props.children as string);
+
+describe('Editar inmueble: rediseño (R4-E)', () => {
+  it('secciones con encabezado y "Guardar cambios" en la barra fija', async () => {
+    const { raiz } = await renderizarPantalla(<Editar />);
+    await esperar();
+    expect(encabezadosDe(raiz)).toEqual(expect.arrayContaining(['Datos del inmueble', 'Estrato']));
+    expect(enBarraFija(raiz, 'Guardar cambios')).toBe(true);
+  });
+
+  it('sin cambios: no llama al servidor', async () => {
+    const { raiz } = await renderizarPantalla(<Editar />);
+    await esperar();
+    await guardar(raiz);
+    expect(mockPatch).not.toHaveBeenCalled();
+    expect(textosDe(raiz)).toContain('No hiciste ningún cambio.');
+  });
+});

@@ -27,6 +27,7 @@ import { CampoDinero } from '../CampoDinero';
 import { CampoTexto } from '../CampoTexto';
 import { ControlSegmentado } from '../ControlSegmentado';
 import { DetalleTecnico } from '../DetalleTecnico';
+import { EncabezadoSeccion } from '../EncabezadoSeccion';
 import { Texto } from '../Texto';
 import { SelectorTipoUnidad } from './SelectorTipoUnidad';
 
@@ -63,6 +64,7 @@ type Props = {
  * Formulario de unidad (crear y editar), con su propia pantalla: el formulario es largo, así que el botón
  * principal queda fijo abajo (`accionFija`). Residencial pide área, habitaciones, baños, ocupantes y
  * mascotas; Comercial los oculta (y no se envían). Dinero en centavos con CampoDinero.
+ * R4-E: secciones con EncabezadoSeccion ("Datos de la unidad" y, en residencial, "Características").
  */
 export function FormularioUnidad(props: Props) {
   const crear = props.modo === 'crear';
@@ -150,6 +152,7 @@ export function FormularioUnidad(props: Props) {
         ) : null}
         {sinCambios ? <Aviso mensaje="No hiciste ningún cambio." tono="informacion" /> : null}
 
+        <EncabezadoSeccion titulo="Datos de la unidad" />
         <Controller
           control={control}
           name="nombre"
@@ -230,6 +233,7 @@ export function FormularioUnidad(props: Props) {
 
         {residencial ? (
           <>
+            <EncabezadoSeccion titulo="Características" />
             <Controller
               control={control}
               name="area"
