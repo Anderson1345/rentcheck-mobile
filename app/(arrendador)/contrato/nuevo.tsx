@@ -399,17 +399,10 @@ export default function NuevoContrato() {
   ) as Partial<Record<keyof BorradorContrato, string>>;
   const ultimo = paso === TOTAL_PASOS - 1;
 
-  return (
-    <PantallaPila>
-      <View style={estilos.progreso}>
-        <Texto variante="etiqueta" color={colores.textoFuerte}>
-          {`Paso ${paso + 1} de ${TOTAL_PASOS} · ${TITULOS[paso]}`}
-        </Texto>
-        <View style={estilos.barra} accessibilityRole="progressbar">
-          <View style={[estilos.relleno, { width: `${((paso + 1) / TOTAL_PASOS) * 100}%` }]} />
-        </View>
-      </View>
-
+  // R4-D: la acción principal ("Siguiente" o "Confirmar y crear contrato"), "Atrás" y lo que respondió
+  // el servidor quedan en la barra fija, a la vista aunque el teclado esté abierto.
+  const accionFija = (
+    <View style={estilos.botones}>
       {error ? (
         <View style={estilos.error}>
           <Aviso mensaje={error.mensaje} />
@@ -420,6 +413,59 @@ export default function NuevoContrato() {
           ))}
         </View>
       ) : null}
+      {ultimo ? (
+        <>
+          <Boton
+            titulo="Confirmar y crear contrato"
+            tituloCargando="Creando contrato…"
+            cargando={enviando}
+            ancho="completo"
+            onPress={() => void confirmarYCrear()}
+          />
+          {incierto ? (
+            <Boton
+              titulo="Verificar si se creó"
+              variante="secundario"
+              ancho="completo"
+              deshabilitado={enviando}
+              onPress={() => void verificarOtraVez()}
+            />
+          ) : null}
+        </>
+      ) : (
+        <Boton titulo="Siguiente" ancho="completo" onPress={() => void siguiente()} />
+      )}
+      {paso > 0 ? (
+        <Boton
+          titulo="Atrás"
+          variante="secundario"
+          ancho="completo"
+          deshabilitado={enviando}
+          onPress={retroceder}
+        />
+      ) : null}
+    </View>
+  );
+
+  return (
+    <PantallaPila accionFija={accionFija}>
+      <View style={estilos.progreso}>
+        <Texto
+          variante="etiqueta"
+          color={colores.textoFuerte}
+          accessibilityRole="header"
+          accessibilityLabel={`Paso ${paso + 1} de ${TOTAL_PASOS}, ${TITULOS[paso]}`}
+        >
+          {`Paso ${paso + 1} de ${TOTAL_PASOS} · ${TITULOS[paso]}`}
+        </Texto>
+        <View
+          style={estilos.barra}
+          accessibilityRole="progressbar"
+          accessibilityValue={{ min: 1, max: TOTAL_PASOS, now: paso + 1 }}
+        >
+          <View style={[estilos.relleno, { width: `${((paso + 1) / TOTAL_PASOS) * 100}%` }]} />
+        </View>
+      </View>
 
       {paso === PASO.UNIDAD ? (
         <PasoUnidad
@@ -427,10 +473,8 @@ export default function NuevoContrato() {
           error={erroresPlanos.unidadId}
           inmuebles={inmuebles.data}
           ocupacion={ocupacion}
-          onElegirInmueble={(id) =>
-            cambiar({ inmuebleId: id, ...(id === null ? { unidadId: null, plantilla: null } : {}) })
-          }
           onElegirUnidad={elegirUnidad}
+          onIrAInmuebles={() => router.push('/inmuebles')}
         />
       ) : null}
       {paso === PASO.INQUILINO ? (
@@ -460,40 +504,6 @@ export default function NuevoContrato() {
           onEditar={irAPaso}
         />
       ) : null}
-
-      <View style={estilos.botones}>
-        {ultimo ? (
-          <>
-            <Boton
-              titulo="Confirmar y crear contrato"
-              tituloCargando="Creando contrato…"
-              cargando={enviando}
-              ancho="completo"
-              onPress={() => void confirmarYCrear()}
-            />
-            {incierto ? (
-              <Boton
-                titulo="Verificar si se creó"
-                variante="secundario"
-                ancho="completo"
-                deshabilitado={enviando}
-                onPress={() => void verificarOtraVez()}
-              />
-            ) : null}
-          </>
-        ) : (
-          <Boton titulo="Siguiente" ancho="completo" onPress={() => void siguiente()} />
-        )}
-        {paso > 0 ? (
-          <Boton
-            titulo="Atrás"
-            variante="secundario"
-            ancho="completo"
-            deshabilitado={enviando}
-            onPress={retroceder}
-          />
-        ) : null}
-      </View>
     </PantallaPila>
   );
 }
@@ -508,5 +518,5 @@ const estilos = StyleSheet.create({
   },
   relleno: { height: 6, borderRadius: radios.pildora, backgroundColor: colores.tinta },
   error: { gap: espaciado.xxs },
-  botones: { gap: espaciado.xs, marginTop: espaciado.sm },
+  botones: { gap: espaciado.xs },
 });

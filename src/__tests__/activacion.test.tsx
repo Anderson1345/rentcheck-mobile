@@ -64,6 +64,17 @@ const SESION_INQUILINO = () => ({
 const error = (status: number, codigo: string) =>
   new ErrorApi({ status, codigo, mensaje: 'técnico' });
 
+type RaizActivacion = Awaited<ReturnType<typeof renderizarPantalla>>['raiz'];
+/** El botón vive en la barra fija, no en el contenido que se desplaza (R1-B, R4-D). */
+const enBarraFija = (raiz: RaizActivacion, titulo: string) => {
+  const barras = raiz.root.findAll((n) => n.props.testID === 'accion-fija');
+  if (barras.length === 0) return false;
+  const desplazable = raiz.root.findAll((n) => n.props.keyboardShouldPersistTaps === 'handled')[0];
+  const tiene = (n: (typeof barras)[number]) =>
+    n.findAll((h) => h.props.children === titulo).length > 0;
+  return tiene(barras[0]) && !tiene(desplazable);
+};
+
 async function irAlPaso2(raiz: Awaited<ReturnType<typeof renderizarPantalla>>['raiz']) {
   mockValidar.mockResolvedValueOnce(SIN_CUENTA);
   await escribirEn(raiz, 'Código de activación', 'rc ab3d 9kpx');
@@ -102,6 +113,12 @@ describe('activar: paso 1 (el código)', () => {
       autoCorrect: false,
     });
     expect(hayBoton(raiz, 'Continuar')).toBe(true);
+  });
+
+  it('R4-D: "Continuar" queda en la barra fija, con el encabezado de acceso arriba', async () => {
+    const { raiz } = await renderizarPantalla(<Activar />);
+    expect(enBarraFija(raiz, 'Continuar')).toBe(true);
+    expect(textosDe(raiz)).toContain('Activa tu cuenta');
   });
 
   it('mientras se escribe, muestra el valor como RC-XXXX-XXXX', async () => {
@@ -183,6 +200,22 @@ describe('activar: paso 2 (crear la cuenta)', () => {
     expect(visibles).toContain('Hola, Camilo Pardo');
     expect(visibles).toContain('Apto 302');
     expect(visibles).toContain('Calle 45 # 12-30');
+  });
+
+  it('R4-D: lo que el inquilino ve del contrato va en filas (Unidad, Dirección)', async () => {
+    const { raiz } = await renderizarPantalla(<Activar />);
+    await irAlPaso2(raiz);
+    const filas = raiz.root
+      .findAll((n) => typeof n.type === 'string' && n.props.testID === 'dato-contrato')
+      .map((f) =>
+        f
+          .findAll((n) => typeof n.type === 'string' && typeof n.props.children === 'string')
+          .map((n) => n.props.children),
+      );
+    expect(filas).toEqual([
+      ['Unidad', 'Apto 302'],
+      ['Dirección', 'Calle 45 # 12-30'],
+    ]);
   });
 
   it('R1-B: "Crear mi cuenta" queda en la barra de acción fija, fuera del contenido que se desplaza', async () => {
@@ -327,6 +360,7 @@ describe('activar: la persona ya tiene cuenta (lo dice validar-codigo)', () => {
     await pulsar(raiz, 'Continuar');
     expect(textosDe(raiz)).toContain('Inicia sesión y agrega este código desde la app.');
     expect(campoDe(raiz, 'Contraseña')).toBeUndefined();
+    expect(enBarraFija(raiz, 'Iniciar sesión')).toBe(true);
     await pulsar(raiz, 'Iniciar sesión');
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/login-inquilino',

@@ -5,13 +5,13 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { ErrorSinConexion, ErrorTimeout } from '@/api/cliente';
 import { detalleTecnico, mensajeDeError, mensajeDeErrorFoto } from '@/api/errores';
 import type { ArchivoFoto } from '@/api/inmuebles';
-import { type Momento, subirFotoInventario } from '@/api/inventario';
+import { type FotoInventario, type Momento, subirFotoInventario } from '@/api/inventario';
 import { Aviso } from '@/componentes/Aviso';
 import { Boton } from '@/componentes/Boton';
 import { CampoTexto } from '@/componentes/CampoTexto';
 import { DetalleTecnico } from '@/componentes/DetalleTecnico';
+import { EncabezadoSeccion } from '@/componentes/EncabezadoSeccion';
 import { EsqueletoCarga } from '@/componentes/EsqueletoCarga';
-import { FilaLista } from '@/componentes/FilaLista';
 import { OpcionesFoto } from '@/componentes/inmuebles/OpcionesFoto';
 import { PortadaInmueble } from '@/componentes/inmuebles/PortadaInmueble';
 import { PantallaPila } from '@/componentes/PantallaPila';
@@ -41,6 +41,19 @@ const TEXTO_ESTADO: Record<EstadoFoto, string> = {
 };
 const MENSAJE_INCIERTA = 'Puede haberse subido; revisa la lista antes de reintentar.';
 
+/** Las fotos subidas, por zona, en el orden en que aparece cada zona en la lista del servidor. */
+function agruparPorZona(
+  fotos: readonly FotoInventario[],
+): { zona: string; fotos: FotoInventario[] }[] {
+  const grupos = new Map<string, FotoInventario[]>();
+  for (const foto of fotos) grupos.set(foto.zona, [...(grupos.get(foto.zona) ?? []), foto]);
+  return [...grupos.entries()].map(([zona, deLaZona]) => ({ zona, fotos: deLaZona }));
+}
+
+// Inventario (rediseño R4-D): la zona y las fotos por subir en filas de un mismo contenedor; las subidas,
+// agrupadas por zona en cuadrícula ampliable (si la URL firmada ya venció, la miniatura vuelve a pedir la
+// lista una vez, como antes); "Subir fotos" y "Terminar" en la barra fija. Las fotos suben una por una,
+// sin bloquear la pantalla, con los mismos estados, límites y errores de siempre.
 export default function InventarioContrato() {
   const router = useRouter();
   const { id, momento: parametro } = useLocalSearchParams<{ id: string; momento?: string }>();
@@ -146,8 +159,23 @@ export default function InventarioContrato() {
   const hayPendientes = fotos.some((f) => f.estado === 'pendiente');
   const subidas = lista.data ?? [];
 
+  const barra = (
+    <View style={estilos.grupo}>
+      {hayPendientes || procesando ? (
+        <Boton
+          titulo="Subir fotos"
+          tituloCargando="Subiendo…"
+          cargando={procesando}
+          ancho="completo"
+          onPress={() => void subirTodas()}
+        />
+      ) : null}
+      <Boton titulo="Terminar" variante="secundario" ancho="completo" onPress={terminar} />
+    </View>
+  );
+
   return (
-    <PantallaPila>
+    <PantallaPila accionFija={barra}>
       <Texto variante="titulo" accessibilityRole="header">
         {momento === 'ENTREGA' ? 'Inventario de entrega' : 'Inventario de devolución'}
       </Texto>
@@ -197,76 +225,67 @@ export default function InventarioContrato() {
 
       {fotos.length > 0 ? (
         <View style={estilos.grupo}>
-          <Texto variante="tituloSeccion" accessibilityRole="header">
-            Por subir
-          </Texto>
-          {fotos.map((item) => (
-            <Superficie key={item.clave} style={estilos.item}>
-              <View
-                accessible
-                accessibilityLabel={`${item.zona}, ${TEXTO_ESTADO[item.estado]}`}
-                accessibilityLiveRegion="polite"
-                style={estilos.filaItem}
-              >
-                <PortadaInmueble url={item.foto.uri} variante="miniatura" />
-                <View style={estilos.textos}>
-                  <Texto variante="filaTitulo">{item.zona}</Texto>
-                  <Texto variante="secundario" color={colores.textoSecundario}>
-                    {item.estado === 'pendiente'
-                      ? 'Pendiente'
-                      : item.estado === 'subiendo'
-                        ? 'Subiendo…'
-                        : item.estado === 'subida'
-                          ? 'Subida'
-                          : item.estado === 'error'
-                            ? 'No se subió'
-                            : 'Incierta'}
-                  </Texto>
+          <EncabezadoSeccion titulo="Por subir" />
+          <View testID="cola-fotos">
+            <Superficie relleno="ninguno">
+              {fotos.map((item, indice) => (
+                <View key={item.clave} style={[estilos.item, indice > 0 && estilos.conSeparador]}>
+                  <View
+                    accessible
+                    accessibilityLabel={`${item.zona}, ${TEXTO_ESTADO[item.estado]}`}
+                    accessibilityLiveRegion="polite"
+                    style={estilos.filaItem}
+                  >
+                    <PortadaInmueble url={item.foto.uri} variante="miniatura" />
+                    <View style={estilos.textos}>
+                      <Texto variante="filaTitulo">{item.zona}</Texto>
+                      <Texto variante="secundario" color={colores.textoSecundario}>
+                        {item.estado === 'pendiente'
+                          ? 'Pendiente'
+                          : item.estado === 'subiendo'
+                            ? 'Subiendo…'
+                            : item.estado === 'subida'
+                              ? 'Subida'
+                              : item.estado === 'error'
+                                ? 'No se subió'
+                                : 'Incierta'}
+                      </Texto>
+                    </View>
+                  </View>
+                  {item.estado === 'error' && item.error ? (
+                    <>
+                      <Aviso mensaje={item.error.mensaje} />
+                      <DetalleTecnico detalle={item.error.detalle} />
+                    </>
+                  ) : null}
+                  {item.estado === 'incierta' ? (
+                    <Aviso tono="advertencia" mensaje={MENSAJE_INCIERTA} />
+                  ) : null}
+                  <View style={estilos.accionesItem}>
+                    {item.estado === 'error' || item.estado === 'incierta' ? (
+                      <Boton
+                        titulo="Reintentar"
+                        variante="secundario"
+                        onPress={() => void reintentar(item)}
+                      />
+                    ) : null}
+                    {item.estado !== 'subiendo' && item.estado !== 'subida' ? (
+                      <Boton
+                        titulo="Quitar"
+                        variante="secundario"
+                        onPress={() => setFotos((a) => a.filter((f) => f.clave !== item.clave))}
+                      />
+                    ) : null}
+                  </View>
                 </View>
-              </View>
-              {item.estado === 'error' && item.error ? (
-                <>
-                  <Aviso mensaje={item.error.mensaje} />
-                  <DetalleTecnico detalle={item.error.detalle} />
-                </>
-              ) : null}
-              {item.estado === 'incierta' ? (
-                <Aviso tono="advertencia" mensaje={MENSAJE_INCIERTA} />
-              ) : null}
-              <View style={estilos.accionesItem}>
-                {item.estado === 'error' || item.estado === 'incierta' ? (
-                  <Boton
-                    titulo="Reintentar"
-                    variante="secundario"
-                    onPress={() => void reintentar(item)}
-                  />
-                ) : null}
-                {item.estado !== 'subiendo' && item.estado !== 'subida' ? (
-                  <Boton
-                    titulo="Quitar"
-                    variante="secundario"
-                    onPress={() => setFotos((a) => a.filter((f) => f.clave !== item.clave))}
-                  />
-                ) : null}
-              </View>
+              ))}
             </Superficie>
-          ))}
-          {hayPendientes || procesando ? (
-            <Boton
-              titulo="Subir fotos"
-              tituloCargando="Subiendo…"
-              cargando={procesando}
-              ancho="completo"
-              onPress={() => void subirTodas()}
-            />
-          ) : null}
+          </View>
         </View>
       ) : null}
 
       <View style={estilos.grupo}>
-        <Texto variante="tituloSeccion" accessibilityRole="header">
-          Fotos subidas
-        </Texto>
+        <EncabezadoSeccion titulo="Fotos subidas" />
         {lista.isPending ? <EsqueletoCarga filas={2} /> : null}
         {lista.isError && lista.data === undefined ? (
           <>
@@ -284,12 +303,19 @@ export default function InventarioContrato() {
             Aún no hay fotos.
           </Texto>
         ) : null}
-        {subidas.length > 0 ? (
-          <Superficie relleno="ninguno">
-            {subidas.map((foto, indice) => (
-              <FilaLista
-                key={foto.id}
-                miniatura={
+        {agruparPorZona(subidas).map((grupo) => (
+          <View
+            key={grupo.zona}
+            testID="grupo-zona"
+            accessibilityLabel={`${grupo.zona}, ${grupo.fotos.length === 1 ? '1 foto' : `${grupo.fotos.length} fotos`}`}
+            style={estilos.zona}
+          >
+            <Texto variante="etiqueta" color={colores.textoFuerte} accessibilityRole="header">
+              {grupo.zona}
+            </Texto>
+            <View style={estilos.cuadricula}>
+              {grupo.fotos.map((foto) => (
+                <View key={foto.id} style={estilos.celda}>
                   <PortadaInmueble
                     url={foto.foto_url}
                     variante="miniatura"
@@ -298,17 +324,15 @@ export default function InventarioContrato() {
                     alFallarUrl={() => void lista.refetch({ cancelRefetch: false })}
                     ampliable
                   />
-                }
-                titulo={foto.zona}
-                subtitulo={formatearFechaCorta(foto.creado_en)}
-                separador={indice > 0}
-              />
-            ))}
-          </Superficie>
-        ) : null}
+                  <Texto variante="secundario" color={colores.textoSecundario}>
+                    {formatearFechaCorta(foto.creado_en)}
+                  </Texto>
+                </View>
+              ))}
+            </View>
+          </View>
+        ))}
       </View>
-
-      <Boton titulo="Terminar" variante="secundario" ancho="completo" onPress={terminar} />
     </PantallaPila>
   );
 }
@@ -325,8 +349,12 @@ const estilos = StyleSheet.create({
     backgroundColor: tintaAlfa(0.06),
   },
   chipActivo: { backgroundColor: colores.tinta },
-  item: { gap: espaciado.xs },
+  item: { gap: espaciado.xs, padding: espaciado.sm },
+  conSeparador: { borderTopWidth: 1, borderTopColor: tintaAlfa(0.07) },
   filaItem: { flexDirection: 'row', alignItems: 'center', gap: espaciado.sm },
   textos: { flex: 1, gap: 2 },
   accionesItem: { flexDirection: 'row', flexWrap: 'wrap', gap: espaciado.xs },
+  zona: { gap: espaciado.xs },
+  cuadricula: { flexDirection: 'row', flexWrap: 'wrap', gap: espaciado.sm },
+  celda: { gap: 4, alignItems: 'center' },
 });

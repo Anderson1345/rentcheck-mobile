@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { StyleSheet, type TextInput } from 'react-native';
+import { StyleSheet, type TextInput, View } from 'react-native';
 
 import {
   completarRegistroInquilino,
@@ -16,7 +16,7 @@ import { formatearCodigoEscrito, validarCodigo } from '../sesion/codigo';
 import { guardarCodigoPendiente } from '../sesion/codigoPendiente';
 import { type DatosActivacionForm, esquemaActivacion } from '../sesion/esquemas';
 import { useSesion } from '../sesion/SesionProvider';
-import { colores, espaciado } from '../tema';
+import { colores, espaciado, tintaAlfa } from '../tema';
 import { Aviso } from './Aviso';
 import { Boton } from './Boton';
 import { CampoTexto } from './CampoTexto';
@@ -40,7 +40,12 @@ interface Props {
   avisoInicial?: string;
 }
 
-/** Activación del inquilino: 1) el código, 2) crear la cuenta. Quien ya tiene cuenta inicia sesión. */
+/**
+ * Activación del inquilino: 1) el código, 2) crear la cuenta. Quien ya tiene cuenta inicia sesión.
+ * R4-D: cada paso lleva su CabeceraAcceso (PantallaFormulario) y su acción principal en la barra fija; lo
+ * que el inquilino ve del contrato va en filas. El código es RC-XXXX-XXXX (letras y números), por eso el
+ * campo no es el de 6 dígitos.
+ */
 export function ActivacionInquilino({ codigoInicial = '', avisoInicial }: Props) {
   const [paso, setPaso] = useState<Paso>({ tipo: 'codigo' });
   const [aviso, setAviso] = useState<string | null>(null);
@@ -66,24 +71,21 @@ export function ActivacionInquilino({ codigoInicial = '', avisoInicial }: Props)
     );
   }
 
+  if (paso.tipo === 'iniciarSesion') {
+    return <PasoYaTengoCuenta codigo={paso.codigo} mensaje={paso.mensaje} />;
+  }
   return (
-    <PantallaFormulario titulo={TITULO} subtitulo={SUBTITULO}>
-      {paso.tipo === 'codigo' ? (
-        <PasoCodigo
-          codigoInicial={codigoInicial}
-          aviso={aviso ?? avisoInicial ?? null}
-          onValidado={(codigo, datos) =>
-            setPaso(
-              datos.requiere_inicio_sesion
-                ? { tipo: 'iniciarSesion', codigo, mensaje: datos.mensaje }
-                : { tipo: 'cuenta', codigo, datos },
-            )
-          }
-        />
-      ) : (
-        <PasoYaTengoCuenta codigo={paso.codigo} mensaje={paso.mensaje} />
-      )}
-    </PantallaFormulario>
+    <PasoCodigo
+      codigoInicial={codigoInicial}
+      aviso={aviso ?? avisoInicial ?? null}
+      onValidado={(codigo, datos) =>
+        setPaso(
+          datos.requiere_inicio_sesion
+            ? { tipo: 'iniciarSesion', codigo, mensaje: datos.mensaje }
+            : { tipo: 'cuenta', codigo, datos },
+        )
+      }
+    />
   );
 }
 
@@ -122,7 +124,19 @@ function PasoCodigo({
   }
 
   return (
-    <>
+    <PantallaFormulario
+      titulo={TITULO}
+      subtitulo={SUBTITULO}
+      accionFija={
+        <Boton
+          titulo="Continuar"
+          tituloCargando="Validando…"
+          cargando={enviando}
+          ancho="completo"
+          onPress={() => void continuar()}
+        />
+      }
+    >
       {aviso ? <Aviso tono="advertencia" mensaje={aviso} /> : null}
       {errorServidor ? <Aviso mensaje={errorServidor} /> : null}
       <CampoTexto
@@ -138,14 +152,7 @@ function PasoCodigo({
         returnKeyType="go"
         onSubmitEditing={() => void continuar()}
       />
-      <Boton
-        titulo="Continuar"
-        tituloCargando="Validando…"
-        cargando={enviando}
-        ancho="completo"
-        onPress={() => void continuar()}
-      />
-    </>
+    </PantallaFormulario>
   );
 }
 
@@ -216,20 +223,28 @@ function PasoCuenta({
         />
       }
     >
-      <Superficie style={estilos.tarjeta}>
+      <View style={estilos.tarjeta}>
         <Texto variante="tituloSeccion" accessibilityRole="header">
           Hola, {datos.nombreInquilino}
         </Texto>
-        {datos.nombreUnidad ? <Texto variante="cuerpoFuerte">{datos.nombreUnidad}</Texto> : null}
-        {datos.direccionInmueble ? (
-          <Texto variante="cuerpo" color={colores.textoSecundario}>
-            {datos.direccionInmueble}
-          </Texto>
+        {datos.nombreUnidad || datos.direccionInmueble ? (
+          <Superficie relleno="ninguno">
+            {datos.nombreUnidad ? (
+              <DatoContrato etiqueta="Unidad" valor={datos.nombreUnidad} />
+            ) : null}
+            {datos.direccionInmueble ? (
+              <DatoContrato
+                etiqueta="Dirección"
+                valor={datos.direccionInmueble}
+                separador={Boolean(datos.nombreUnidad)}
+              />
+            ) : null}
+          </Superficie>
         ) : null}
         <Texto variante="secundario" color={colores.textoSecundario}>
           Crea tu cuenta para ver tu contrato.
         </Texto>
-      </Superficie>
+      </View>
 
       {errorServidor ? <Aviso mensaje={errorServidor} /> : null}
 
@@ -307,7 +322,11 @@ function PasoYaTengoCuenta({ codigo, mensaje }: { codigo: string; mensaje: strin
   }
 
   return (
-    <>
+    <PantallaFormulario
+      titulo={TITULO}
+      subtitulo={SUBTITULO}
+      accionFija={<Boton titulo="Iniciar sesión" ancho="completo" onPress={iniciarSesion} />}
+    >
       <Superficie style={estilos.tarjeta}>
         <Texto variante="tituloSeccion" accessibilityRole="header">
           Ya tienes una cuenta
@@ -316,11 +335,32 @@ function PasoYaTengoCuenta({ codigo, mensaje }: { codigo: string; mensaje: strin
           {mensaje}
         </Texto>
       </Superficie>
-      <Boton titulo="Iniciar sesión" ancho="completo" onPress={iniciarSesion} />
-    </>
+    </PantallaFormulario>
+  );
+}
+
+/** Un dato del contrato que el inquilino ve antes de activar: etiqueta arriba y valor debajo. */
+function DatoContrato({
+  etiqueta,
+  valor,
+  separador = false,
+}: {
+  etiqueta: string;
+  valor: string;
+  separador?: boolean;
+}) {
+  return (
+    <View testID="dato-contrato" style={[estilos.dato, separador && estilos.conSeparador]}>
+      <Texto variante="secundario" color={colores.textoSecundario}>
+        {etiqueta}
+      </Texto>
+      <Texto variante="cuerpoFuerte">{valor}</Texto>
+    </View>
   );
 }
 
 const estilos = StyleSheet.create({
   tarjeta: { gap: espaciado.xs },
+  dato: { gap: 2, minHeight: 56, paddingHorizontal: espaciado.md, paddingVertical: espaciado.sm },
+  conSeparador: { borderTopWidth: 1, borderTopColor: tintaAlfa(0.07) },
 });

@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 
 import type { BorradorContrato } from '../../contratos/esquemas';
 import { esPlantillaVivienda } from '../../contratos/plantilla';
-import { espaciado } from '../../tema';
+import { colores, espaciado } from '../../tema';
 import { Aviso } from '../Aviso';
 import { Boton } from '../Boton';
 import { CampoDinero } from '../CampoDinero';
@@ -27,22 +27,31 @@ export function PasoPago({ valores, errores, cambiar }: Props) {
       <Texto variante="tituloSeccion" accessibilityRole="header">
         ¿Cómo se paga el arriendo?
       </Texto>
-      <CampoDinero
-        etiqueta="Canon mensual"
-        valorCentavos={valores.canonCentavos}
-        onCambio={(canonCentavos) => cambiar({ canonCentavos })}
-        error={errores.canonCentavos}
-      />
-      <CampoTexto
-        etiqueta="Día de pago (1 a 31)"
-        valor={valores.diaPago}
-        onCambio={(diaPago) => cambiar({ diaPago })}
-        error={errores.diaPago}
-        keyboardType="number-pad"
-        maxLength={2}
-        returnKeyType="next"
-        ayuda="Si el mes no tiene ese día, vence el último día del mes."
-      />
+      {/* R4-D: los dos datos cortos en dos columnas; la ayuda del día va debajo, a todo el ancho. */}
+      <View testID="dos-columnas" style={estilos.columnas}>
+        <View style={estilos.columnaAncha}>
+          <CampoDinero
+            etiqueta="Canon mensual"
+            valorCentavos={valores.canonCentavos}
+            onCambio={(canonCentavos) => cambiar({ canonCentavos })}
+            error={errores.canonCentavos}
+          />
+        </View>
+        <View style={estilos.columna}>
+          <CampoTexto
+            etiqueta="Día de pago (1 a 31)"
+            valor={valores.diaPago}
+            onCambio={(diaPago) => cambiar({ diaPago })}
+            error={errores.diaPago}
+            keyboardType="number-pad"
+            maxLength={2}
+            returnKeyType="next"
+          />
+        </View>
+      </View>
+      <Texto variante="secundario" color={colores.textoSecundario}>
+        Si el mes no tiene ese día, vence el último día del mes.
+      </Texto>
       <CampoTexto
         etiqueta="Forma de pago"
         valor={valores.formaPago}
@@ -92,4 +101,7 @@ export function PasoPago({ valores, errores, cambiar }: Props) {
 const estilos = StyleSheet.create({
   grupo: { gap: espaciado.sm },
   atajos: { flexDirection: 'row', flexWrap: 'wrap', gap: espaciado.xs },
+  columnas: { flexDirection: 'row', gap: espaciado.sm, alignItems: 'flex-start' },
+  columnaAncha: { flex: 3, minWidth: 0 },
+  columna: { flex: 2, minWidth: 0 },
 });

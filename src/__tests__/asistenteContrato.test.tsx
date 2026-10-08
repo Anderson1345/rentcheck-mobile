@@ -169,10 +169,37 @@ const pulsar = async (raiz: Raiz, titulo: string) => {
   await esperar();
 };
 const titulo = (raiz: Raiz) => textosDe(raiz).find((t) => t.startsWith('Paso '));
+/** El botón vive en la barra fija, no en el contenido que se desplaza (R4-D). */
+const enBarraFija = (raiz: Raiz, nombre: string) => {
+  const barras = raiz.root.findAll((n) => n.props.testID === 'accion-fija');
+  if (barras.length === 0) return false;
+  const desplazable = raiz.root.findAll((n) => n.props.keyboardShouldPersistTaps === 'handled')[0];
+  const tiene = (n: (typeof barras)[number]) =>
+    n.findAll((h) => h.props.children === nombre).length > 0;
+  return tiene(barras[0]) && !tiene(desplazable);
+};
+/** Etiqueta → valor de las filas de un grupo del resumen (R4-D). */
+const filasDeGrupo = (raiz: Raiz, grupo: string) => {
+  const [nodo] = raiz.root.findAll(
+    (n) => typeof n.type === 'string' && n.props.testID === `resumen-${grupo}`,
+  );
+  return Object.fromEntries(
+    nodo
+      .findAll((n) => typeof n.type === 'string' && n.props.testID === 'fila-resumen')
+      .map((fila) =>
+        fila
+          .findAll((n) => typeof n.type === 'string' && typeof n.props.children === 'string')
+          .map((n) => n.props.children as string),
+      ),
+  );
+};
 const botonesEditar = (raiz: Raiz) => {
   const vistos = new Set<unknown>();
   return raiz.root.findAll((n) => {
-    if (n.props.accessibilityRole !== 'button' || typeof n.props.onPress !== 'function')
+    if (
+      (n.props.accessibilityRole !== 'button' && n.props.accessibilityRole !== 'link') ||
+      typeof n.props.onPress !== 'function'
+    )
       return false;
     if (n.findAll((h) => h.props.children === 'Editar').length === 0) return false;
     if (vistos.has(n.props.onPress)) return false;
@@ -214,7 +241,6 @@ async function llenarPago(raiz: Raiz, canon = '2500000') {
 }
 /** Recorre los pasos hasta el resumen (unidad ya elegida por quien llama o por el parámetro). */
 async function llegarAlResumen(raiz: Raiz, unidad = 'Apto 302') {
-  if (hayBoton(raiz, 'Calle 45 # 12-30')) await pulsar(raiz, 'Calle 45 # 12-30');
   await pulsar(raiz, unidad);
   await pulsar(raiz, 'Siguiente');
   await llenarInquilinoNuevo(raiz);
@@ -278,12 +304,81 @@ describe('Asistente: cédula del arrendador (B-16)', () => {
   });
 });
 
+describe('Asistente (R4-D): progreso y barra fija', () => {
+  it('el progreso se anuncia ("Paso 1 de 6, Unidad") como encabezado', async () => {
+    const { raiz } = await montar();
+    const progreso = raiz.root.find(
+      (n) => typeof n.type === 'string' && n.props.accessibilityLabel === 'Paso 1 de 6, Unidad',
+    );
+    expect(progreso.props.accessibilityRole).toBe('header');
+  });
+
+  it('"Siguiente" y "Atrás" en la barra fija; en el último paso, "Confirmar y crear contrato"', async () => {
+    const { raiz } = await montar();
+    expect(enBarraFija(raiz, 'Siguiente')).toBe(true);
+    expect(hayBoton(raiz, 'Atrás')).toBe(false);
+    await pulsar(raiz, 'Apto 302');
+    await pulsar(raiz, 'Siguiente');
+    expect(enBarraFija(raiz, 'Atrás')).toBe(true);
+    await pulsar(raiz, 'Atrás');
+    await llegarAlResumen(raiz);
+    expect(enBarraFija(raiz, 'Confirmar y crear contrato')).toBe(true);
+    expect(enBarraFija(raiz, 'Atrás')).toBe(true);
+  });
+
+  it('atrás y adelante conservan lo escrito', async () => {
+    const { raiz } = await montar();
+    await pulsar(raiz, 'Apto 302');
+    await pulsar(raiz, 'Siguiente');
+    await llenarInquilinoNuevo(raiz);
+    await pulsar(raiz, 'Siguiente');
+    await escribirEn(raiz, 'Día de pago (1 a 31)', '7');
+    await pulsar(raiz, 'Atrás');
+    expect(campoDe(raiz, 'Nombre completo')?.props.value).toBe(' Camilo Pardo ');
+    expect(campoDe(raiz, 'Teléfono')?.props.value).toBe('3001234567');
+    await pulsar(raiz, 'Siguiente');
+    expect(campoDe(raiz, 'Día de pago (1 a 31)')?.props.value).toBe('7');
+    expect(campoDe(raiz, 'Canon mensual')?.props.value).toBe('1.800.000');
+  });
+
+  it('pago: canon y día de pago en dos columnas', async () => {
+    const { raiz } = await montar();
+    await pulsar(raiz, 'Apto 302');
+    await pulsar(raiz, 'Siguiente');
+    await llenarInquilinoNuevo(raiz);
+    await pulsar(raiz, 'Siguiente');
+    const [fila] = raiz.root.findAll(
+      (n) => typeof n.type === 'string' && n.props.testID === 'dos-columnas',
+    );
+    const etiquetas = fila
+      .findAll((n) => typeof n.type === 'string' && typeof n.props.accessibilityLabel === 'string')
+      .map((n) => n.props.accessibilityLabel);
+    expect(etiquetas).toEqual(expect.arrayContaining(['Canon mensual', 'Día de pago (1 a 31)']));
+  });
+});
+
 describe('Asistente: paso 1 Unidad', () => {
-  it('lista inmuebles y unidades con su plantilla; la plantilla no se elige', async () => {
+  it('R4-D: sin unidades, un vacío que explica qué hacer y lleva a Inmuebles', async () => {
+    datos.inmuebles = [];
+    const { raiz } = await montar();
+    expect(textosDe(raiz)).toContain('Aún no tienes unidades para arrendar');
+    await pulsar(raiz, 'Ir a Inmuebles');
+    expect(mockPush).toHaveBeenCalledWith('/inmuebles');
+    datos.inmuebles = [{ ...INMUEBLE, unidades: [] }];
+    const otro = await montar();
+    expect(textosDe(otro.raiz)).toContain('Aún no tienes unidades para arrendar');
+  });
+
+  it('R4-D: las unidades de todos los inmuebles en filas, agrupadas por inmueble, con foto, plantilla y canon sugerido', async () => {
     const { raiz } = await montar();
     expect(titulo(raiz)).toBe('Paso 1 de 6 · Unidad');
-    await pulsar(raiz, 'Calle 45 # 12-30');
     const textos = textosDe(raiz);
+    expect(textos).toContain('Calle 45 # 12-30');
+    expect(textos).toContain('$ 1.800.000');
+    // Cada unidad con su miniatura (la foto si la tiene, o el icono).
+    expect(
+      raiz.root.findAll((n) => typeof n.type === 'string' && n.props.testID === 'unidad-asistente'),
+    ).toHaveLength(3);
     expect(textos).toContain('Plantilla: Vivienda urbana (Ley 820 de 2003)');
     expect(textos).toContain('Plantilla: Local comercial');
     expect(textos).toContain('Plantilla: Parqueadero');
@@ -347,7 +442,6 @@ describe('Asistente: pasos 2 a 6', () => {
 
   it('el segundo modo solo aparece si ya hay inquilinos; elegir uno envía SOLO inquilino_id', async () => {
     const sin = await montar();
-    await pulsar(sin.raiz, 'Calle 45 # 12-30');
     await pulsar(sin.raiz, 'Apto 302');
     await pulsar(sin.raiz, 'Siguiente');
     expect(
@@ -356,7 +450,6 @@ describe('Asistente: pasos 2 a 6', () => {
 
     datos.inquilinos = [INQUILINO_EXISTENTE];
     const { raiz } = await montar();
-    await pulsar(raiz, 'Calle 45 # 12-30');
     await pulsar(raiz, 'Apto 302');
     await pulsar(raiz, 'Siguiente');
     await act(async () => porEtiqueta(raiz, 'Ya arrendó conmigo').props.onPress());
@@ -378,7 +471,6 @@ describe('Asistente: pasos 2 a 6', () => {
 
   it('inquilino nuevo incompleto: errores en español y no avanza', async () => {
     const { raiz } = await montar();
-    await pulsar(raiz, 'Calle 45 # 12-30');
     await pulsar(raiz, 'Apto 302');
     await pulsar(raiz, 'Siguiente');
     await pulsar(raiz, 'Siguiente');
@@ -388,7 +480,6 @@ describe('Asistente: pasos 2 a 6', () => {
 
   it('vivienda: sin campo de depósito, con la nota de la Ley 820 y el cuerpo sin deposito_centavos', async () => {
     const { raiz } = await montar();
-    await pulsar(raiz, 'Calle 45 # 12-30');
     await pulsar(raiz, 'Apto 302');
     await pulsar(raiz, 'Siguiente');
     await llenarInquilinoNuevo(raiz);
@@ -415,7 +506,6 @@ describe('Asistente: pasos 2 a 6', () => {
     ['Parqueadero 5', 'PARQUEADERO'],
   ])('%s: el depósito aparece, es opcional y se envía si se escribe', async (unidad, plantilla) => {
     const { raiz } = await montar();
-    await pulsar(raiz, 'Calle 45 # 12-30');
     await pulsar(raiz, unidad);
     await pulsar(raiz, 'Siguiente');
     await llenarInquilinoNuevo(raiz);
@@ -438,7 +528,6 @@ describe('Asistente: pasos 2 a 6', () => {
 
   it('pago: valida día de pago, canon y forma; "Transferencia" llena la forma de pago', async () => {
     const { raiz } = await montar();
-    await pulsar(raiz, 'Calle 45 # 12-30');
     await pulsar(raiz, 'Local 1');
     await pulsar(raiz, 'Siguiente');
     await llenarInquilinoNuevo(raiz);
@@ -467,7 +556,6 @@ describe('Asistente: pasos 2 a 6', () => {
 
   it('inicio futuro: aviso de Programado y el fin se calcula desde ese inicio', async () => {
     const { raiz } = await montar();
-    await pulsar(raiz, 'Calle 45 # 12-30');
     await pulsar(raiz, 'Apto 302');
     await pulsar(raiz, 'Siguiente');
     await llenarInquilinoNuevo(raiz);
@@ -491,7 +579,6 @@ describe('Asistente: pasos 2 a 6', () => {
 
   it('"Otra fecha": un fin que ya pasó no deja avanzar', async () => {
     const { raiz } = await montar();
-    await pulsar(raiz, 'Calle 45 # 12-30');
     await pulsar(raiz, 'Apto 302');
     await pulsar(raiz, 'Siguiente');
     await llenarInquilinoNuevo(raiz);
@@ -513,8 +600,24 @@ describe('Asistente: pasos 2 a 6', () => {
     expect(textos).toContain(
       'Las plantillas de RentCheck son modelos. Verifica que el contrato se ajuste a tu caso antes de firmarlo.',
     );
-    expect(textos).toContain('Canon: $ 2.500.000');
-    expect(textos).toContain('Plantilla: Vivienda urbana (Ley 820 de 2003)');
+    // R4-D: filas agrupadas (etiqueta → valor).
+    expect(filasDeGrupo(raiz, 'unidad')).toMatchObject({
+      Unidad: 'Apto 302',
+      Plantilla: 'Vivienda urbana (Ley 820 de 2003)',
+    });
+    expect(filasDeGrupo(raiz, 'inquilino')).toMatchObject({
+      Nombre: 'Camilo Pardo',
+      Documento: '1020304050',
+    });
+    expect(filasDeGrupo(raiz, 'pago')).toMatchObject({
+      Canon: '$ 2.500.000',
+      'Día de pago': '5',
+      'Forma de pago': 'Transferencia',
+    });
+    expect(filasDeGrupo(raiz, 'fechas')).toMatchObject({ Estado: 'Quedará Activo' });
+    expect(filasDeGrupo(raiz, 'garantias')).toMatchObject({
+      Garantías: 'Sin garantías ni condiciones particulares.',
+    });
     expect(textos).toContain('Camilo Pardo');
     const editar = botonesEditar(raiz);
     expect(editar).toHaveLength(5);
@@ -526,7 +629,6 @@ describe('Asistente: pasos 2 a 6', () => {
 describe('Asistente: navegación hacia atrás', () => {
   it('Atrás (botón del encabezado o físico) vuelve al paso anterior', async () => {
     const { raiz } = await montar();
-    await pulsar(raiz, 'Calle 45 # 12-30');
     await pulsar(raiz, 'Apto 302');
     await pulsar(raiz, 'Siguiente');
     expect(titulo(raiz)).toBe('Paso 2 de 6 · Inquilino');
@@ -539,7 +641,6 @@ describe('Asistente: navegación hacia atrás', () => {
   it('en el primer paso, con datos escritos, pide confirmación; "Salir" deja salir', async () => {
     const alerta = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     const { raiz } = await montar();
-    await pulsar(raiz, 'Calle 45 # 12-30');
     await pulsar(raiz, 'Apto 302');
     const evento = { preventDefault: jest.fn(), data: { action: { type: 'GO_BACK' } } };
     await act(async () => mockListeners[mockListeners.length - 1](evento));
@@ -968,10 +1069,18 @@ describe('Contrato creado', () => {
     });
   });
 
-  it('"Listo" lleva al detalle del contrato', async () => {
+  it('R4-D: protagonista de éxito y las dos acciones en la barra fija ("Hacer inventario" principal)', async () => {
     datos.detalle = DETALLE;
     const { raiz } = await montarCreado();
-    await pulsar(raiz, 'Listo');
+    expect(textosDe(raiz)).toContain('Tu contrato está listo');
+    expect(enBarraFija(raiz, 'Hacer inventario')).toBe(true);
+    expect(enBarraFija(raiz, 'Ver contrato')).toBe(true);
+  });
+
+  it('"Ver contrato" lleva al detalle del contrato', async () => {
+    datos.detalle = DETALLE;
+    const { raiz } = await montarCreado();
+    await pulsar(raiz, 'Ver contrato');
     expect(mockReplace).toHaveBeenCalledWith({
       pathname: '/contrato/[id]',
       params: { id: 'c1' },
@@ -1034,9 +1143,9 @@ describe('Contrato creado: QR, copiar código e inventario (E4-B)', () => {
     expect(avisos.join('|')).not.toContain('RC-');
   });
 
-  it('"Registrar inventario de entrega" abre el inventario del contrato', async () => {
+  it('"Hacer inventario" abre el inventario del contrato', async () => {
     const { raiz } = await montarCreado();
-    await pulsar(raiz, 'Registrar inventario de entrega');
+    await pulsar(raiz, 'Hacer inventario');
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/contrato/[id]/inventario',
       params: { id: 'c1' },
