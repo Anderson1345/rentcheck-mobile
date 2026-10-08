@@ -11,10 +11,18 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://rentcheck-backend-9zb6.onrender.com",
+        "APP_ENV": "preview"
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://rentcheck-backend-9zb6.onrender.com",
+        "APP_ENV": "production"
+      }
     }
   }
 }

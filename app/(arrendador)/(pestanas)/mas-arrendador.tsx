@@ -5,6 +5,7 @@ import { CabeceraTinta, ContenidoBajoCabecera, TituloCabecera } from '@/componen
 import { EncabezadoSeccion } from '@/componentes/EncabezadoSeccion';
 import { FilaLista } from '@/componentes/FilaLista';
 import { Superficie } from '@/componentes/Superficie';
+import { VersionApp } from '@/componentes/VersionApp';
 import { useSesion } from '@/sesion/SesionProvider';
 import { colores, espaciado } from '@/tema';
 
@@ -55,6 +56,7 @@ export default function MasArrendador() {
             />
           </Superficie>
         </View>
+        <VersionApp />
       </ContenidoBajoCabecera>
     </View>
   );
