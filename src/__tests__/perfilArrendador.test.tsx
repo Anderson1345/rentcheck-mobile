@@ -77,6 +77,24 @@ beforeEach(() => {
 });
 
 describe('Mi perfil', () => {
+  it('R4-C: "Guardar cambios" en la barra fija; el correo es una fila de solo lectura', async () => {
+    const { raiz } = await renderizarPantalla(<Perfil />);
+    const barra = raiz.root.findByProps({ testID: 'accion-fija' });
+    expect(barra.findAll((n) => n.props.children === 'Guardar cambios').length).toBeGreaterThan(0);
+    const desplazable = raiz.root.findAll(
+      (n) => n.props.keyboardShouldPersistTaps === 'handled',
+    )[0];
+    expect(desplazable.findAll((n) => n.props.children === 'Guardar cambios')).toHaveLength(0);
+    const filas = raiz.root
+      .findAll((n) => typeof n.type === 'string' && n.props.testID === 'dato-perfil')
+      .map((f) =>
+        f
+          .findAll((n) => typeof n.type === 'string' && typeof n.props.children === 'string')
+          .map((n) => n.props.children),
+      );
+    expect(filas).toEqual([['Correo', 'marta@ejemplo.com']]);
+  });
+
   it('muestra el correo como solo lectura y los campos con sus valores', async () => {
     const { raiz } = await renderizarPantalla(<Perfil />);
     expect(mockGet).toHaveBeenCalledWith('/arrendadores/perfil');

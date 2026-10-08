@@ -16,9 +16,7 @@ export const TRAZOS_ICONOS = {
       'M4.5 18.5h15',
       'M10.8 14.5a1.2 1.2 0 1 0 2.4 0a1.2 1.2 0 1 0 -2.4 0',
     ],
-    relleno: [
-      'M4 14.5a8 8 0 0 1 16 0z',
-    ],
+    relleno: ['M4 14.5a8 8 0 0 1 16 0z'],
   },
   inmuebles: {
     trazos: [
@@ -31,9 +29,7 @@ export const TRAZOS_ICONOS = {
       'M8 14h1',
       'M8 17.5h1',
     ],
-    relleno: [
-      'M11.5 20.5v-16h7v16z',
-    ],
+    relleno: ['M11.5 20.5v-16h7v16z'],
   },
   contratos: {
     trazos: [
@@ -42,19 +38,11 @@ export const TRAZOS_ICONOS = {
       'M9 11.5h4.5',
       'M9 16.6c.8-1.5 1.6-1.6 2.1-.3.5 1.3 1.3 1.3 2.1 0 .4-.6.9-.7 1.4-.1',
     ],
-    relleno: [
-      'M13.5 3.5H8a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8z',
-    ],
+    relleno: ['M13.5 3.5H8a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8z'],
   },
   pagos: {
-    trazos: [
-      'M20.5 12a8.5 8.5 0 1 1-5-7.75',
-      'M20.5 3.5l-6 6',
-      'M14.5 5.6v3.9h3.9',
-    ],
-    relleno: [
-      'M3.5 12a8.5 8.5 0 1 0 17 0a8.5 8.5 0 1 0 -17 0',
-    ],
+    trazos: ['M20.5 12a8.5 8.5 0 1 1-5-7.75', 'M20.5 3.5l-6 6', 'M14.5 5.6v3.9h3.9'],
+    relleno: ['M3.5 12a8.5 8.5 0 1 0 17 0a8.5 8.5 0 1 0 -17 0'],
   },
   mas: {
     trazos: [
@@ -75,14 +63,19 @@ export const TRAZOS_ICONOS = {
       'M9 11.5h6',
       'M9 15h3.5',
     ],
-    relleno: [
-      'M6 3.5h12v17l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4z',
-    ],
+    relleno: ['M6 3.5h12v17l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4z'],
   },
   camara: {
     trazos: [
       'M4 9a2 2 0 0 1 2-2h1.8l1.4-2.3h5.6L16.2 7H18a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z',
       'M8.7 13a3.3 3.3 0 1 0 6.6 0a3.3 3.3 0 1 0 -6.6 0',
+    ],
+  },
+  // R4-C (a8): video propio (adjunto de mantenimiento), distinto de la cámara de fotos.
+  video: {
+    trazos: [
+      'M4 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z',
+      'M16 10.5l4-2.5v8l-4-2.5',
     ],
   },
   documento: {
@@ -94,11 +87,7 @@ export const TRAZOS_ICONOS = {
     ],
   },
   descarga: {
-    trazos: [
-      'M12 4v10.5',
-      'M8 10.5l4 4 4-4',
-      'M5 16v1.5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V16',
-    ],
+    trazos: ['M12 4v10.5', 'M8 10.5l4 4 4-4', 'M5 16v1.5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V16'],
   },
   compartir: {
     trazos: [
@@ -119,13 +108,8 @@ export const TRAZOS_ICONOS = {
     ],
   },
   alerta: {
-    trazos: [
-      'M6.5 16.5v-5a5.5 5.5 0 0 1 11 0v5l1.5 1.5h-14z',
-      'M10.2 20.5h3.6',
-    ],
-    relleno: [
-      'M6.5 16.5v-5a5.5 5.5 0 0 1 11 0v5l1.5 1.5h-14z',
-    ],
+    trazos: ['M6.5 16.5v-5a5.5 5.5 0 0 1 11 0v5l1.5 1.5h-14z', 'M10.2 20.5h3.6'],
+    relleno: ['M6.5 16.5v-5a5.5 5.5 0 0 1 11 0v5l1.5 1.5h-14z'],
   },
   calendario: {
     trazos: [
@@ -135,9 +119,7 @@ export const TRAZOS_ICONOS = {
       'M15.5 3.5V7',
       'M14.4 15a1.1 1.1 0 1 0 2.2 0a1.1 1.1 0 1 0 -2.2 0',
     ],
-    relleno: [
-      'M4 8.5a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3V10H4z',
-    ],
+    relleno: ['M4 8.5a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3V10H4z'],
   },
   filtro: {
     trazos: [
@@ -153,32 +135,19 @@ export const TRAZOS_ICONOS = {
     ],
   },
   atras: {
-    trazos: [
-      'M14.5 5.5L8 12l6.5 6.5',
-    ],
+    trazos: ['M14.5 5.5L8 12l6.5 6.5'],
   },
   buscar: {
-    trazos: [
-      'M4.2 10.5a6.3 6.3 0 1 0 12.6 0a6.3 6.3 0 1 0 -12.6 0',
-      'M15.2 15.2L20 20',
-    ],
+    trazos: ['M4.2 10.5a6.3 6.3 0 1 0 12.6 0a6.3 6.3 0 1 0 -12.6 0', 'M15.2 15.2L20 20'],
   },
   aprobar: {
-    trazos: [
-      'M5 12.5l4.5 4.5L19 7.5',
-    ],
+    trazos: ['M5 12.5l4.5 4.5L19 7.5'],
   },
   rechazar: {
-    trazos: [
-      'M7 7l10 10',
-      'M17 7L7 17',
-    ],
+    trazos: ['M7 7l10 10', 'M17 7L7 17'],
   },
   anadir: {
-    trazos: [
-      'M12 5v14',
-      'M5 12h14',
-    ],
+    trazos: ['M12 5v14', 'M5 12h14'],
   },
   perfil: {
     trazos: [

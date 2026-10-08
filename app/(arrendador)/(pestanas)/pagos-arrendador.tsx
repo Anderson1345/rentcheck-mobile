@@ -5,13 +5,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CabeceraTinta, ContenidoBajoCabecera, TituloCabecera } from '@/componentes/CabeceraTinta';
 import { ColaPagos } from '@/componentes/pagos/ColaPagos';
+import { usePagos } from '@/consultas/pagos';
 import { colores, espaciado } from '@/tema';
 
-// Cola de validación del arrendador: los pagos que reportan sus inquilinos, por estado.
+// Cola de validación del arrendador: los pagos que reportan sus inquilinos, por estado. R4-C: la
+// cabecera dice cuántos hay por validar (la misma consulta del segmento "En revisión").
 export default function PagosArrendador() {
   const cliente = useQueryClient();
   const { bottom } = useSafeAreaInsets();
   const [refrescando, setRefrescando] = useState(false);
+  const pendientes = usePagos('PENDIENTE');
 
   async function arrastrar() {
     setRefrescando(true);
@@ -25,7 +28,12 @@ export default function PagosArrendador() {
   return (
     <View style={estilos.pantalla}>
       <CabeceraTinta conSolapa>
-        <TituloCabecera titulo="Pagos" />
+        <TituloCabecera
+          titulo="Pagos"
+          subtitulo={
+            pendientes.data !== undefined ? `${pendientes.data.length} por validar` : undefined
+          }
+        />
       </CabeceraTinta>
       <ContenidoBajoCabecera style={estilos.cuerpo}>
         <ScrollView

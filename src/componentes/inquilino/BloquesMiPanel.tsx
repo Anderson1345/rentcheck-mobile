@@ -365,7 +365,7 @@ export function TuContrato({
 
 /**
  * Miniatura de la foto adjunta (Mi panel y la lista de Solicitudes); si la URL firmada ya no sirve, el
- * icono (no se guarda la URL). Un video no tiene miniatura: el icono de cámara lo anuncia.
+ * icono (no se guarda la URL). Un video no tiene miniatura: su icono propio lo anuncia (R4-C, a8).
  */
 export function MiniaturaSolicitud({ solicitud }: { solicitud: SolicitudInquilino }) {
   const [fallida, setFallida] = useState(false);
@@ -378,7 +378,7 @@ export function MiniaturaSolicitud({ solicitud }: { solicitud: SolicitudInquilin
         accessibilityLabel={video ? 'Tiene video' : undefined}
         style={[estilos.miniatura, estilos.sinFoto]}
       >
-        <Icono nombre={video ? 'camara' : 'mantenimiento'} tamano={22} grosor={1.7} />
+        <Icono nombre={video ? 'video' : 'mantenimiento'} tamano={22} grosor={1.7} />
       </View>
     );
   }
